@@ -205,6 +205,8 @@ class ServerTrustManager implements X509TrustManager {
             throws CertificateExceptionDetail {
 
         int nSize = x509Certificates.length;
+        if(nSize == 0)
+            throw new CertificateExceptionDetail(x509Certificates, "No peer certificates received");
 
         List<String> peerIdentities = getPeerIdentity(x509Certificates[0]);
 
@@ -239,6 +241,11 @@ class ServerTrustManager implements X509TrustManager {
         }
 
         if (configuration.isVerifyRootCAEnabled()) {
+            // If we couldn't find root certificates, then assume all connections are
+            // insecure.
+            if(trustStore == null)
+                throw new CertificateExceptionDetail(x509Certificates, "Couldn't load root certificates");
+
             // Verify that the the last certificate in the chain was issued
             // by a third-party that the client trusts.
             boolean trusted = false;
