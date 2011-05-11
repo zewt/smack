@@ -95,10 +95,39 @@ class ServerTrustManager implements X509TrustManager {
         throw new IOException("No truststore path located");
     }
 
-    private static KeyStore getKeyStore(String path, String type, String password)
+    /* Loading the keystore can take some time (almost a second) on slower systems,
+     * so load it the first time we need it and then cache it.  The keystore we load
+     * depends on the configuration. */
+    private static class KeyStoreCacheParams {
+        public String path, type, password;
+        public boolean equals(Object rhs) {
+            if(!(rhs instanceof KeyStoreCacheParams))
+                return false;
+            KeyStoreCacheParams rhsParams = (KeyStoreCacheParams) rhs;
+            return path == rhsParams.path && type == rhsParams.type && password == rhsParams.password;
+        }
+        public int hashCode() {
+            int hash = 0;
+            if(path != null)            hash += path.hashCode();
+            if(type != null)            hash += type.hashCode();
+            if(password != null)        hash += password.hashCode();
+            return hash;
+        }
+    };
+    private static HashMap<KeyStoreCacheParams, KeyStore> trustStoreCache = new HashMap<KeyStoreCacheParams, KeyStore>();
+
+    /** Load a KeyStore of root certificates from disk, caching the result. */
+    private static synchronized KeyStore getKeyStore(String path, String type, String password)
     throws Exception
     {
-        KeyStore trustStore;
+        KeyStoreCacheParams params = new KeyStoreCacheParams();
+        params.path = path;
+        params.type = type;
+        params.password = password;
+        KeyStore trustStore = trustStoreCache.get(params);
+        if(trustStore != null)
+            return trustStore;
+
         InputStream in = null;
         try {
             in = new BufferedInputStream(getTruststoreStream(path));
@@ -115,6 +144,7 @@ class ServerTrustManager implements X509TrustManager {
             }
         }
 
+        trustStoreCache.put(params, trustStore);
         return trustStore;
     }
 
