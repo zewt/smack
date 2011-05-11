@@ -263,7 +263,9 @@ class ServerTrustManager implements X509TrustManager {
                 }
             }
             catch (KeyStoreException e) {
-                e.printStackTrace();
+                // KeyStoreException is thrown if the KeyStore isn't initialized.  We've
+                // initialized it, so this is a runtime error.
+                throw new RuntimeException(e);
             }
             if (!trusted) {
                 throw new CertificateExceptionDetail(x509Certificates,
