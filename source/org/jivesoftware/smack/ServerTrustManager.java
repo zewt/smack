@@ -61,6 +61,7 @@ class ServerTrustManager implements X509TrustManager {
         try {
             trustStore = getKeyStore(configuration.getTruststorePath(), configuration.getTruststoreType(), configuration.getTruststorePassword());
         }
+        catch (RuntimeException e) { throw e; } // don't catch unchecked exceptions below
         catch (Exception e) {
             e.printStackTrace();
             // Disable root CA checking
