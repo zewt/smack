@@ -28,6 +28,9 @@ import org.jivesoftware.smack.provider.ProviderManager;
 import org.jivesoftware.smack.sasl.SASLMechanism.Failure;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.w3c.dom.Text;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -838,6 +841,34 @@ public class PacketParserUtils {
             }
         }
         return object;
+    }
+
+    /**
+     * Implement Node.getTextContent(), which isn't available in DOM Level 2.
+     */
+    public static String getTextContent(Node node) {
+        String result = "";
+        if(node instanceof Text)
+            result = ((Text) node).getData();
+
+        for (Node child = node.getFirstChild(); child != null; child = child.getNextSibling())
+            result += getTextContent(child);
+
+        return result;
+    }
+
+    /**
+     * Return an iterable Collection<Node> of the children of the specified
+     * node.
+     * @param parent The parent node.
+     * @return A collection of child nodes.
+     */
+    public static Collection<Node> getChildNodes(Node node) {
+        NodeList children = node.getChildNodes();
+        ArrayList<Node> result = new ArrayList<Node>(children.getLength());
+        for(int i = 0; i < children.getLength(); ++i)
+            result.add(children.item(i));
+        return result;
     }
 
     /**
