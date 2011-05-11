@@ -741,6 +741,7 @@ public abstract class Connection {
                     // Ignore.
                 }
                 debuggers.add("org.jivesoftware.smackx.debugger.EnhancedDebugger");
+                debuggers.add("org.jivesoftware.smackx.debugger.AndroidDebugger");
                 debuggers.add("org.jivesoftware.smack.debugger.LiteDebugger");
                 for (String debuggerName: debuggers) {
                     try {
