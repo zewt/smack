@@ -487,6 +487,11 @@ public class XMPPConnection extends Connection {
         removePacketSendingListener(packetListener);
     }
 
+    /**
+     * Initializes the connection, opening an XMPP stream to the server.
+     *
+     * @throws XMPPException if establishing a connection to the server fails.
+     */
     private void connectUsingConfiguration(ConnectionConfiguration config) throws XMPPException {
         URI boshURI = config.getBoshURI();
         if(boshURI != null)
@@ -498,16 +503,6 @@ public class XMPPConnection extends Connection {
         if (config.isDebuggerEnabled())
             initDebugger();
 
-        initConnection();
-    }
-
-    /**
-     * Initializes the connection by creating a packet reader and writer and opening a
-     * XMPP stream to the server.
-     *
-     * @throws XMPPException if establishing a connection to the server fails.
-     */
-    private void initConnection() throws XMPPException {
         boolean isFirstInitialization = packetReader == null || packetWriter == null;
 
         try {
