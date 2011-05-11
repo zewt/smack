@@ -22,18 +22,28 @@ package org.jivesoftware.smack;
 
 import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.net.InetAddress;
+import java.net.Socket;
+import java.net.UnknownHostException;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.Provider;
 import java.security.SecureRandom;
 import java.security.Security;
+import java.util.WeakHashMap;
 
+import javax.net.ssl.HandshakeCompletedEvent;
+import javax.net.ssl.HandshakeCompletedListener;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 
@@ -42,18 +52,114 @@ import org.apache.harmony.javax.security.auth.callback.PasswordCallback;
 
 /**
  * An SSLSocketFactory with associated ServerTrustManager.  This allows verifying
- * certificates and retrieving details about certificate failures.
+ * certificates and retrieving details about certificate failures.  We also enable
+ * support for TLS compression here, if support is available. 
  */
 public class XMPPSSLSocketFactory {
-    private SSLSocketFactory socketFactory;
+    private WrappedSocketFactory socketFactory;
 
     public SSLSocketFactory getSocketFactory() { return socketFactory; }
 
-    /** If at least one insecure connection has been created with this factory,
-     * return a CertificateExceptionDetail.  If all connections have been secure,
-     * return null. */
-    public ServerTrustManager.CertificateExceptionDetail getSeenInsecureConnection() { return seenInsecureConnection; } 
-    public ServerTrustManager.CertificateExceptionDetail seenInsecureConnection = null;
+    /** Store information about each socket connection.  There's no good way to wrap
+     *  an SSLSocket that another class gives to us, so we store these in a WeakHashMap. */
+    private class SSLSocketInfo { 
+        // If compression is enabled, this contains the compression method used.  If compression
+        // is not enabled, this is null.
+        String compressionMethod;
+    };
+    public WeakHashMap<SSLSocket, SSLSocketInfo> map = new WeakHashMap<SSLSocket, SSLSocketInfo>();
+
+    /* A SocketFactory that initializes its returned sockets with our TrustManager. */
+    private class WrappedSocketFactory extends SSLSocketFactory {
+        SSLSocketFactory wrapped;
+
+        WrappedSocketFactory(SSLSocketFactory factory) {
+            this.wrapped = factory;
+        }
+
+        public Socket createSocket() throws IOException {
+            return initSocket(wrapped.createSocket());
+        }
+
+        public Socket createSocket(String host, int port)
+        throws IOException, UnknownHostException {
+            return initSocket(wrapped.createSocket(host, port));
+        }
+
+        public Socket createSocket(String host, int port, InetAddress localHost, int localPort)
+        throws IOException, UnknownHostException {
+            return initSocket(wrapped.createSocket(host, port, localHost, localPort));
+        }
+
+        public Socket createSocket(Socket s, String host, int port, boolean autoClose) throws IOException {
+            return initSocket(wrapped.createSocket(s, host, port, autoClose));
+        }
+
+        // These two calls aren't told the remote host's name, so it's not possible to check
+        // certificates.
+        public Socket createSocket(InetAddress host, int port) throws IOException {
+            return initSocket(wrapped.createSocket(host, port));
+        }
+
+        public Socket createSocket(InetAddress address, int port,
+                InetAddress localAddress, int localPort) throws IOException {
+            return initSocket(wrapped.createSocket(address, port, localAddress, localPort));
+        }
+
+        public String[] getDefaultCipherSuites() { return wrapped.getDefaultCipherSuites(); }
+        public String[] getSupportedCipherSuites() { return wrapped.getSupportedCipherSuites(); }
+
+        // If host is null, we're connecting directly to an IP address.  We won't be able
+        // to verify the host certificate.
+        private SSLSocket initSocket(Socket socket) {
+            SSLSocket sslSocket = (SSLSocket) socket;
+
+            SSLSocketInfo info = new SSLSocketInfo();
+            map.put(sslSocket, info);
+
+            sslSocket.addHandshakeCompletedListener(new HandshakeCompletedListener() {
+                public void handshakeCompleted(HandshakeCompletedEvent event) {
+                    SSLSocket socket = (SSLSocket) event.getSocket();
+                    SSLSocketInfo info = map.get(socket);
+
+                    info.compressionMethod = getCompressionMethod(socket);
+                }
+            });
+
+            initCompression(sslSocket);
+
+            return sslSocket;
+        }
+
+        /** Attempt to request compression on the given socket, if supported by the implementation.
+         *  This is supported by org.apache.harmony.xnet.provider.jsse. */
+        private void initCompression(SSLSocket socket)
+        {
+            try {
+                Method getSupportedCompressionMethods = socket.getClass().getMethod("getSupportedCompressionMethods");
+                Method setEnabledCompressionMethods = socket.getClass().getMethod("setEnabledCompressionMethods", String[].class);
+
+                String[] compressionMethods = (String[]) getSupportedCompressionMethods.invoke(socket);
+                setEnabledCompressionMethods.invoke(socket, (Object) compressionMethods);
+            } catch (Exception e) {
+            }
+        }
+
+        /** Return the name of the compression method in use on a socket, or null if none is active. */
+        private String getCompressionMethod(SSLSocket socket) {
+            try {
+                SSLSession session = socket.getSession();
+                Method getCompressionMethod = session.getClass().getMethod("getCompressionMethod");
+                String compressionMethod = (String) getCompressionMethod.invoke(session);
+                if(compressionMethod != null && compressionMethod.equals("NULL"))
+                    return null;
+                else
+                    return compressionMethod;
+            } catch (Exception e) {
+                return null;
+            }
+        }
+    };
 
     XMPPSSLSocketFactory(ConnectionConfiguration config, String originalServiceName)
     throws XMPPException
@@ -71,12 +177,19 @@ public class XMPPSSLSocketFactory {
 
         getServerTrustManager(context, config, originalServiceName);
 
-        socketFactory = context.getSocketFactory();
+        SSLSocketFactory factory = context.getSocketFactory();
+        socketFactory = new WrappedSocketFactory(factory);
     }
 
     /** @return true if TLS is available. */
     public boolean isAvailable() {
         return socketFactory != null;
+    }
+
+    /** Return the name of the compression in use on the specified socket, or null if no
+     * compression is active. */
+    public String getCompressionMethod(SSLSocket socket) {
+        return map.get(socket).compressionMethod;
     }
 
     private static KeyManager[] createKeyManagers(ConnectionConfiguration config)

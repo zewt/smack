@@ -26,21 +26,13 @@ import org.jivesoftware.smack.packet.Presence;
 import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.util.StringUtils;
 
-import javax.net.ssl.KeyManager;
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
-import org.apache.harmony.javax.security.auth.callback.Callback;
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
-import org.apache.harmony.javax.security.auth.callback.PasswordCallback;
 import java.io.*;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.net.Socket;
 import java.net.UnknownHostException;
-import java.security.KeyStore;
-import java.security.Provider;
-import java.security.Security;
 import java.util.Collection;
 
 /**
@@ -86,6 +78,8 @@ public class XMPPConnection extends Connection {
      */
     private boolean usingCompression;
 
+    /* True if TLS compression is enabled. */
+    private boolean usingTLSCompression = false;    
 
     /**
      * Creates a new connection to the specified XMPP server. A DNS SRV lookup will be
@@ -226,7 +220,7 @@ public class XMPPConnection extends Connection {
         }
 
         // If compression is enabled then request the server to use stream compression
-        if (config.isCompressionEnabled()) {
+        if (config.isCompressionEnabled() && !usingTLSCompression) {
             useCompression();
         }
 
@@ -731,11 +725,11 @@ public class XMPPConnection extends Connection {
         Socket plain = socket;
 
         // Secure the plain connection
-        XMPPSSLSocketFactory sf = new XMPPSSLSocketFactory(config, getServiceName());
-        if(sf.isAvailable())
+        XMPPSSLSocketFactory sslSocketFactory = new XMPPSSLSocketFactory(config, getServiceName());
+        if(sslSocketFactory.isAvailable())
             throw new XMPPException("TLS is not available");
 
-        socket = sf.getSocketFactory().createSocket(plain,
+        socket = sslSocketFactory.getSocketFactory().createSocket(plain,
                 plain.getInetAddress().getHostName(), plain.getPort(), true);
         socket.setSoTimeout(0);
         socket.setKeepAlive(true);
@@ -743,6 +737,12 @@ public class XMPPConnection extends Connection {
         initReaderAndWriter();
         // Proceed to do the handshake
         ((SSLSocket) socket).startHandshake();
+
+        // Record if TLS compression is active, so we won't try to negotiate XMPP
+        // compression too.
+        if(sslSocketFactory.getCompressionMethod((SSLSocket) socket) != null)
+            usingTLSCompression = true;
+        
         //if (((SSLSocket) socket).getWantClientAuth()) {
         //    System.err.println("Connection wants client auth");
         //}
@@ -781,7 +781,7 @@ public class XMPPConnection extends Connection {
     }
 
     public boolean isUsingCompression() {
-        return usingCompression;
+        return usingCompression || usingTLSCompression;
     }
 
     /**
