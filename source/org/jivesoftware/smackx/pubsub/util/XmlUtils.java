@@ -15,12 +15,6 @@ package org.jivesoftware.smackx.pubsub.util;
 
 import java.io.StringReader;
 
-import javax.xml.transform.OutputKeys;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.stream.StreamResult;
-import javax.xml.transform.stream.StreamSource;
-
 /**
  * Simple utility for pretty printing xml.
  * 
@@ -28,32 +22,6 @@ import javax.xml.transform.stream.StreamSource;
  */
 public class XmlUtils
 {
-	/**
-	 * 
-	 * @param header Just a title for the stanza for readability.  Single word no spaces since
-	 * it is inserted as the root element in the output.
-	 * @param xml The string to pretty print
-	 */
-	static public void prettyPrint(String header, String xml)
-	{
-		try
-		{
-			Transformer transformer = TransformerFactory.newInstance().newTransformer();
-			transformer.setOutputProperty(OutputKeys.INDENT, "yes");
-			transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "3");
-
-			if (header != null)
-			{
-				xml = "\n<" + header + ">" + xml + "</" + header + '>';
-			}
-			transformer.transform(new StreamSource(new StringReader(xml)), new StreamResult(System.out));
-		}
-		catch (Exception e)
-		{
-			System.out.println("Something wrong with xml in \n---------------\n" + xml + "\n---------------");
-			e.printStackTrace();
-		}
-	}
 
 	static public void appendAttribute(StringBuilder builder, String att, String value)
 	{
