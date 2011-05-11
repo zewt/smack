@@ -27,6 +27,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
+import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -728,50 +729,38 @@ public abstract class Connection {
         if (config.isDebuggerEnabled()) {
             if (debugger == null) {
                 // Detect the debugger class to use.
-                String className = null;
                 // Use try block since we may not have permission to get a system
                 // property (for example, when an applet).
+                Vector<String> debuggers = new Vector<String>();
+                String requestedDebugger = null;
                 try {
-                    className = System.getProperty("smack.debuggerClass");
+                    requestedDebugger = System.getProperty("smack.debuggerClass");
+                    debuggers.add(requestedDebugger);
                 }
                 catch (Throwable t) {
                     // Ignore.
                 }
-                Class<?> debuggerClass = null;
-                if (className != null) {
+                debuggers.add("org.jivesoftware.smackx.debugger.EnhancedDebugger");
+                debuggers.add("org.jivesoftware.smack.debugger.LiteDebugger");
+                for (String debuggerName: debuggers) {
                     try {
-                        debuggerClass = Class.forName(className);
+                        Class<?> debuggerClass = Class.forName(debuggerName);
+
+                        // Attempt to create an instance of this debugger.
+                        Constructor<?> constructor = debuggerClass
+                                .getConstructor(Connection.class, Writer.class, Reader.class);
+                        debugger = (SmackDebugger) constructor.newInstance(this, writer, reader);
                     }
                     catch (Exception e) {
-                        e.printStackTrace();
+                        if(requestedDebugger != null && requestedDebugger.equals(debuggerName))
+                            e.printStackTrace();
+                        continue;
                     }
                 }
-                if (debuggerClass == null) {
-                    try {
-                        debuggerClass =
-                                Class.forName("org.jivesoftware.smackx.debugger.EnhancedDebugger");
-                    }
-                    catch (Exception ex) {
-                        try {
-                            debuggerClass =
-                                    Class.forName("org.jivesoftware.smack.debugger.LiteDebugger");
-                        }
-                        catch (Exception ex2) {
-                            ex2.printStackTrace();
-                        }
-                    }
-                }
-                // Create a new debugger instance. If an exception occurs then disable the debugging
-                // option
-                try {
-                    Constructor<?> constructor = debuggerClass
-                            .getConstructor(Connection.class, Writer.class, Reader.class);
-                    debugger = (SmackDebugger) constructor.newInstance(this, writer, reader);
+
+                if(debugger != null) {
                     reader = debugger.getReader();
                     writer = debugger.getWriter();
-                }
-                catch (Exception e) {
-                    throw new IllegalArgumentException("Can't initialize the configured debugger!", e);
                 }
             }
             else {
