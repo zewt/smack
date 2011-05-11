@@ -502,52 +502,6 @@ public class XMPPConnection extends Connection {
     }
 
     /**
-     * Initialize the {@link #debugger}. You can specify a customized {@link SmackDebugger}
-     * by setup the system property <code>smack.debuggerClass</code> to the implementation.
-     *
-     * @throws IllegalStateException if the reader or writer isn't yet initialized.
-     * @throws IllegalArgumentException if the SmackDebugger can't be loaded.
-     */
-    private void initDebugger() {
-        // If debugging is enabled, we open a window and write out all network traffic.
-        if (debugger != null)
-            return;
-
-        // Detect the debugger class to use.
-        // Use try block since we may not have permission to get a system
-        // property (for example, when an applet).
-        Vector<String> debuggers = new Vector<String>();
-        String requestedDebugger = null;
-        try {
-            requestedDebugger = System.getProperty("smack.debuggerClass");
-            debuggers.add(requestedDebugger);
-        }
-        catch (Throwable t) {
-            // Ignore.
-        }
-        debuggers.add("org.jivesoftware.smackx.debugger.EnhancedDebugger");
-        debuggers.add("org.jivesoftware.smackx.debugger.AndroidDebugger");
-        debuggers.add("org.jivesoftware.smack.debugger.LiteDebugger");
-        for (String debuggerName: debuggers) {
-            try {
-                Class<?> debuggerClass = Class.forName(debuggerName);
-
-                // Attempt to create an instance of this debugger.
-                Constructor<?> constructor = debuggerClass
-                        .getConstructor(Connection.class, ObservableWriter.class, ObservableReader.class);
-                debugger = (SmackDebugger) constructor.newInstance(this,
-                        data_stream.getObservableWriter(), data_stream.getObservableReader());
-                break;
-            }
-            catch (Exception e) {
-                if(requestedDebugger != null && requestedDebugger.equals(debuggerName))
-                    e.printStackTrace();
-                continue;
-            }
-        }
-    }
-
-    /**
      * Initializes the connection by creating a packet reader and writer and opening a
      * XMPP stream to the server.
      *
@@ -600,6 +554,52 @@ public class XMPPConnection extends Connection {
             // readers and writers and close the socket.
             cleanup();
             throw ex;        // Everything stoppped. Now throw the exception.
+        }
+    }
+
+    /**
+     * Initialize the {@link #debugger}. You can specify a customized {@link SmackDebugger}
+     * by setup the system property <code>smack.debuggerClass</code> to the implementation.
+     *
+     * @throws IllegalStateException if the reader or writer isn't yet initialized.
+     * @throws IllegalArgumentException if the SmackDebugger can't be loaded.
+     */
+    private void initDebugger() {
+        // If debugging is enabled, we open a window and write out all network traffic.
+        if (debugger != null)
+            return;
+
+        // Detect the debugger class to use.
+        // Use try block since we may not have permission to get a system
+        // property (for example, when an applet).
+        Vector<String> debuggers = new Vector<String>();
+        String requestedDebugger = null;
+        try {
+            requestedDebugger = System.getProperty("smack.debuggerClass");
+            debuggers.add(requestedDebugger);
+        }
+        catch (Throwable t) {
+            // Ignore.
+        }
+        debuggers.add("org.jivesoftware.smackx.debugger.EnhancedDebugger");
+        debuggers.add("org.jivesoftware.smackx.debugger.AndroidDebugger");
+        debuggers.add("org.jivesoftware.smack.debugger.LiteDebugger");
+        for (String debuggerName: debuggers) {
+            try {
+                Class<?> debuggerClass = Class.forName(debuggerName);
+
+                // Attempt to create an instance of this debugger.
+                Constructor<?> constructor = debuggerClass
+                        .getConstructor(Connection.class, ObservableWriter.class, ObservableReader.class);
+                debugger = (SmackDebugger) constructor.newInstance(this,
+                        data_stream.getObservableWriter(), data_stream.getObservableReader());
+                break;
+            }
+            catch (Exception e) {
+                if(requestedDebugger != null && requestedDebugger.equals(debuggerName))
+                    e.printStackTrace();
+                continue;
+            }
         }
     }
 
