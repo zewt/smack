@@ -238,6 +238,12 @@ public class ConnectionConfiguration implements Cloneable {
     }
 
     /**
+     * Return the configured proxy settings.
+     * @return {@link ProxyInfo}
+     */
+    public ProxyInfo getProxyInfo() { return proxy; }
+
+    /**
      * Returns the TLS security mode used when making the connection. By default,
      * the mode is {@link SecurityMode#enabled}.
      *
