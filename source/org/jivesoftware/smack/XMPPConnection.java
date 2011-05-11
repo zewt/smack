@@ -949,7 +949,7 @@ public class XMPPConnection extends Connection {
      *      appropiate error messages to end-users.
      */
     public void connect() throws XMPPException {
-        // Stablishes the connection, readers and writers
+        // Establishes the connection, readers and writers
         connectUsingConfiguration(config);
         // Automatically makes the login if the user was previouslly connected successfully
         // to the server and the connection was terminated abruptly
