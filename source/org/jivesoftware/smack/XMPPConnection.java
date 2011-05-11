@@ -29,15 +29,10 @@ import org.jivesoftware.smack.util.StringUtils;
 import org.jivesoftware.smack.util.ObservableReader;
 import org.jivesoftware.smack.util.ObservableWriter;
 
-import javax.net.ssl.SSLSocket;
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
-import java.io.*;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
-import java.net.Socket;
-import java.net.UnknownHostException;
-import java.util.Collection;
 import java.util.Vector;
+import org.w3c.dom.Element;
 
 /**
  * Creates a socket connection to a XMPP server. This is the default connection
@@ -47,13 +42,11 @@ import java.util.Vector;
  * @author Matt Tucker
  */
 public class XMPPConnection extends Connection {
-
     /**
-     * The socket which is used for this connection.
+     * The XMPPStream used for this connection.
      */
-    Socket socket;
+    XMPPStream data_stream = null;
 
-    String connectionID = null;
     private String user = null;
     private boolean connected = false;
     /**
@@ -66,35 +59,18 @@ public class XMPPConnection extends Connection {
      */
     private boolean wasAuthenticated = false;
     private boolean anonymous = false;
-    private boolean usingTLS = false;
 
-    PacketWriter packetWriter;
-    PacketReader packetReader;
-    private ObservableReader obsReader;
-    private ObservableWriter obsWriter;
+    private boolean suppressConnectionErrors;
+
+    Element readPacket() throws InterruptedException, XMPPException { return data_stream.readPacket(); }
+    
+    private PacketWriter packetWriter;
+    private PacketReader packetReader;
 
     /** The SmackDebugger allows to log and debug XML traffic. */
     protected SmackDebugger debugger = null;
 
-    /** The low-level Reader stream. */
-    protected Reader reader;
-
-    /** The low-level Writer stream. */
-    protected Writer writer;
-
     Roster roster = null;
-
-    /**
-     * Collection of available stream compression methods offered by the server.
-     */
-    private Collection<String> compressionMethods;
-    /**
-     * Flag that indicates if stream compression is actually in use.
-     */
-    private boolean usingCompression;
-
-    /* True if TLS compression is enabled. */
-    private boolean usingTLSCompression = false;    
 
     /**
      * Creates a new connection to the specified XMPP server. A DNS SRV lookup will be
@@ -125,8 +101,6 @@ public class XMPPConnection extends Connection {
         config.setSASLAuthenticationEnabled(true);
         config.setDebuggerEnabled(DEBUG_ENABLED);
         config.setCallbackHandler(callbackHandler);
-        obsReader = new ObservableReader(null);
-        obsWriter = new ObservableWriter(null);
     }
 
     /**
@@ -143,8 +117,6 @@ public class XMPPConnection extends Connection {
         config.setCompressionEnabled(false);
         config.setSASLAuthenticationEnabled(true);
         config.setDebuggerEnabled(DEBUG_ENABLED);
-        obsReader = new ObservableReader(null);
-        obsWriter = new ObservableWriter(null);
     }
 
     /**
@@ -158,8 +130,6 @@ public class XMPPConnection extends Connection {
      */
     public XMPPConnection(ConnectionConfiguration config) {
         super(config);
-        obsReader = new ObservableReader(null);
-        obsWriter = new ObservableWriter(null);
     }
 
     /**
@@ -183,15 +153,13 @@ public class XMPPConnection extends Connection {
     public XMPPConnection(ConnectionConfiguration config, CallbackHandler callbackHandler) {
         super(config);
         config.setCallbackHandler(callbackHandler);
-        obsReader = new ObservableReader(null);
-        obsWriter = new ObservableWriter(null);
     }
 
     public String getConnectionID() {
         if (!isConnected()) {
             return null;
         }
-        return connectionID;
+        return data_stream.getConnectionID();
     }
 
     public String getUser() {
@@ -242,11 +210,6 @@ public class XMPPConnection extends Connection {
             }
         }
 
-        // If compression is enabled then request the server to use stream compression
-        if (config.isCompressionEnabled() && !usingTLSCompression) {
-            useCompression();
-        }
-
         // Indicate that we're now authenticated.
         authenticated = true;
         anonymous = false;
@@ -269,9 +232,7 @@ public class XMPPConnection extends Connection {
 
         // If debugging is enabled, change the the debug window title to include the
         // name we are now logged-in as.
-        // If DEBUG_ENABLED was set to true AFTER the connection was created the debugger
-        // will be null
-        if (config.isDebuggerEnabled() && debugger != null) {
+        if (debugger != null) {
             debugger.userHasLogged(user);
         }
     }
@@ -300,11 +261,6 @@ public class XMPPConnection extends Connection {
         // Update the serviceName with the one returned by the server
         config.setServiceName(StringUtils.parseServer(response));
 
-        // If compression is enabled then request the server to use stream compression
-        if (config.isCompressionEnabled()) {
-            useCompression();
-        }
-
         // Set presence to online.
         packetWriter.sendPacket(new Presence(Presence.Type.available));
 
@@ -314,9 +270,7 @@ public class XMPPConnection extends Connection {
 
         // If debugging is enabled, change the the debug window title to include the
         // name we are now logged-in as.
-        // If DEBUG_ENABLED was set to true AFTER the connection was created the debugger
-        // will be null
-        if (config.isDebuggerEnabled() && debugger != null) {
+        if (debugger != null) {
             debugger.userHasLogged(user);
         }
     }
@@ -372,7 +326,7 @@ public class XMPPConnection extends Connection {
     }
 
     public boolean isSecureConnection() {
-        return isUsingTLS();
+        return this.data_stream != null && this.data_stream.isSecureConnection();
     }
 
     public boolean isAuthenticated() {
@@ -394,44 +348,45 @@ public class XMPPConnection extends Connection {
      */
     protected void shutdown(Presence unavailablePresence) {
         // Set presence to offline.
-        packetWriter.sendPacket(unavailablePresence);
+        if(unavailablePresence != null)
+            packetWriter.sendPacket(unavailablePresence);
+
+        data_stream.disconnect();
+        packetReader.shutdown();
+        packetWriter.shutdown();
+
+        saslAuthentication.init();
 
         this.setWasAuthenticated(authenticated);
         authenticated = false;
         connected = false;
+    }
 
-        packetReader.shutdown();
-        packetWriter.shutdown();
-        // Wait 150 ms for processes to clean-up, then shutdown.
-        try {
-            Thread.sleep(150);
-        }
-        catch (Exception e) {
-            // Ignore.
-        }
+    /** Close the stream and shut down the packet reader and writer threads. */
+    // XXX: This is only called from initConnection.  Merge this code path.
+    private void cleanup() {
+        // Disconnect the data stream, to ensure packetReader receives EOF and its reader
+        // thread shuts down promptly.
+        data_stream.disconnect();
 
-        // Close down the readers and writers.
-        if (reader != null) {
-            try {
-                reader.close();
-            }
-            catch (Throwable ignore) { /* ignore */ }
-            reader = null;
-        }
-        if (writer != null) {
-            try {
-                writer.close();
-            }
-            catch (Throwable ignore) { /* ignore */ }
-            writer = null;
+        if(packetReader != null) {
+            packetReader.shutdown();
+            packetReader.cleanup();
+            packetReader = null;
         }
 
-        try {
-            socket.close();
+        if(packetWriter != null) {
+            packetWriter.shutdown();
+            packetWriter.cleanup();
+            packetWriter = null;
         }
-        catch (Exception e) {
-            // Ignore.
-        }
+
+        // packetReader and packetWriter are gone, so we can safely clear data_stream.
+        data_stream = null;
+        
+        this.setWasAuthenticated(authenticated);
+        authenticated = false;
+        connected = false;
 
         saslAuthentication.init();
     }
@@ -442,6 +397,10 @@ public class XMPPConnection extends Connection {
             return;
         }
 
+        // Shutting down will cause I/O exceptions in the reader and writer threads;
+        // suppress them.
+        suppressConnectionErrors = true;
+
         shutdown(unavailablePresence);
 
         if (roster != null) {
@@ -449,12 +408,17 @@ public class XMPPConnection extends Connection {
             roster = null;
         }
 
-        wasAuthenticated = false;
-
+        // These will block until the threads are completely shut down.  This should happen
+        // immediately, due to shutdown() calling data_stream.disconnect().
         packetWriter.cleanup();
         packetWriter = null;
         packetReader.cleanup();
         packetReader = null;
+
+        wasAuthenticated = false;
+        suppressConnectionErrors = false;
+
+        notifyConnectionClosed();
     }
 
     public void sendPacket(Packet packet) {
@@ -519,31 +483,10 @@ public class XMPPConnection extends Connection {
     }
 
     private void connectUsingConfiguration(ConnectionConfiguration config) throws XMPPException {
-        String host = config.getHost();
-        int port = config.getPort();
-        try {
-            if (config.getSocketFactory() == null) {
-                this.socket = new Socket(host, port);
-            }
-            else {
-                this.socket = config.getSocketFactory().createSocket(host, port);
-            }
-        }
-        catch (UnknownHostException uhe) {
-            String errorMessage = "Could not connect to " + host + ":" + port + ".";
-            throw new XMPPException(errorMessage, new XMPPError(
-                    XMPPError.Condition.remote_server_timeout, errorMessage),
-                    uhe);
-        }
-        catch (IOException ioe) {
-            String errorMessage = "XMPPError connecting to " + host + ":"
-                    + port + ".";
-            throw new XMPPException(errorMessage, new XMPPError(
-                    XMPPError.Condition.remote_server_error, errorMessage), ioe);
-        }
+        data_stream = new XMPPStreamTCP(config);
 
         // If debugging is enabled, we open a window and write out all network traffic.
-        if (!config.isDebuggerEnabled())
+        if (config.isDebuggerEnabled())
             initDebugger();
 
         initConnection();
@@ -560,9 +503,6 @@ public class XMPPConnection extends Connection {
         // If debugging is enabled, we open a window and write out all network traffic.
         if (debugger != null)
             return;
-        if (reader == null || writer == null) {
-            throw new NullPointerException("Reader or writer isn't initialized.");
-        }
 
         // Detect the debugger class to use.
         // Use try block since we may not have permission to get a system
@@ -586,7 +526,8 @@ public class XMPPConnection extends Connection {
                 // Attempt to create an instance of this debugger.
                 Constructor<?> constructor = debuggerClass
                         .getConstructor(Connection.class, ObservableWriter.class, ObservableReader.class);
-                debugger = (SmackDebugger) constructor.newInstance(this, writer, reader);
+                debugger = (SmackDebugger) constructor.newInstance(this,
+                        data_stream.getObservableWriter(), data_stream.getObservableReader());
                 break;
             }
             catch (Exception e) {
@@ -605,12 +546,6 @@ public class XMPPConnection extends Connection {
      */
     private void initConnection() throws XMPPException {
         boolean isFirstInitialization = packetReader == null || packetWriter == null;
-        if (!isFirstInitialization) {
-            usingCompression = false;
-        }
-
-        // Set the reader and writer instance variables
-        initReaderAndWriter();
 
         try {
             if (isFirstInitialization) {
@@ -619,7 +554,7 @@ public class XMPPConnection extends Connection {
 
                 // If debugging is enabled, we should start the thread that will listen for
                 // all packets and then log them.
-                if (config.isDebuggerEnabled()) {
+                if (debugger != null) {
                     addPacketListener(debugger.getReaderListener(), null);
                     if (debugger.getWriterListener() != null) {
                         addPacketSendingListener(debugger.getWriterListener(), null);
@@ -640,10 +575,6 @@ public class XMPPConnection extends Connection {
             // Make note of the fact that we're now connected.
             connected = true;
 
-            // Start keep alive process (after TLS was negotiated - if available)
-            packetWriter.startKeepAliveProcess();
-
-
             if (isFirstInitialization) {
                 // Notify listeners that a new connection has been established
                 for (ConnectionCreationListener listener : getConnectionCreationListeners()) {
@@ -658,297 +589,22 @@ public class XMPPConnection extends Connection {
         catch (XMPPException ex) {
             // An exception occurred in setting up the connection. Make sure we shut down the
             // readers and writers and close the socket.
-
-            if (packetWriter != null) {
-                try {
-                    packetWriter.shutdown();
-                }
-                catch (Throwable ignore) { /* ignore */ }
-                packetWriter = null;
-            }
-            if (packetReader != null) {
-                try {
-                    packetReader.shutdown();
-                }
-                catch (Throwable ignore) { /* ignore */ }
-                packetReader = null;
-            }
-            if (reader != null) {
-                try {
-                    reader.close();
-                }
-                catch (Throwable ignore) { /* ignore */ }
-                reader = null;
-            }
-            if (writer != null) {
-                try {
-                    writer.close();
-                }
-                catch (Throwable ignore) {  /* ignore */}
-                writer = null;
-            }
-            if (socket != null) {
-                try {
-                    socket.close();
-                }
-                catch (Exception e) { /* ignore */ }
-                socket = null;
-            }
-            this.setWasAuthenticated(authenticated);
-            authenticated = false;
-            connected = false;
-
+            cleanup();
             throw ex;        // Everything stoppped. Now throw the exception.
         }
     }
 
-    private void initReaderAndWriter() throws XMPPException {
-        try {
-            Reader streamReader;
-            Writer streamWriter;
-            if (!usingCompression) {
-                streamReader = new InputStreamReader(socket.getInputStream(), "UTF-8");
-                streamWriter = new OutputStreamWriter(socket.getOutputStream(), "UTF-8"); 
-            }
-            else {
-                try {
-                    Class<?> zoClass = Class.forName("com.jcraft.jzlib.ZOutputStream");
-                    Constructor<?> constructor =
-                            zoClass.getConstructor(OutputStream.class, Integer.TYPE);
-                    Object out = constructor.newInstance(socket.getOutputStream(), 9);
-                    Method method = zoClass.getMethod("setFlushMode", Integer.TYPE);
-                    method.invoke(out, 2);
-                    streamWriter = new OutputStreamWriter((OutputStream) out, "UTF-8");
-
-                    Class<?> ziClass = Class.forName("com.jcraft.jzlib.ZInputStream");
-                    constructor = ziClass.getConstructor(InputStream.class);
-                    Object in = constructor.newInstance(socket.getInputStream());
-                    method = ziClass.getMethod("setFlushMode", Integer.TYPE);
-                    method.invoke(in, 2);
-                    streamReader = new InputStreamReader((InputStream) in, "UTF-8");
-                }
-                catch (Exception e) {
-                    e.printStackTrace();
-                    streamReader = new InputStreamReader(socket.getInputStream(), "UTF-8");
-                    streamWriter = new OutputStreamWriter(socket.getOutputStream(), "UTF-8");
-                }
-            }
-            streamReader = new BufferedReader(streamReader);
-            streamWriter = new BufferedWriter(streamWriter);
-
-            /* Point the observers at the new stream. */
-            obsReader.setSource(streamReader);
-            obsWriter.setTarget(streamWriter);
-            reader = obsReader;
-            writer = obsWriter;
-        }
-        catch (IOException ioe) {
-            throw new XMPPException(
-                    "XMPPError establishing connection with server.",
-                    new XMPPError(XMPPError.Condition.remote_server_error,
-                            "XMPPError establishing connection with server."),
-                    ioe);
-        }
-    }
-
-    /***********************************************
-     * TLS code below
-     **********************************************/
-
-    /**
-     * Returns true if the connection to the server has successfully negotiated TLS. Once TLS
-     * has been negotiatied the connection has been secured.
-     *
-     * @return true if the connection to the server has successfully negotiated TLS.
+    /*
+     * Called when the XMPP stream is reset, usually due to successful
+     * authentication.
      */
-    public boolean isUsingTLS() {
-        return usingTLS;
-    }
-
-    /**
-     * Notification message saying that the server supports TLS so confirm the server that we
-     * want to secure the connection.
-     *
-     * @param required true when the server indicates that TLS is required.
-     */
-    void startTLSReceived(boolean required) {
-        if (required && config.getSecurityMode() ==
-                ConnectionConfiguration.SecurityMode.disabled) {
-            packetReader.notifyConnectionError(new IllegalStateException(
-                    "TLS required by server but not allowed by connection configuration"));
-            return;
-        }
-
-        if (config.getSecurityMode() == ConnectionConfiguration.SecurityMode.disabled) {
-            // Do not secure the connection using TLS since TLS was disabled
-            return;
-        }
-        try {
-            writer.write("<starttls xmlns=\"urn:ietf:params:xml:ns:xmpp-tls\"/>");
-            writer.flush();
-        }
-        catch (IOException e) {
-            packetReader.notifyConnectionError(e);
-        }
-    }
-
-    /**
-     * The server has indicated that TLS negotiation can start. We now need to secure the
-     * existing plain connection and perform a handshake. This method won't return until the
-     * connection has finished the handshake or an error occured while securing the connection.
-     *
-     * @throws Exception if an exception occurs.
-     */
-    void proceedTLSReceived() throws Exception {
-        Socket plain = socket;
-
-        // Secure the plain connection
-        XMPPSSLSocketFactory sslSocketFactory = new XMPPSSLSocketFactory(config, getServiceName());
-        if(sslSocketFactory.isAvailable())
-            throw new XMPPException("TLS is not available");
-
-        socket = sslSocketFactory.getSocketFactory().createSocket(plain,
-                plain.getInetAddress().getHostName(), plain.getPort(), true);
-        socket.setSoTimeout(0);
-        socket.setKeepAlive(true);
-        // Initialize the reader and writer with the new secured version
-        initReaderAndWriter();
-        // Proceed to do the handshake
-        ((SSLSocket) socket).startHandshake();
-
-        // Record if TLS compression is active, so we won't try to negotiate XMPP
-        // compression too.
-        if(sslSocketFactory.getCompressionMethod((SSLSocket) socket) != null)
-            usingTLSCompression = true;
-        
-        //if (((SSLSocket) socket).getWantClientAuth()) {
-        //    System.err.println("Connection wants client auth");
-        //}
-        //else if (((SSLSocket) socket).getNeedClientAuth()) {
-        //    System.err.println("Connection needs client auth");
-        //}
-        //else {
-        //    System.err.println("Connection does not require client auth");
-       // }
-        // Set that TLS was successful
-        usingTLS = true;
-
-        // Set the new  writer to use
-        packetWriter.setWriter(writer);
-        // Send a new opening stream to the server
-        packetWriter.openStream();
-    }
-
-    /**
-     * Sets the available stream compression methods offered by the server.
-     *
-     * @param methods compression methods offered by the server.
-     */
-    void setAvailableCompressionMethods(Collection<String> methods) {
-        compressionMethods = methods;
-    }
-
-    /**
-     * Returns true if the specified compression method was offered by the server.
-     *
-     * @param method the method to check.
-     * @return true if the specified compression method was offered by the server.
-     */
-    private boolean hasAvailableCompressionMethod(String method) {
-        return compressionMethods != null && compressionMethods.contains(method);
+    void streamReset() throws XMPPException
+    {
+        this.data_stream.streamReset();
     }
 
     public boolean isUsingCompression() {
-        return usingCompression || usingTLSCompression;
-    }
-
-    /**
-     * Starts using stream compression that will compress network traffic. Traffic can be
-     * reduced up to 90%. Therefore, stream compression is ideal when using a slow speed network
-     * connection. However, the server and the client will need to use more CPU time in order to
-     * un/compress network data so under high load the server performance might be affected.<p>
-     * <p/>
-     * Stream compression has to have been previously offered by the server. Currently only the
-     * zlib method is supported by the client. Stream compression negotiation has to be done
-     * before authentication took place.<p>
-     * <p/>
-     * Note: to use stream compression the smackx.jar file has to be present in the classpath.
-     *
-     * @return true if stream compression negotiation was successful.
-     */
-    private boolean useCompression() {
-        // If stream compression was offered by the server and we want to use
-        // compression then send compression request to the server
-        if (authenticated) {
-            throw new IllegalStateException("Compression should be negotiated before authentication.");
-        }
-        try {
-            Class.forName("com.jcraft.jzlib.ZOutputStream");
-        }
-        catch (ClassNotFoundException e) {
-            throw new IllegalStateException("Cannot use compression. Add smackx.jar to the classpath");
-        }
-        if (hasAvailableCompressionMethod("zlib")) {
-            requestStreamCompression();
-            // Wait until compression is being used or a timeout happened
-            synchronized (this) {
-                try {
-                    this.wait(SmackConfiguration.getPacketReplyTimeout() * 5);
-                }
-                catch (InterruptedException e) {
-                    // Ignore.
-                }
-            }
-            return usingCompression;
-        }
-        return false;
-    }
-
-    /**
-     * Request the server that we want to start using stream compression. When using TLS
-     * then negotiation of stream compression can only happen after TLS was negotiated. If TLS
-     * compression is being used the stream compression should not be used.
-     */
-    private void requestStreamCompression() {
-        try {
-            writer.write("<compress xmlns='http://jabber.org/protocol/compress'>");
-            writer.write("<method>zlib</method></compress>");
-            writer.flush();
-        }
-        catch (IOException e) {
-            packetReader.notifyConnectionError(e);
-        }
-    }
-
-    /**
-     * Start using stream compression since the server has acknowledged stream compression.
-     *
-     * @throws Exception if there is an exception starting stream compression.
-     */
-    void startStreamCompression() throws Exception {
-        // Secure the plain connection
-        usingCompression = true;
-        // Initialize the reader and writer with the new secured version
-        initReaderAndWriter();
-
-        // Set the new  writer to use
-        packetWriter.setWriter(writer);
-        // Send a new opening stream to the server
-        packetWriter.openStream();
-        // Notify that compression is being used
-        synchronized (this) {
-            this.notify();
-        }
-    }
-
-    /**
-     * Notifies the XMPP connection that stream compression was denied so that
-     * the connection process can proceed.
-     */
-    void streamCompressionDenied() {
-        synchronized (this) {
-            this.notify();
-        }
+        return data_stream.isUsingCompression();
     }
 
     /**
@@ -1040,6 +696,18 @@ public class XMPPConnection extends Connection {
      * @param e the exception that causes the connection close event.
      */
     protected void notifyConnectionClosedOnError(Exception e) {
+        synchronized(this) {
+            if(suppressConnectionErrors)
+                return;
+
+            // Only send one connection error.
+            suppressConnectionErrors = true;
+        }
+
+        // Shut down the connection.  The connection has already failed, so there's
+        // no point in trying to send presence.
+        shutdown(null);
+
         // Print the stack trace to help catch the problem.  Include the current
         // stack in the output.
         new Exception(e).printStackTrace();
