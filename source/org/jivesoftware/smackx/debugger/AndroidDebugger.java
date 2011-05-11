@@ -9,8 +9,6 @@ import org.jivesoftware.smack.util.*;
 
 import android.util.Log;
 
-import java.io.Reader;
-import java.io.Writer;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
@@ -35,12 +33,12 @@ public class AndroidDebugger implements SmackDebugger {
     private PacketListener listener = null;
     private ConnectionListener connListener = null;
 
-    private Writer writer;
-    private Reader reader;
+    private ObservableWriter writer;
+    private ObservableReader reader;
     private ReaderListener readerListener;
     private WriterListener writerListener;
 
-    public AndroidDebugger(Connection connection, Writer writer, Reader reader) {
+    public AndroidDebugger(Connection connection, ObservableWriter writer, ObservableReader reader) {
         this.connection = connection;
         this.writer = writer;
         this.reader = reader;
@@ -52,7 +50,6 @@ public class AndroidDebugger implements SmackDebugger {
      */
     private void createDebug() {
         // Create a special Reader that wraps the main Reader and logs data to the GUI.
-        ObservableReader debugReader = new ObservableReader(reader);
         readerListener = new ReaderListener() {
             public void read(String str) {
             	Log.d("SMACK",
@@ -61,10 +58,9 @@ public class AndroidDebugger implements SmackDebugger {
                         str);
             }
         };
-        debugReader.addReaderListener(readerListener);
+        reader.addReaderListener(readerListener);
 
         // Create a special Writer that wraps the main Writer and logs data to the GUI.
-        ObservableWriter debugWriter = new ObservableWriter(writer);
         writerListener = new WriterListener() {
             public void write(String str) {
             	Log.d("SMACK",
@@ -73,12 +69,7 @@ public class AndroidDebugger implements SmackDebugger {
                         str);
             }
         };
-        debugWriter.addWriterListener(writerListener);
-
-        // Assign the reader/writer objects to use the debug versions. The packet reader
-        // and writer will use the debug versions when they are created.
-        reader = debugReader;
-        writer = debugWriter;
+        writer.addWriterListener(writerListener);
 
         // Create a thread that will listen for all incoming packets and write them to
         // the GUI. This is what we call "interpreted" packet data, since it's the packet
@@ -134,22 +125,6 @@ public class AndroidDebugger implements SmackDebugger {
         };
     }
 
-    public Reader newConnectionReader(Reader newReader) {
-        ((ObservableReader)reader).removeReaderListener(readerListener);
-        ObservableReader debugReader = new ObservableReader(newReader);
-        debugReader.addReaderListener(readerListener);
-        reader = debugReader;
-        return reader;
-    }
-
-    public Writer newConnectionWriter(Writer newWriter) {
-        ((ObservableWriter)writer).removeWriterListener(writerListener);
-        ObservableWriter debugWriter = new ObservableWriter(newWriter);
-        debugWriter.addWriterListener(writerListener);
-        writer = debugWriter;
-        return writer;
-    }
-
     public void userHasLogged(String user) {
         boolean isAnonymous = "".equals(StringUtils.parseName(user));
         String title =
@@ -164,14 +139,6 @@ public class AndroidDebugger implements SmackDebugger {
         // Add the connection listener to the connection so that the debugger can be notified
         // whenever the connection is closed.
         connection.addConnectionListener(connListener);
-    }
-
-    public Reader getReader() {
-        return reader;
-    }
-
-    public Writer getWriter() {
-        return writer;
     }
 
     public PacketListener getReaderListener() {

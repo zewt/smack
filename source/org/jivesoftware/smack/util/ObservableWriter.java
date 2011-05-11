@@ -117,4 +117,15 @@ public class ObservableWriter extends Writer {
         }
     }
 
+    /**
+     * Replace the wrapped writer.
+     *
+     * @param writer The new target writer.
+     * @return The old target writer.
+     */
+    public Writer setTarget(Writer writer) {
+        Writer oldWriter = this.wrappedWriter;
+        this.wrappedWriter = writer;
+        return oldWriter;
+    }
 }

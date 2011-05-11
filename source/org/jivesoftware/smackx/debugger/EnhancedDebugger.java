@@ -118,8 +118,8 @@ public class EnhancedDebugger implements SmackDebugger {
     private PacketListener packetWriterListener = null;
     private ConnectionListener connListener = null;
 
-    private Writer writer;
-    private Reader reader;
+    private ObservableWriter writer;
+    private ObservableReader reader;
     private ReaderListener readerListener;
     private WriterListener writerListener;
 
@@ -140,7 +140,7 @@ public class EnhancedDebugger implements SmackDebugger {
 
     JTabbedPane tabbedPane;
 
-    public EnhancedDebugger(Connection connection, Writer writer, Reader reader) {
+    public EnhancedDebugger(Connection connection, ObservableWriter writer, ObservableReader reader) {
         this.connection = connection;
         this.writer = writer;
         this.reader = reader;
@@ -411,7 +411,6 @@ public class EnhancedDebugger implements SmackDebugger {
         menu.add(menuItem2);
 
         // Create a special Reader that wraps the main Reader and logs data to the GUI.
-        ObservableReader debugReader = new ObservableReader(reader);
         readerListener = new ReaderListener() {
             public void read(final String str) {
                 SwingUtilities.invokeLater(new Runnable() {
@@ -446,10 +445,9 @@ public class EnhancedDebugger implements SmackDebugger {
                 });
             }
         };
-        debugReader.addReaderListener(readerListener);
+        reader.addReaderListener(readerListener);
 
         // Create a special Writer that wraps the main Writer and logs data to the GUI.
-        ObservableWriter debugWriter = new ObservableWriter(writer);
         writerListener = new WriterListener() {
             public void write(final String str) {
                 SwingUtilities.invokeLater(new Runnable() {
@@ -479,12 +477,7 @@ public class EnhancedDebugger implements SmackDebugger {
 
             }
         };
-        debugWriter.addWriterListener(writerListener);
-
-        // Assign the reader/writer objects to use the debug versions. The packet reader
-        // and writer will use the debug versions when they are created.
-        reader = debugReader;
-        writer = debugWriter;
+        writer.addWriterListener(writerListener);
 
     }
 
@@ -683,22 +676,6 @@ public class EnhancedDebugger implements SmackDebugger {
         tabbedPane.setToolTipTextAt(4, "Information and statistics about the debugged connection");
     }
 
-    public Reader newConnectionReader(Reader newReader) {
-        ((ObservableReader) reader).removeReaderListener(readerListener);
-        ObservableReader debugReader = new ObservableReader(newReader);
-        debugReader.addReaderListener(readerListener);
-        reader = debugReader;
-        return reader;
-    }
-
-    public Writer newConnectionWriter(Writer newWriter) {
-        ((ObservableWriter) writer).removeWriterListener(writerListener);
-        ObservableWriter debugWriter = new ObservableWriter(newWriter);
-        debugWriter.addWriterListener(writerListener);
-        writer = debugWriter;
-        return writer;
-    }
-
     public void userHasLogged(final String user) {
         final EnhancedDebugger debugger = this;
         SwingUtilities.invokeLater(new Runnable() {
@@ -711,14 +688,6 @@ public class EnhancedDebugger implements SmackDebugger {
             }
         });
 
-    }
-
-    public Reader getReader() {
-        return reader;
-    }
-
-    public Writer getWriter() {
-        return writer;
     }
 
     public PacketListener getReaderListener() {

@@ -25,6 +25,8 @@ import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.packet.Presence;
 import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.util.StringUtils;
+import org.jivesoftware.smack.util.ObservableReader;
+import org.jivesoftware.smack.util.ObservableWriter;
 
 import javax.net.ssl.SSLSocket;
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
@@ -66,6 +68,8 @@ public class XMPPConnection extends Connection {
 
     PacketWriter packetWriter;
     PacketReader packetReader;
+    private ObservableReader obsReader;
+    private ObservableWriter obsWriter;
 
     Roster roster = null;
 
@@ -110,6 +114,8 @@ public class XMPPConnection extends Connection {
         config.setSASLAuthenticationEnabled(true);
         config.setDebuggerEnabled(DEBUG_ENABLED);
         config.setCallbackHandler(callbackHandler);
+        obsReader = new ObservableReader(null);
+        obsWriter = new ObservableWriter(null);
     }
 
     /**
@@ -126,6 +132,8 @@ public class XMPPConnection extends Connection {
         config.setCompressionEnabled(false);
         config.setSASLAuthenticationEnabled(true);
         config.setDebuggerEnabled(DEBUG_ENABLED);
+        obsReader = new ObservableReader(null);
+        obsWriter = new ObservableWriter(null);
     }
 
     /**
@@ -139,6 +147,8 @@ public class XMPPConnection extends Connection {
      */
     public XMPPConnection(ConnectionConfiguration config) {
         super(config);
+        obsReader = new ObservableReader(null);
+        obsWriter = new ObservableWriter(null);
     }
 
     /**
@@ -162,6 +172,8 @@ public class XMPPConnection extends Connection {
     public XMPPConnection(ConnectionConfiguration config, CallbackHandler callbackHandler) {
         super(config);
         config.setCallbackHandler(callbackHandler);
+        obsReader = new ObservableReader(null);
+        obsWriter = new ObservableWriter(null);
     }
 
     public String getConnectionID() {
@@ -657,8 +669,14 @@ public class XMPPConnection extends Connection {
                     streamWriter = new OutputStreamWriter(socket.getOutputStream(), "UTF-8");
                 }
             }
-            reader = new BufferedReader(streamReader);
-            writer = new BufferedWriter(streamWriter);
+            streamReader = new BufferedReader(streamReader);
+            streamWriter = new BufferedWriter(streamWriter);
+
+            /* Point the observers at the new stream. */
+            obsReader.setSource(streamReader);
+            obsWriter.setTarget(streamWriter);
+            reader = obsReader;
+            writer = obsWriter;
         }
         catch (IOException ioe) {
             throw new XMPPException(

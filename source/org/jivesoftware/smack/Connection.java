@@ -38,6 +38,8 @@ import org.jivesoftware.smack.debugger.SmackDebugger;
 import org.jivesoftware.smack.filter.PacketFilter;
 import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.packet.Presence;
+import org.jivesoftware.smack.util.ObservableReader;
+import org.jivesoftware.smack.util.ObservableWriter;
 
 /**
  * The abstract Connection class provides an interface for connections to a
@@ -170,12 +172,12 @@ public abstract class Connection {
     /**
      * The Reader which is used for the {@see debugger}.
      */
-    protected Reader reader;
+    protected ObservableReader reader;
 
     /**
      * The Writer which is used for the {@see debugger}.
      */
-    protected Writer writer;
+    protected ObservableWriter writer;
 
 
     /**
@@ -749,7 +751,7 @@ public abstract class Connection {
 
                         // Attempt to create an instance of this debugger.
                         Constructor<?> constructor = debuggerClass
-                                .getConstructor(Connection.class, Writer.class, Reader.class);
+                                .getConstructor(Connection.class, ObservableWriter.class, ObservableReader.class);
                         debugger = (SmackDebugger) constructor.newInstance(this, writer, reader);
                     }
                     catch (Exception e) {
@@ -758,16 +760,6 @@ public abstract class Connection {
                         continue;
                     }
                 }
-
-                if(debugger != null) {
-                    reader = debugger.getReader();
-                    writer = debugger.getWriter();
-                }
-            }
-            else {
-                // Obtain new reader and writer from the existing debugger
-                reader = debugger.newConnectionReader(reader);
-                writer = debugger.newConnectionWriter(writer);
             }
         }
     }

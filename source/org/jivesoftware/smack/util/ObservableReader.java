@@ -122,4 +122,16 @@ public class ObservableReader extends Reader {
             readerListeners[i].read(str);
         }
     }
+
+    /**
+     * Replace the wrapped reader.
+     *
+     * @param reader The new source reader.
+     * @return The old source reader.
+     */
+    public Reader setSource(Reader reader) {
+        Reader oldReader = this.wrappedReader;
+        this.wrappedReader = reader;
+        return oldReader;
+    }
 }
