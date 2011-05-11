@@ -284,9 +284,9 @@ class ServerTrustManager implements X509TrustManager {
             for (int i = 0; i < nSize; i++) {
                 try {
                     x509Certificates[i].checkValidity(date);
-                }
-                catch (GeneralSecurityException generalsecurityexception) {
-                    throw new CertificateExceptionDetail(x509Certificates, generalsecurityexception);
+                } catch (CertificateException e) {
+                    // The certificate is expired, or not yet valid.
+                    throw new CertificateExceptionDetail(x509Certificates, e);
                 }
             }
         }
