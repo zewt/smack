@@ -20,6 +20,8 @@
 
 package org.jivesoftware.smack;
 
+import java.net.URI;
+
 import org.jivesoftware.smack.debugger.SmackDebugger;
 import org.jivesoftware.smack.filter.PacketFilter;
 import org.jivesoftware.smack.packet.Packet;
@@ -483,7 +485,11 @@ public class XMPPConnection extends Connection {
     }
 
     private void connectUsingConfiguration(ConnectionConfiguration config) throws XMPPException {
-        data_stream = new XMPPStreamTCP(config);
+        URI boshURI = config.getBoshURI();
+        if(boshURI != null)
+            data_stream = new XMPPStreamBOSH(config, boshURI);
+        else
+            data_stream = new XMPPStreamTCP(config);
 
         // If debugging is enabled, we open a window and write out all network traffic.
         if (config.isDebuggerEnabled())

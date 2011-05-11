@@ -24,9 +24,9 @@ import org.jivesoftware.smack.proxy.ProxyInfo;
 import org.jivesoftware.smack.util.DNSUtil;
 
 import javax.net.SocketFactory;
+import java.net.URI;
 import java.security.KeyStore;
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
-import java.io.File;
 
 /**
  * Configuration to use while establishing the connection to the server. It is possible to
@@ -62,6 +62,13 @@ public class ConnectionConfiguration implements Cloneable {
     private boolean selfSignedCertificateEnabled = false;
     private boolean expiredCertificatesCheckEnabled = false;
     private boolean notMatchingDomainCheckEnabled = true;
+
+    /**
+     * If not null, the parsed URI of the BOSH server to use.  If set to
+     * AutoDetectBOSH, attempt to detect BOSH via XEP-0156.
+     */
+    private URI boshURI = null;
+    final static public URI AUTO_DETECT_BOSH = URI.create("bosh-xep-0156:");
 
     private boolean compressionEnabled = false;
 
@@ -242,6 +249,21 @@ public class ConnectionConfiguration implements Cloneable {
      * @return {@link ProxyInfo}
      */
     public ProxyInfo getProxyInfo() { return proxy; }
+
+    /**
+     * @return the parsed URI of the specified BOSH server, or null if none was specified.
+     */
+    public URI getBoshURI() {
+        return boshURI;
+    }
+
+    /**
+     * Sets the BOSH server to use.  To auto-detect BOSH, set to {@link AUTO_DETECT_BOSH}.
+     * By default, BOSH is not used.
+     */
+    public void setBoshURI(URI uri) {
+        this.boshURI = uri;
+    }
 
     /**
      * Returns the TLS security mode used when making the connection. By default,
