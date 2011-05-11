@@ -41,7 +41,7 @@ import org.jivesoftware.smackx.pubsub.util.NodeUtils;
  * 
  * @author Robin Collier
  */
-final public class PubSubManager
+public class PubSubManager
 {
 	private Connection con;
 	private String to;
