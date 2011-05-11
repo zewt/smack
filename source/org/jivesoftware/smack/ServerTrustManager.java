@@ -21,6 +21,7 @@
 package org.jivesoftware.smack;
 
 import javax.net.ssl.X509TrustManager;
+import java.io.BufferedInputStream;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.IOException;
@@ -57,26 +58,13 @@ class ServerTrustManager implements X509TrustManager {
         this.configuration = configuration;
         this.server = server;
 
-        InputStream in = null;
         try {
-            trustStore = KeyStore.getInstance(configuration.getTruststoreType());
-            in = getTruststoreStream(configuration.getTruststorePath());
-            trustStore.load(in, configuration.getTruststorePassword().toCharArray());
+            trustStore = getKeyStore(configuration.getTruststorePath(), configuration.getTruststoreType(), configuration.getTruststorePassword());
         }
         catch (Exception e) {
             e.printStackTrace();
             // Disable root CA checking
             configuration.setVerifyRootCAEnabled(false);
-        }
-        finally {
-            if (in != null) {
-                try {
-                    in.close();
-                }
-                catch (IOException ioe) {
-                    // Ignore.
-                }
-            }
         }
     }
 
@@ -104,6 +92,29 @@ class ServerTrustManager implements X509TrustManager {
         }
 
         throw new IOException("No truststore path located");
+    }
+
+    private static KeyStore getKeyStore(String path, String type, String password)
+    throws Exception
+    {
+        KeyStore trustStore;
+        InputStream in = null;
+        try {
+            in = new BufferedInputStream(getTruststoreStream(path));
+            trustStore = KeyStore.getInstance(type);
+            trustStore.load(in, password != null? password.toCharArray():null);
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                }
+                catch (IOException ioe) {
+                    // Ignore.
+                }
+            }
+        }
+
+        return trustStore;
     }
 
     /**
