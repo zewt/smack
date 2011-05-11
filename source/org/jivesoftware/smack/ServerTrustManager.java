@@ -25,6 +25,7 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.IOException;
 import java.security.*;
+import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
@@ -109,8 +110,13 @@ class ServerTrustManager implements X509TrustManager {
             throws CertificateException {
     }
 
-    public void checkServerTrusted(X509Certificate[] x509Certificates, String arg1)
-            throws CertificateException {
+    public void checkServerTrusted(X509Certificate[] x509Certificates, String authType)
+    throws CertificateException {
+        checkCertificates(x509Certificates);
+    }
+
+    public void checkCertificates(X509Certificate[] x509Certificates)
+            throws CertificateExceptionDetail {
 
         int nSize = x509Certificates.length;
 
@@ -199,6 +205,28 @@ class ServerTrustManager implements X509TrustManager {
             }
         }
 
+    }
+
+    /**
+     * Verify a certificate chain.  On success, return normally.  On verification failure,
+     * throws {@link CertificateExceptionDetail}.
+     */
+    public void checkCertificates(Certificate[] certificates) throws CertificateExceptionDetail {
+        X509Certificate[] x509Certificates;
+        try {
+            x509Certificates = new X509Certificate[certificates.length];
+
+            for(int i = 0; i < certificates.length; ++i) {
+                X509Certificate cert = (X509Certificate) certificates[i];
+                x509Certificates[i] = cert;
+            }
+        } catch(ClassCastException e) {
+            // One of the certificates wasn't an X509Certificate.  Assume the connection
+            // is insecure.
+            throw new CertificateExceptionDetail(new X509Certificate[]{}, "Received a non-X509 certificate", e);
+        }
+
+        checkCertificates(x509Certificates);
     }
 
     /**
