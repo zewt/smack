@@ -44,7 +44,6 @@ public class XMPPException extends Exception {
 
     private StreamError streamError = null;
     private XMPPError error = null;
-    private Throwable wrappedThrowable = null;
 
     /**
      * Creates a new XMPPException.
@@ -69,8 +68,7 @@ public class XMPPException extends Exception {
      * @param wrappedThrowable the root cause of the exception.
      */
     public XMPPException(Throwable wrappedThrowable) {
-        super();
-        this.wrappedThrowable = wrappedThrowable;
+        super(wrappedThrowable);
     }
 
     /**
@@ -104,8 +102,7 @@ public class XMPPException extends Exception {
      * @param wrappedThrowable the root cause of the exception.
      */
     public XMPPException(String message, Throwable wrappedThrowable) {
-        super(message);
-        this.wrappedThrowable = wrappedThrowable;
+        super(message, wrappedThrowable);
     }
 
     /**
@@ -117,9 +114,8 @@ public class XMPPException extends Exception {
      * @param wrappedThrowable the root cause of the exception.
      */
     public XMPPException(String message, XMPPError error, Throwable wrappedThrowable) {
-        super(message);
+        super(message, wrappedThrowable);
         this.error = error;
-        this.wrappedThrowable = wrappedThrowable;
     }
 
     /**
@@ -162,7 +158,7 @@ public class XMPPException extends Exception {
      * @return the Throwable asscociated with this exception.
      */
     public Throwable getWrappedThrowable() {
-        return wrappedThrowable;
+        return getCause();
     }
 
     public void printStackTrace() {
@@ -171,17 +167,17 @@ public class XMPPException extends Exception {
 
     public void printStackTrace(PrintStream out) {
         super.printStackTrace(out);
-        if (wrappedThrowable != null) {
+        if (getCause() != null) {
             out.println("Nested Exception: ");
-            wrappedThrowable.printStackTrace(out);
+            getCause().printStackTrace(out);
         }
     }
 
     public void printStackTrace(PrintWriter out) {
         super.printStackTrace(out);
-        if (wrappedThrowable != null) {
+        if (getCause() != null) {
             out.println("Nested Exception: ");
-            wrappedThrowable.printStackTrace(out);
+            getCause().printStackTrace(out);
         }
     }
 
@@ -210,8 +206,8 @@ public class XMPPException extends Exception {
         if (streamError != null) {
             buf.append(streamError);
         }
-        if (wrappedThrowable != null) {
-            buf.append("\n  -- caused by: ").append(wrappedThrowable);
+        if (getCause() != null) {
+            buf.append("\n  -- caused by: ").append(getCause());
         }
 
         return buf.toString();
