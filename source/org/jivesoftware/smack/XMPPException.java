@@ -22,6 +22,7 @@ package org.jivesoftware.smack;
 
 import org.jivesoftware.smack.packet.StreamError;
 import org.jivesoftware.smack.packet.XMPPError;
+import org.jivesoftware.smack.packet.XMPPError.Condition;
 
 import java.io.PrintStream;
 import java.io.PrintWriter;
@@ -116,6 +117,32 @@ public class XMPPException extends Exception {
     public XMPPException(String message, XMPPError error, Throwable wrappedThrowable) {
         super(message, wrappedThrowable);
         this.error = error;
+    }
+
+    /**
+     * Creates a new XMPPException with a description of the exception, an XMPPError
+     * constructed from the specified Condition, and the Throwable that was the root
+     * cause of the exception.
+     *
+     * @param message a description of the exception.
+     * @param condition the error condition.
+     * @param wrappedThrowable the root cause of the exception.
+     */
+    public XMPPException(String message, Condition condition, Throwable wrappedThrowable) {
+        super(message, wrappedThrowable);
+        this.error = new XMPPError(condition, message);
+    }
+
+    /**
+     * Creates a new XMPPException with a description of the exception and an XMPPError
+     * constructed from the specified Condition.
+     *
+     * @param message a description of the exception.
+     * @param condition the error condition.
+     */
+    public XMPPException(String message, Condition condition) {
+        super(message);
+        this.error = new XMPPError(condition, message);
     }
 
     /**
