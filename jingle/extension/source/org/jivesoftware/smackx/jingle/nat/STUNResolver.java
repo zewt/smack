@@ -30,7 +30,7 @@ import java.util.Enumeration;
 import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smackx.jingle.JingleSession;
 import org.jivesoftware.smackx.jingle.SmackLogger;
-import org.xmlpull.mxp1.MXParser;
+import org.xmlpull.v1.XmlPullParserFactory;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -140,7 +140,7 @@ public class STUNResolver extends TransportResolver {
         int serverPort;
 
         try {
-            XmlPullParser parser = new MXParser();
+            XmlPullParser parser = XmlPullParserFactory.newInstance().newPullParser();
             parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
             parser.setInput(stunConfigStream, "UTF-8");
 

@@ -38,7 +38,7 @@ import org.jivesoftware.smack.util.PacketParserUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.xmlpull.mxp1.MXParser;
+import org.xmlpull.v1.XmlPullParserFactory;
 import org.xmlpull.v1.XmlPullParser;
 
 /**
@@ -318,7 +318,7 @@ public class RosterTest {
         final String contactJID = "nurse@example.com";
         final Roster roster = connection.getRoster();
         assertNotNull("Can't get the roster from the provided connection!", roster);
-        final MXParser parser = new MXParser();
+        final XmlPullParser parser = XmlPullParserFactory.newInstance().newPullParser();
         parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
         final StringBuilder sb = new StringBuilder();
         sb.append("<iq id=\"rostertest1\" type=\"set\" ")
@@ -433,7 +433,7 @@ public class RosterTest {
         final String contactJID = "nurse@example.com";
         final Roster roster = connection.getRoster();
         assertNotNull("Can't get the roster from the provided connection!", roster);
-        final MXParser parser = new MXParser();
+        final XmlPullParser parser = XmlPullParserFactory.newInstance().newPullParser();
         parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
         final StringBuilder sb = new StringBuilder();
         sb.append("<iq id=\"rostertest2\" type=\"set\" ")

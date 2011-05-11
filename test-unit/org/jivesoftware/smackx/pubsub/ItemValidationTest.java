@@ -12,7 +12,7 @@ import org.jivesoftware.smackx.pubsub.provider.ItemsProvider;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.xmlpull.mxp1.MXParser;
+import org.xmlpull.v1.XmlPullParserFactory;
 import org.xmlpull.v1.XmlPullParser;
 
 public class ItemValidationTest
@@ -74,7 +74,7 @@ public class ItemValidationTest
 //	@Test
 //	public void parseBasicItemWithoutNode() throws Exception
 //	{
-//		XmlPullParser parser = new MXParser();
+//		XmlPullParser parser = XmlPullParserFactory.newInstance().newPullParser();
 //		Reader reader = new StringReader(
 //				"<event xmlns='http://jabber.org/protocol/pubsub#event'>" +
 //				"<items node='testNode'>" +

@@ -22,7 +22,7 @@ package org.jivesoftware.smack.provider;
 
 import org.jivesoftware.smack.packet.IQ;
 import org.jivesoftware.smack.packet.PacketExtension;
-import org.xmlpull.mxp1.MXParser;
+import org.xmlpull.v1.XmlPullParserFactory;
 import org.xmlpull.v1.XmlPullParser;
 
 import java.io.InputStream;
@@ -164,7 +164,7 @@ public class ProviderManager {
                     InputStream providerStream = null;
                     try {
                         providerStream = url.openStream();
-                        XmlPullParser parser = new MXParser();
+                        XmlPullParser parser = XmlPullParserFactory.newInstance().newPullParser();
                         parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
                         parser.setInput(providerStream, "UTF-8");
                         int eventType = parser.getEventType();

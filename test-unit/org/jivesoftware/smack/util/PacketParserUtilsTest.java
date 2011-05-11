@@ -21,7 +21,7 @@ import org.jivesoftware.smack.packet.Message;
 import org.jivesoftware.smack.packet.Packet;
 import org.junit.Ignore;
 import org.junit.Test;
-import org.xmlpull.mxp1.MXParser;
+import org.xmlpull.v1.XmlPullParserFactory;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -741,7 +741,7 @@ public class PacketParserUtilsTest {
     }
 
     private XmlPullParser getParser(String control) throws XmlPullParserException, IOException {
-        XmlPullParser parser = new MXParser();
+        XmlPullParser parser = XmlPullParserFactory.newInstance().newPullParser();
         parser.setInput(new StringReader(control));
         while(true) {
             if(parser.next() == XmlPullParser.START_TAG
