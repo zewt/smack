@@ -184,14 +184,8 @@ public class ConnectionConfiguration implements Cloneable {
         this.serviceName = serviceName;
         this.proxy = proxy;
 
-        // Build the default path to the cacert truststore file. By default we are
-        // going to use the file located in $JREHOME/lib/security/cacerts.
-        String javaHome = System.getProperty("java.home");
-        StringBuilder buffer = new StringBuilder();
-        buffer.append(javaHome).append(File.separator).append("lib");
-        buffer.append(File.separator).append("security");
-        buffer.append(File.separator).append("cacerts");
-        truststorePath = buffer.toString();
+        // By default, search for the certificate file.
+        truststorePath = null;
         // Set the default store type
         truststoreType = "jks";
         // Set the default password of the cacert file that is "changeit"
@@ -276,8 +270,10 @@ public class ConnectionConfiguration implements Cloneable {
 
     /**
      * Sets the path to the trust store file. The truststore file contains the root
-     * certificates of several well?known CAs. By default Smack is going to use
-     * the file located in $JREHOME/lib/security/cacerts.
+     * certificates of several well?known CAs. By default Smack will search for the
+     * keystore path in the location specified by the "javax.net.ssl.trustStore"
+     * property, followed by $JREHOME/lib/security/jssecacerts and
+     * $JREHOME/lib/security/cacerts.
      *
      * @param truststorePath the path to the truststore file.
      */

@@ -60,7 +60,7 @@ class ServerTrustManager implements X509TrustManager {
         InputStream in = null;
         try {
             trustStore = KeyStore.getInstance(configuration.getTruststoreType());
-            in = new FileInputStream(configuration.getTruststorePath());
+            in = getTruststoreStream(configuration.getTruststorePath());
             trustStore.load(in, configuration.getTruststorePassword().toCharArray());
         }
         catch (Exception e) {
@@ -78,6 +78,32 @@ class ServerTrustManager implements X509TrustManager {
                 }
             }
         }
+    }
+
+    private static InputStream getTruststoreStream(String path) throws IOException {
+        // If an explicit path was specified, only use it.
+        if(path != null)
+            return new FileInputStream(path);
+
+        // If an explicit root certificate path isn't specified, search for one
+        // using the paths described here:
+        // http://download.oracle.com/javase/1,5.0/docs/guide/security/jsse/JSSERefGuide.html
+        String javaHome = System.getProperty("java.home");
+        String[] defaultTruststorePaths = {
+                System.getProperty("javax.net.ssl.trustStore"),
+                javaHome + "/lib/security/jssecacerts",
+                javaHome + "/lib/security/cacerts"
+        };
+
+        for(String candidate: Arrays.asList(defaultTruststorePaths)) {
+            try {
+                return new FileInputStream(candidate);
+            } catch(IOException e) {
+                // Ignore and keep searching.
+            }
+        }
+
+        throw new IOException("No truststore path located");
     }
 
     /**
