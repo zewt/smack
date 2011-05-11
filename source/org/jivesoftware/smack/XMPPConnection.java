@@ -628,11 +628,11 @@ public class XMPPConnection extends Connection {
 
     private void initReaderAndWriter() throws XMPPException {
         try {
+            Reader streamReader;
+            Writer streamWriter;
             if (!usingCompression) {
-                reader =
-                        new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));
-                writer = new BufferedWriter(
-                        new OutputStreamWriter(socket.getOutputStream(), "UTF-8"));
+                streamReader = new InputStreamReader(socket.getInputStream(), "UTF-8");
+                streamWriter = new OutputStreamWriter(socket.getOutputStream(), "UTF-8"); 
             }
             else {
                 try {
@@ -642,24 +642,23 @@ public class XMPPConnection extends Connection {
                     Object out = constructor.newInstance(socket.getOutputStream(), 9);
                     Method method = zoClass.getMethod("setFlushMode", Integer.TYPE);
                     method.invoke(out, 2);
-                    writer =
-                            new BufferedWriter(new OutputStreamWriter((OutputStream) out, "UTF-8"));
+                    streamWriter = new OutputStreamWriter((OutputStream) out, "UTF-8");
 
                     Class<?> ziClass = Class.forName("com.jcraft.jzlib.ZInputStream");
                     constructor = ziClass.getConstructor(InputStream.class);
                     Object in = constructor.newInstance(socket.getInputStream());
                     method = ziClass.getMethod("setFlushMode", Integer.TYPE);
                     method.invoke(in, 2);
-                    reader = new BufferedReader(new InputStreamReader((InputStream) in, "UTF-8"));
+                    streamReader = new InputStreamReader((InputStream) in, "UTF-8");
                 }
                 catch (Exception e) {
                     e.printStackTrace();
-                    reader = new BufferedReader(
-                            new InputStreamReader(socket.getInputStream(), "UTF-8"));
-                    writer = new BufferedWriter(
-                            new OutputStreamWriter(socket.getOutputStream(), "UTF-8"));
+                    streamReader = new InputStreamReader(socket.getInputStream(), "UTF-8");
+                    streamWriter = new OutputStreamWriter(socket.getOutputStream(), "UTF-8");
                 }
             }
+            reader = new BufferedReader(streamReader);
+            writer = new BufferedWriter(streamWriter);
         }
         catch (IOException ioe) {
             throw new XMPPException(
