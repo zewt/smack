@@ -728,75 +728,11 @@ public class XMPPConnection extends Connection {
      * @throws Exception if an exception occurs.
      */
     void proceedTLSReceived() throws Exception {
-        SSLContext context = SSLContext.getInstance("TLS");
-        KeyStore ks = null;
-        KeyManager[] kms = null;
-        PasswordCallback pcb = null;
-
-        if(config.getCallbackHandler() == null) {
-           ks = null;
-        } else {
-            //System.out.println("Keystore type: "+configuration.getKeystoreType());
-            if(config.getKeystoreType().equals("NONE")) {
-                ks = null;
-                pcb = null;
-            }
-            else if(config.getKeystoreType().equals("PKCS11")) {
-                try {
-                    Constructor c = Class.forName("sun.security.pkcs11.SunPKCS11").getConstructor(InputStream.class);
-                    String pkcs11Config = "name = SmartCard\nlibrary = "+config.getPKCS11Library();
-                    ByteArrayInputStream config = new ByteArrayInputStream(pkcs11Config.getBytes());
-                    Provider p = (Provider)c.newInstance(config);
-                    Security.addProvider(p);
-                    ks = KeyStore.getInstance("PKCS11",p);
-                    pcb = new PasswordCallback("PKCS11 Password: ",false);
-                    this.config.getCallbackHandler().handle(new Callback[]{pcb});
-                    ks.load(null,pcb.getPassword());
-                }
-                catch (Exception e) {
-                    ks = null;
-                    pcb = null;
-                }
-            }
-            else if(config.getKeystoreType().equals("Apple")) {
-                ks = KeyStore.getInstance("KeychainStore","Apple");
-                ks.load(null,null);
-                //pcb = new PasswordCallback("Apple Keychain",false);
-                //pcb.setPassword(null);
-            }
-            else {
-                ks = KeyStore.getInstance(config.getKeystoreType());
-                try {
-                    pcb = new PasswordCallback("Keystore Password: ",false);
-                    config.getCallbackHandler().handle(new Callback[]{pcb});
-                    ks.load(new FileInputStream(config.getKeystorePath()), pcb.getPassword());
-                }
-                catch(Exception e) {
-                    ks = null;
-                    pcb = null;
-                }
-            }
-            KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509");
-            try {
-                if(pcb == null) {
-                    kmf.init(ks,null);
-                } else {
-                    kmf.init(ks,pcb.getPassword());
-                    pcb.clearPassword();
-                }
-                kms = kmf.getKeyManagers();
-            } catch (NullPointerException npe) {
-                kms = null;
-            }
-        }
-
-        // Verify certificate presented by the server
-        context.init(kms,
-                new javax.net.ssl.TrustManager[]{new ServerTrustManager(getServiceName(), config)},
-                new java.security.SecureRandom());
         Socket plain = socket;
+
         // Secure the plain connection
-        socket = context.getSocketFactory().createSocket(plain,
+        XMPPSSLSocketFactory sf = new XMPPSSLSocketFactory(config, getServiceName());
+        socket = sf.getSocketFactory().createSocket(plain,
                 plain.getInetAddress().getHostName(), plain.getPort(), true);
         socket.setSoTimeout(0);
         socket.setKeepAlive(true);
