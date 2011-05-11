@@ -35,6 +35,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.Provider;
 import java.security.SecureRandom;
 import java.security.Security;
+import java.security.cert.Certificate;
 import java.util.WeakHashMap;
 
 import javax.net.ssl.HandshakeCompletedEvent;
@@ -42,6 +43,7 @@ import javax.net.ssl.HandshakeCompletedListener;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
@@ -57,12 +59,24 @@ import org.apache.harmony.javax.security.auth.callback.PasswordCallback;
  */
 public class XMPPSSLSocketFactory {
     private WrappedSocketFactory socketFactory;
+    private ServerTrustManager trustManager;
+    private boolean secureConnectionRequired;
 
     public SSLSocketFactory getSocketFactory() { return socketFactory; }
+
+    /** If at least one insecure connection has been created with this factory,
+     * return a CertificateExceptionDetail.  If all connections have been secure,
+     * return null. */
+    public ServerTrustManager.CertificateExceptionDetail getSeenInsecureConnection() { return seenInsecureConnection; } 
+    public ServerTrustManager.CertificateExceptionDetail seenInsecureConnection = null;
 
     /** Store information about each socket connection.  There's no good way to wrap
      *  an SSLSocket that another class gives to us, so we store these in a WeakHashMap. */
     private class SSLSocketInfo { 
+        // If the connection is insecure, this contains the exception explaining the
+        // reason.
+        ServerTrustManager.CertificateExceptionDetail insecureConnection;
+
         // If compression is enabled, this contains the compression method used.  If compression
         // is not enabled, this is null.
         String compressionMethod;
@@ -122,6 +136,22 @@ public class XMPPSSLSocketFactory {
                     SSLSocket socket = (SSLSocket) event.getSocket();
                     SSLSocketInfo info = map.get(socket);
 
+                    if(secureConnectionRequired) {
+                        // If secureConnectionRequired is true then we've performed the certificate
+                        // check in ServerTrustManager.checkServerTrusted; if it fails then the
+                        // handshake will be aborted, so we'll never get here.
+                        info.insecureConnection = null;
+                    } else {
+                        try {
+                            checkSecureConnection(socket);
+                            info.insecureConnection = null;
+                        } catch(ServerTrustManager.CertificateExceptionDetail e) {
+                            // The connection isn't secure.  Store the reason.
+                            info.insecureConnection = e;
+                            seenInsecureConnection = e;
+                        }
+                    }
+
                     info.compressionMethod = getCompressionMethod(socket);
                 }
             });
@@ -159,6 +189,28 @@ public class XMPPSSLSocketFactory {
                 return null;
             }
         }
+
+        /**
+         * Verify the certificate for the given socket.  If the certificate isn't
+         * trusted, throw {@link ServerTrustManager.CertificateExceptionDetail }.
+         */
+        private void checkSecureConnection(SSLSocket socket)
+        throws ServerTrustManager.CertificateExceptionDetail
+        {
+            SSLSession session = socket.getSession();
+
+            Certificate[] certs;
+            try {
+                certs = session.getPeerCertificates();
+            } catch(SSLPeerUnverifiedException e) {
+                // If checkSecureConnection is called then getSecurityMode() != required, and
+                // we've disabled certificate checks within ServiceTrustManager, so all certificates
+                // are trusted at that level and this exception should never happen.
+                throw new RuntimeException(e);
+            }
+
+            trustManager.checkCertificates(certs);
+        }
     };
 
     XMPPSSLSocketFactory(ConnectionConfiguration config, String originalServiceName)
@@ -175,7 +227,8 @@ public class XMPPSSLSocketFactory {
             return;
         }
 
-        getServerTrustManager(context, config, originalServiceName);
+        this.secureConnectionRequired = config.getSecurityMode() == ConnectionConfiguration.SecurityMode.required;
+        trustManager = getServerTrustManager(context, config, secureConnectionRequired, originalServiceName);
 
         SSLSocketFactory factory = context.getSocketFactory();
         socketFactory = new WrappedSocketFactory(factory);
@@ -184,6 +237,11 @@ public class XMPPSSLSocketFactory {
     /** @return true if TLS is available. */
     public boolean isAvailable() {
         return socketFactory != null;
+    }
+
+    /** Return true if the specified socket is over a secure connection. */
+    public ServerTrustManager.CertificateExceptionDetail isInsecureConnection(SSLSocket socket) {
+        return map.get(socket).insecureConnection;
     }
 
     /** Return the name of the compression in use on the specified socket, or null if no
@@ -260,13 +318,13 @@ public class XMPPSSLSocketFactory {
      * the created ServerTrustManager.
      */
     public static ServerTrustManager getServerTrustManager(SSLContext context, ConnectionConfiguration config,
-            String serviceName) throws XMPPException
+            boolean secureConnectionRequired, String serviceName) throws XMPPException
     {
         try {
             KeyManager[] kms = createKeyManagers(config);
 
             // Verify certificate presented by the server
-            ServerTrustManager trustManager = new ServerTrustManager(serviceName, config);
+            ServerTrustManager trustManager = new ServerTrustManager(serviceName, config, secureConnectionRequired);
             TrustManager[] trustManagers = new TrustManager[]{trustManager};
 
             try {

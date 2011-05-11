@@ -53,10 +53,17 @@ class ServerTrustManager implements X509TrustManager {
      */
     private String server;
     private KeyStore trustStore;
+    private boolean secureConnectionRequired;
 
-    public ServerTrustManager(String server, ConnectionConfiguration configuration) {
+    /**
+     * @param secureConnectionRequired If true, the connection will be rejected if the certificate
+     * can't be verified.  If false, the connection will be allowed, but isSecureConnection will
+     * return false.
+     */
+    public ServerTrustManager(String server, ConnectionConfiguration configuration, boolean secureConnectionRequired) {
         this.configuration = configuration;
         this.server = server;
+        this.secureConnectionRequired = secureConnectionRequired;
 
         try {
             trustStore = getKeyStore(configuration.getTruststorePath(), configuration.getTruststoreType(), configuration.getTruststorePassword());
@@ -180,6 +187,17 @@ class ServerTrustManager implements X509TrustManager {
 
     public void checkServerTrusted(X509Certificate[] x509Certificates, String authType)
     throws CertificateException {
+        // If a secure connection isn't required, don't perform checks here.  The caller
+        // can still run certificate checks separately, using SSLSession.getPeerCertificates
+        // and calling checkCertificates directly.
+        //
+        // This is important, because if the caller only wants to display warnings on
+        // insecure connections and not prevent using encryption entirely, we must not
+        // throw an exception here, or getPeerCertificates will refuse to tell what the
+        // certificates are.
+        if(!secureConnectionRequired)
+            return;
+
         checkCertificates(x509Certificates);
     }
 
