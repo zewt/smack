@@ -54,11 +54,11 @@ public class ConnectionConfiguration implements Cloneable {
     private String keystorePath;
     private String keystoreType;
     private String pkcs11Library;
-    private boolean verifyChainEnabled = false;
-    private boolean verifyRootCAEnabled = false;
+    private boolean verifyChainEnabled = true;
+    private boolean verifyRootCAEnabled = true;
     private boolean selfSignedCertificateEnabled = false;
     private boolean expiredCertificatesCheckEnabled = false;
-    private boolean notMatchingDomainCheckEnabled = false;
+    private boolean notMatchingDomainCheckEnabled = true;
 
     private boolean compressionEnabled = false;
 
@@ -382,105 +382,63 @@ public class ConnectionConfiguration implements Cloneable {
         this.pkcs11Library = pkcs11Library;
     }
 
-    /**
-     * Returns true if the whole chain of certificates presented by the server are going to
-     * be checked. By default the certificate chain is not verified.
-     *
-     * @return true if the whole chaing of certificates presented by the server are going to
-     *         be checked.
-     */
+    /** Returns true if certificate chains must verify to treat a connection as secure.  Default: true. */
     public boolean isVerifyChainEnabled() {
         return verifyChainEnabled;
     }
 
-    /**
-     * Sets if the whole chain of certificates presented by the server are going to
-     * be checked. By default the certificate chain is not verified.
-     *
-     * @param verifyChainEnabled if the whole chaing of certificates presented by the server
-     *        are going to be checked.
-     */
+    /** Sets if the certificate chain must verify to treat a connection as secure.  Default: true. */
     public void setVerifyChainEnabled(boolean verifyChainEnabled) {
         this.verifyChainEnabled = verifyChainEnabled;
     }
 
-    /**
-     * Returns true if root CA checking is going to be done. By default checking is disabled.
-     *
-     * @return true if root CA checking is going to be done.
-     */
+    /** Returns true if the root certificate must be verified to treat a connection as secure.  Default: true. */
     public boolean isVerifyRootCAEnabled() {
         return verifyRootCAEnabled;
     }
 
-    /**
-     * Sets if root CA checking is going to be done. By default checking is disabled.
-     *
-     * @param verifyRootCAEnabled if root CA checking is going to be done.
-     */
+    /** Sets if the root certificate must be verified to treat a connection as secure.  Default: true. */
     public void setVerifyRootCAEnabled(boolean verifyRootCAEnabled) {
         this.verifyRootCAEnabled = verifyRootCAEnabled;
     }
 
-    /**
-     * Returns true if self-signed certificates are going to be accepted. By default
-     * this option is disabled.
-     *
-     * @return true if self-signed certificates are going to be accepted.
-     */
+    /** Returns true if self-signed certificates are accepted.  Default: false. */
     public boolean isSelfSignedCertificateEnabled() {
         return selfSignedCertificateEnabled;
     }
 
-    /**
-     * Sets if self-signed certificates are going to be accepted. By default
-     * this option is disabled.
-     *
-     * @param selfSignedCertificateEnabled if self-signed certificates are going to be accepted.
-     */
+    /** Sets if self-signed certificates are accepted. Default: true. */
     public void setSelfSignedCertificateEnabled(boolean selfSignedCertificateEnabled) {
         this.selfSignedCertificateEnabled = selfSignedCertificateEnabled;
     }
 
     /**
-     * Returns true if certificates presented by the server are going to be checked for their
-     * validity. By default certificates are not verified.
-     *
-     * @return true if certificates presented by the server are going to be checked for their
-     *         validity.
+     * Returns true if connections are considered insecure if their certificate is expired.
+     * Default: false.
      */
     public boolean isExpiredCertificatesCheckEnabled() {
         return expiredCertificatesCheckEnabled;
     }
 
     /**
-     * Sets if certificates presented by the server are going to be checked for their
-     * validity. By default certificates are not verified.
-     *
-     * @param expiredCertificatesCheckEnabled if certificates presented by the server are going
-     *        to be checked for their validity.
+     * Sets if a certificates presented by the server are going to be checked for their
+     * validity. Default: true.
      */
     public void setExpiredCertificatesCheckEnabled(boolean expiredCertificatesCheckEnabled) {
         this.expiredCertificatesCheckEnabled = expiredCertificatesCheckEnabled;
     }
 
     /**
-     * Returns true if certificates presented by the server are going to be checked for their
-     * domain. By default certificates are not verified.
-     *
-     * @return true if certificates presented by the server are going to be checked for their
-     *         domain.
+     * Returns true if certificate domains presented by the server must match for the connection
+     * to be considered secure.
      */
     public boolean isNotMatchingDomainCheckEnabled() {
         return notMatchingDomainCheckEnabled;
     }
 
     /**
-     * Sets if certificates presented by the server are going to be checked for their
-     * domain. By default certificates are not verified.
-     *
-     * @param notMatchingDomainCheckEnabled if certificates presented by the server are going
-     *        to be checked for their domain.
+     * Sets if certificate domains presented by the server must match for the connection to
+     * be considered secure.  Default: true.
      */
     public void setNotMatchingDomainCheckEnabled(boolean notMatchingDomainCheckEnabled) {
         this.notMatchingDomainCheckEnabled = notMatchingDomainCheckEnabled;
