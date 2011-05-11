@@ -79,6 +79,28 @@ class ServerTrustManager implements X509TrustManager {
         }
     }
 
+    /**
+     * This exception contains details about a certificate verification failure.
+     */
+    public static class CertificateExceptionDetail extends CertificateException {
+        private static final long serialVersionUID = 9002117483237932715L;
+        X509Certificate[] certificates;
+
+        CertificateExceptionDetail(X509Certificate[] certificates, Throwable t) {
+            super(t);
+            this.certificates = certificates;
+        }
+        CertificateExceptionDetail(X509Certificate[] certificates, String message) {
+            super(message);
+            this.certificates = certificates;
+        }
+        CertificateExceptionDetail(X509Certificate[] certificates, String message, Throwable t) {
+            super(message, t);
+            this.certificates = certificates;
+        }
+
+    };
+
     public X509Certificate[] getAcceptedIssuers() {
         return new X509Certificate[0];
     }
@@ -111,13 +133,13 @@ class ServerTrustManager implements X509TrustManager {
                             x509Certificates[i].verify(publickey);
                         }
                         catch (GeneralSecurityException generalsecurityexception) {
-                            throw new CertificateException(
-                                    "signature verification failed of " + peerIdentities);
+                            throw new CertificateExceptionDetail(x509Certificates,
+                                    "signature verification failed of " + peerIdentities.get(i));
                         }
                     }
                     else {
-                        throw new CertificateException(
-                                "subject/issuer verification failed of " + peerIdentities);
+                        throw new CertificateExceptionDetail(x509Certificates,
+                                "subject/issuer verification failed of " + peerIdentities.get(i));
                     }
                 }
                 principalLast = principalSubject;
@@ -141,7 +163,8 @@ class ServerTrustManager implements X509TrustManager {
                 e.printStackTrace();
             }
             if (!trusted) {
-                throw new CertificateException("root certificate not trusted of " + peerIdentities);
+                throw new CertificateExceptionDetail(x509Certificates,
+                        "Certificate \"" + getPeerIdentity(x509Certificates[0]) + "\" is self-signed");
             }
         }
 
@@ -154,11 +177,11 @@ class ServerTrustManager implements X509TrustManager {
                 String peerIdentity = peerIdentities.get(0).replace("*.", "");
                 // Check if the requested subdomain matches the certified domain
                 if (!server.endsWith(peerIdentity)) {
-                    throw new CertificateException("target verification failed of " + peerIdentities);
+                    throw new CertificateExceptionDetail(x509Certificates, "target verification failed of " + peerIdentities);
                 }
             }
             else if (!peerIdentities.contains(server)) {
-                throw new CertificateException("target verification failed of " + peerIdentities);
+                throw new CertificateExceptionDetail(x509Certificates, "target verification failed of " + peerIdentities);
             }
         }
 
@@ -171,7 +194,7 @@ class ServerTrustManager implements X509TrustManager {
                     x509Certificates[i].checkValidity(date);
                 }
                 catch (GeneralSecurityException generalsecurityexception) {
-                    throw new CertificateException("invalid date of " + server);
+                    throw new CertificateExceptionDetail(x509Certificates, generalsecurityexception);
                 }
             }
         }
