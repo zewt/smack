@@ -24,6 +24,7 @@ import org.jivesoftware.smack.proxy.ProxyInfo;
 import org.jivesoftware.smack.util.DNSUtil;
 
 import javax.net.SocketFactory;
+import java.security.KeyStore;
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
 import java.io.File;
 
@@ -186,10 +187,9 @@ public class ConnectionConfiguration implements Cloneable {
 
         // By default, search for the certificate file.
         truststorePath = null;
-        // Set the default store type
-        truststoreType = "jks";
-        // Set the default password of the cacert file that is "changeit"
-        truststorePassword = "changeit";
+        truststoreType = KeyStore.getDefaultType();
+        truststorePassword = System.getProperty("javax.net.ssl.trustStorePassword");
+
         keystorePath = System.getProperty("javax.net.ssl.keyStore");
         keystoreType = "jks";
         pkcs11Library = "pkcs11.config";
