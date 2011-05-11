@@ -732,6 +732,9 @@ public class XMPPConnection extends Connection {
 
         // Secure the plain connection
         XMPPSSLSocketFactory sf = new XMPPSSLSocketFactory(config, getServiceName());
+        if(sf.isAvailable())
+            throw new XMPPException("TLS is not available");
+
         socket = sf.getSocketFactory().createSocket(plain,
                 plain.getInetAddress().getHostName(), plain.getPort(), true);
         socket.setSoTimeout(0);
