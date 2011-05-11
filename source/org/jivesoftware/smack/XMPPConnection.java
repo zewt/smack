@@ -1025,7 +1025,7 @@ public class XMPPConnection extends Connection {
     protected void notifyConnectionClosedOnError(Exception e) {
         // Print the stack trace to help catch the problem.  Include the current
         // stack in the output.
-        e.printStackTrace();
+        new Exception(e).printStackTrace();
 
         for (ConnectionListener listener: getConnectionListeners()) {
             try {
