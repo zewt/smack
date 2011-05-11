@@ -541,6 +541,11 @@ public class XMPPConnection extends Connection {
             throw new XMPPException(errorMessage, new XMPPError(
                     XMPPError.Condition.remote_server_error, errorMessage), ioe);
         }
+
+        // If debugging is enabled, we open a window and write out all network traffic.
+        if (!config.isDebuggerEnabled())
+            initDebugger();
+
         initConnection();
     }
 
@@ -744,10 +749,6 @@ public class XMPPConnection extends Connection {
                             "XMPPError establishing connection with server."),
                     ioe);
         }
-
-        // If debugging is enabled, we open a window and write out all network traffic.
-        if (!config.isDebuggerEnabled())
-            initDebugger();
     }
 
     /***********************************************
