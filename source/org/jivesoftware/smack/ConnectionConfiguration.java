@@ -24,7 +24,7 @@ import org.jivesoftware.smack.proxy.ProxyInfo;
 import org.jivesoftware.smack.util.DNSUtil;
 
 import javax.net.SocketFactory;
-import javax.security.auth.callback.CallbackHandler;
+import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
 import java.io.File;
 
 /**

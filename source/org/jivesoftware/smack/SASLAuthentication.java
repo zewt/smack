@@ -27,7 +27,7 @@ import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.packet.Session;
 import org.jivesoftware.smack.sasl.*;
 
-import javax.security.auth.callback.CallbackHandler;
+import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.*;

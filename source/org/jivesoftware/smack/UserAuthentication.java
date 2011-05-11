@@ -20,7 +20,7 @@
 
 package org.jivesoftware.smack;
 
-import javax.security.auth.callback.CallbackHandler;
+import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
 
 /**
  * There are two ways to authenticate a user with a server. Using SASL or Non-SASL

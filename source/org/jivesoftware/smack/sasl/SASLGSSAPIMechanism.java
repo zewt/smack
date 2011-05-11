@@ -25,9 +25,9 @@ import org.jivesoftware.smack.XMPPException;
 import java.io.IOException;
 import java.util.Map;
 import java.util.HashMap;
-import javax.security.sasl.Sasl;
-import javax.security.sasl.SaslClient;
-import javax.security.auth.callback.CallbackHandler;
+import org.apache.harmony.javax.security.sasl.Sasl;
+import org.apache.harmony.javax.security.sasl.SaslClient;
+import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
 
 /**
  * Implementation of the SASL GSSAPI mechanism

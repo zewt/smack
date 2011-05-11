@@ -24,9 +24,9 @@ import org.jivesoftware.smack.filter.PacketIDFilter;
 import org.jivesoftware.smack.packet.Authentication;
 import org.jivesoftware.smack.packet.IQ;
 
-import javax.security.auth.callback.CallbackHandler;
-import javax.security.auth.callback.PasswordCallback;
-import javax.security.auth.callback.Callback;
+import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
+import org.apache.harmony.javax.security.auth.callback.PasswordCallback;
+import org.apache.harmony.javax.security.auth.callback.Callback;
 
 /**
  * Implementation of JEP-0078: Non-SASL Authentication. Follow the following
