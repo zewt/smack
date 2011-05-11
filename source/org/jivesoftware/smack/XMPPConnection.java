@@ -73,6 +73,15 @@ public class XMPPConnection extends Connection {
     private ObservableReader obsReader;
     private ObservableWriter obsWriter;
 
+    /** The SmackDebugger allows to log and debug XML traffic. */
+    protected SmackDebugger debugger = null;
+
+    /** The low-level Reader stream. */
+    protected Reader reader;
+
+    /** The low-level Writer stream. */
+    protected Writer writer;
+
     Roster roster = null;
 
     /**

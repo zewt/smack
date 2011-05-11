@@ -30,12 +30,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.jivesoftware.smack.debugger.SmackDebugger;
 import org.jivesoftware.smack.filter.PacketFilter;
 import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.packet.Presence;
-import org.jivesoftware.smack.util.ObservableReader;
-import org.jivesoftware.smack.util.ObservableWriter;
 
 /**
  * The abstract Connection class provides an interface for connections to a
@@ -159,22 +156,6 @@ public abstract class Connection {
      * The ChatManager keeps track of references to all current chats.
      */
     private ChatManager chatManager = null;
-
-    /**
-     * The SmackDebugger allows to log and debug XML traffic.
-     */
-    protected SmackDebugger debugger = null;
-
-    /**
-     * The Reader which is used for the {@see debugger}.
-     */
-    protected ObservableReader reader;
-
-    /**
-     * The Writer which is used for the {@see debugger}.
-     */
-    protected ObservableWriter writer;
-
 
     /**
      * The SASLAuthentication manager that is responsible for authenticating with the server.
