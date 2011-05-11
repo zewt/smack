@@ -60,7 +60,9 @@ class ServerTrustManager implements X509TrustManager {
      * can't be verified.  If false, the connection will be allowed, but isSecureConnection will
      * return false.
      */
-    public ServerTrustManager(String server, ConnectionConfiguration configuration, boolean secureConnectionRequired) {
+    public ServerTrustManager(String server, ConnectionConfiguration configuration, boolean secureConnectionRequired)
+    throws XMPPException
+    {
         this.configuration = configuration;
         this.server = server;
         this.secureConnectionRequired = secureConnectionRequired;
@@ -70,9 +72,11 @@ class ServerTrustManager implements X509TrustManager {
         }
         catch (RuntimeException e) { throw e; } // don't catch unchecked exceptions below
         catch (Exception e) {
-            e.printStackTrace();
-            // Disable root CA checking
-            configuration.setVerifyRootCAEnabled(false);
+            if(secureConnectionRequired)
+                throw new XMPPException("Error creating keystore", e);
+
+            // If a secure connection isn't required anyway, just clear trustStore.
+            trustStore = null;
         }
     }
 
