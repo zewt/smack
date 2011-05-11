@@ -255,21 +255,48 @@ class ServerTrustManager implements X509TrustManager {
             boolean trusted = false;
             try {
                 trusted = trustStore.getCertificateAlias(x509Certificates[nSize - 1]) != null;
-                if (!trusted && nSize == 1 && configuration.isSelfSignedCertificateEnabled())
-                {
-                    System.out.println("Accepting self-signed certificate of remote server: " +
-                            peerIdentities);
-                    trusted = true;
-                }
             }
             catch (KeyStoreException e) {
                 // KeyStoreException is thrown if the KeyStore isn't initialized.  We've
                 // initialized it, so this is a runtime error.
                 throw new RuntimeException(e);
             }
+
+            boolean isSelfSigned = false;
+            if (!trusted && x509Certificates.length == 1) {
+                // This isn't a trusted certificate.  Figure out if it's a self-signed certificate.
+                // Even if we accept self-signed certificates, only accept them if they're well-
+                // formed, so we don't accept certificates that won't work anywhere else, and to
+                // improve diagnostics.
+                X509Certificate cert = x509Certificates[0];
+                if(cert.getIssuerDN() == cert.getSubjectDN()) {
+                    try {
+                        PublicKey publickey = cert.getPublicKey();
+                        cert.verify(publickey);
+
+                        // This is an otherwise valid self-signed certificate.
+                        isSelfSigned = true;
+                    }
+                    catch (GeneralSecurityException generalsecurityexception) {
+                    }
+                }
+
+                if (isSelfSigned && configuration.isSelfSignedCertificateEnabled())
+                {
+                    System.out.println("Accepting self-signed certificate of remote server: " +
+                            peerIdentities);
+                    trusted = true;
+                }
+            }
+
             if (!trusted) {
-                throw new CertificateExceptionDetail(x509Certificates,
-                        "Certificate \"" + getPeerIdentity(x509Certificates[0]) + "\" is self-signed");
+                if(isSelfSigned)
+                    throw new CertificateExceptionDetail(x509Certificates,
+                            "Certificate \"" + getPeerIdentity(x509Certificates[0]) + "\" is self-signed");
+                else
+                    throw new CertificateExceptionDetail(x509Certificates,
+                            "Unknown root certificate for \"" + getPeerIdentity(x509Certificates[0]) + "\": " +
+                            x509Certificates[nSize-1].getIssuerDN());
             }
         }
 
