@@ -19,14 +19,13 @@
 
 package org.jivesoftware.smack.util;
 
-import java.util.Hashtable;
 import java.util.Map;
 
-import javax.naming.NamingEnumeration;
-import javax.naming.directory.Attribute;
-import javax.naming.directory.Attributes;
-import javax.naming.directory.DirContext;
-import javax.naming.directory.InitialDirContext;
+import org.xbill.DNS.Lookup;
+import org.xbill.DNS.Record;
+import org.xbill.DNS.SRVRecord;
+import org.xbill.DNS.TextParseException;
+import org.xbill.DNS.Type;
 
 /**
  * Utilty class to perform DNS lookups for XMPP services.
@@ -39,19 +38,49 @@ public class DNSUtil {
      * Create a cache to hold the 100 most recently accessed DNS lookups for a period of
      * 10 minutes.
      */
-    private static Map cache = new Cache(100, 1000*60*10);
+    private static Map<String, HostAddress> cache = new Cache(100, 1000 * 60 * 10);
 
-    private static DirContext context;
-
-    static {
+    private static HostAddress resolveSRV(String domain) {
+        String bestHost = null;
+        int bestPort = -1;
+        int bestPriority = Integer.MAX_VALUE;
+        int bestWeight = 0;
+        Lookup lookup;
         try {
-            Hashtable env = new Hashtable();
-            env.put("java.naming.factory.initial", "com.sun.jndi.dns.DnsContextFactory");
-            context = new InitialDirContext(env);
+            lookup = new Lookup(domain, Type.SRV);
+            Record recs[] = lookup.run();
+            if (recs == null) { return null; }
+            for (Record rec : recs) {
+                SRVRecord record = (SRVRecord) rec;
+                if (record != null && record.getTarget() != null) {
+                    int weight = (int) (record.getWeight() * record.getWeight() * Math
+                            .random());
+                    if (record.getPriority() < bestPriority) {
+                        bestPriority = record.getPriority();
+                        bestWeight = weight;
+                        bestHost = record.getTarget().toString();
+                        bestPort = record.getPort();
+                    } else if (record.getPriority() == bestPriority) {
+                        if (weight > bestWeight) {
+                            bestPriority = record.getPriority();
+                            bestWeight = weight;
+                            bestHost = record.getTarget().toString();
+                            bestPort = record.getPort();
+                        }
+                    }
+                }
+            }
+        } catch (TextParseException e) {
+        } catch (NullPointerException e) {
         }
-        catch (Exception e) {
-            // Ignore.
+        if (bestHost == null) {
+            return null;
         }
+        // Host entries in DNS should end with a ".".
+        if (bestHost.endsWith(".")) {
+            bestHost = bestHost.substring(0, bestHost.length() - 1);
+        }
+        return new HostAddress(bestHost, bestPort);
     }
 
     /**
@@ -79,9 +108,6 @@ public class DNSUtil {
      *      server can be reached at for the specified domain.
      */
     public static HostAddress resolveXMPPDomain(String domain) {
-        if (context == null) {
-            return new HostAddress(domain, 5222);
-        }
         String key = "c" + domain;
         // Return item from cache if it exists.
         if (cache.containsKey(key)) {
@@ -90,50 +116,13 @@ public class DNSUtil {
                 return address;
             }
         }
-        String bestHost = domain;
-        int bestPort = 5222;
-        int bestPriority = 0;
-        int bestWeight = 0;
-        try {
-            Attributes dnsLookup = context.getAttributes("_xmpp-client._tcp." + domain, new String[]{"SRV"});
-            Attribute srvAttribute = dnsLookup.get("SRV");
-            NamingEnumeration srvRecords = srvAttribute.getAll();
-            while(srvRecords.hasMore()) {
-				String srvRecord = (String) srvRecords.next();
-	            String [] srvRecordEntries = srvRecord.split(" ");
-	            int priority = Integer.parseInt(srvRecordEntries[srvRecordEntries.length - 4]);
-	            int port = Integer.parseInt(srvRecordEntries[srvRecordEntries.length-2]);
-	            int weight = Integer.parseInt(srvRecordEntries[srvRecordEntries.length - 3]);
-	            String host = srvRecordEntries[srvRecordEntries.length-1];
-	            
-	            // Randomize the weight.
-	            weight *= Math.random() * weight;
-	            
-	            if ((bestPriority == 0) || (priority < bestPriority)) {
-	            	// Choose a server with the lowest priority.
-	            	bestPriority = priority;
-	            	bestWeight = weight;
-	            	bestHost = host;
-	            	bestPort = port;
-	            } else if (priority == bestPriority) {
-	            	// When we have like priorities then randomly choose a server based on its weight
-	            	// The weights were randomized above.
-	            	if (weight > bestWeight) {
-	            		bestWeight = weight;
-	            		bestHost = host;
-	            		bestPort = port;
-	            	}
-	            }
-			}
+        HostAddress address = resolveSRV("_xmpp-client._tcp." + domain);
+        if (address == null) {
+            address = resolveSRV("_jabber._tcp." + domain);
         }
-        catch (Exception e) {
-            // Ignore.
+        if (address == null) {
+            address = new HostAddress(domain, 5222);
         }
-        // Host entries in DNS should end with a ".".
-        if (bestHost.endsWith(".")) {
-        	bestHost = bestHost.substring(0, bestHost.length()-1);
-        }
-        HostAddress address = new HostAddress(bestHost, bestPort);
         // Add item to cache.
         cache.put(key, address);
         return address;
@@ -157,9 +146,6 @@ public class DNSUtil {
      *      server can be reached at for the specified domain.
      */
     public static HostAddress resolveXMPPServerDomain(String domain) {
-        if (context == null) {
-            return new HostAddress(domain, 5269);
-        }
         String key = "s" + domain;
         // Return item from cache if it exists.
         if (cache.containsKey(key)) {
@@ -168,35 +154,13 @@ public class DNSUtil {
                 return address;
             }
         }
-        String host = domain;
-        int port = 5269;
-        try {
-            Attributes dnsLookup =
-                    context.getAttributes("_xmpp-server._tcp." + domain, new String[]{"SRV"});
-            String srvRecord = (String)dnsLookup.get("SRV").get();
-            String [] srvRecordEntries = srvRecord.split(" ");
-            port = Integer.parseInt(srvRecordEntries[srvRecordEntries.length-2]);
-            host = srvRecordEntries[srvRecordEntries.length-1];
+        HostAddress address = resolveSRV("_xmpp-server._tcp." + domain);
+        if (address == null) {
+            address = resolveSRV("_jabber._tcp." + domain);
         }
-        catch (Exception e) {
-            // Attempt lookup with older "jabber" name.
-            try {
-                Attributes dnsLookup =
-                        context.getAttributes("_jabber._tcp." + domain, new String[]{"SRV"});
-                String srvRecord = (String)dnsLookup.get("SRV").get();
-                String [] srvRecordEntries = srvRecord.split(" ");
-                port = Integer.parseInt(srvRecordEntries[srvRecordEntries.length-2]);
-                host = srvRecordEntries[srvRecordEntries.length-1];
-            }
-            catch (Exception e2) {
-                // Ignore.
-            }
+        if (address == null) {
+            address = new HostAddress(domain, 5269);
         }
-        // Host entries in DNS should end with a ".".
-        if (host.endsWith(".")) {
-            host = host.substring(0, host.length()-1);
-        }
-        HostAddress address = new HostAddress(host, port);
         // Add item to cache.
         cache.put(key, address);
         return address;
