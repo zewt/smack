@@ -172,7 +172,7 @@ class PacketReader {
         boolean waitingForEstablishedConnection = true;
         try {
             try {
-                this.connection.data_stream.initializeConnection();
+                connection.initializeConnection();
             } catch(XMPPException e) {
                 /* Before connection, users can't yet attach error listeners.  Errors before
                  * connection are thrown from startup(). */

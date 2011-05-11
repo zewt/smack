@@ -32,6 +32,8 @@ import org.jivesoftware.smack.util.ObservableReader;
 import org.jivesoftware.smack.util.ObservableWriter;
 
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
+
+import java.io.Writer;
 import java.lang.reflect.Constructor;
 import java.util.Vector;
 import org.w3c.dom.Element;
@@ -47,7 +49,7 @@ public class XMPPConnection extends Connection {
     /**
      * The XMPPStream used for this connection.
      */
-    XMPPStream data_stream = null;
+    private XMPPStream data_stream = null;
 
     private String user = null;
     private boolean connected = false;
@@ -65,6 +67,7 @@ public class XMPPConnection extends Connection {
     private boolean suppressConnectionErrors;
 
     Element readPacket() throws InterruptedException, XMPPException { return data_stream.readPacket(); }
+    Writer getWriter() { return data_stream.getWriter(); }
     
     private PacketWriter packetWriter;
     private PacketReader packetReader;
@@ -598,6 +601,10 @@ public class XMPPConnection extends Connection {
             cleanup();
             throw ex;        // Everything stoppped. Now throw the exception.
         }
+    }
+
+    void initializeConnection() throws XMPPException {
+        data_stream.initializeConnection();
     }
 
     /*

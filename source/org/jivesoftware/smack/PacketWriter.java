@@ -45,7 +45,7 @@ class PacketWriter {
     private final BlockingQueue<Packet> queue;
     private boolean done;
 
-    private Writer getWriter() { return connection.data_stream.getWriter(); }
+    private Writer getWriter() { return connection.getWriter(); }
     
     /**
      * Creates a new packet writer with the specified connection.
