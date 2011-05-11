@@ -42,15 +42,7 @@ public class ObservableReader extends Reader {
         int count = wrappedReader.read(cbuf, off, len);
         if (count > 0) {
             String str = new String(cbuf, off, count);
-            // Notify that a new string has been read
-            ReaderListener[] readerListeners = null;
-            synchronized (listeners) {
-                readerListeners = new ReaderListener[listeners.size()];
-                listeners.toArray(readerListeners);
-            }
-            for (int i = 0; i < readerListeners.length; i++) {
-                readerListeners[i].read(str);
-            }
+            notifyListeners(str);
         }
         return count;
     }
@@ -115,4 +107,19 @@ public class ObservableReader extends Reader {
         }
     }
 
+    /**
+     * Notify that a new string has been read.
+     *
+     * @param str the read String to notify
+     */
+    private void notifyListeners(String str) {
+        ReaderListener[] readerListeners = null;
+        synchronized (listeners) {
+            readerListeners = new ReaderListener[listeners.size()];
+            listeners.toArray(readerListeners);
+        }
+        for (int i = 0; i < readerListeners.length; i++) {
+            readerListeners[i].read(str);
+        }
+    }
 }
