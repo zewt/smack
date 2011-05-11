@@ -20,14 +20,10 @@
 
 package org.jivesoftware.smack;
 
-import java.io.Reader;
-import java.io.Writer;
-import java.lang.reflect.Constructor;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
-import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -715,56 +711,6 @@ public abstract class Connection {
             }
         }
     }
-
-    /**
-     * Initialize the {@link #debugger}. You can specify a customized {@link SmackDebugger}
-     * by setup the system property <code>smack.debuggerClass</code> to the implementation.
-     * 
-     * @throws IllegalStateException if the reader or writer isn't yet initialized.
-     * @throws IllegalArgumentException if the SmackDebugger can't be loaded.
-     */
-    protected void initDebugger() {
-        if (reader == null || writer == null) {
-            throw new NullPointerException("Reader or writer isn't initialized.");
-        }
-        // If debugging is enabled, we open a window and write out all network traffic.
-        if (config.isDebuggerEnabled()) {
-            if (debugger == null) {
-                // Detect the debugger class to use.
-                // Use try block since we may not have permission to get a system
-                // property (for example, when an applet).
-                Vector<String> debuggers = new Vector<String>();
-                String requestedDebugger = null;
-                try {
-                    requestedDebugger = System.getProperty("smack.debuggerClass");
-                    debuggers.add(requestedDebugger);
-                }
-                catch (Throwable t) {
-                    // Ignore.
-                }
-                debuggers.add("org.jivesoftware.smackx.debugger.EnhancedDebugger");
-                debuggers.add("org.jivesoftware.smackx.debugger.AndroidDebugger");
-                debuggers.add("org.jivesoftware.smack.debugger.LiteDebugger");
-                for (String debuggerName: debuggers) {
-                    try {
-                        Class<?> debuggerClass = Class.forName(debuggerName);
-
-                        // Attempt to create an instance of this debugger.
-                        Constructor<?> constructor = debuggerClass
-                                .getConstructor(Connection.class, ObservableWriter.class, ObservableReader.class);
-                        debugger = (SmackDebugger) constructor.newInstance(this, writer, reader);
-                    }
-                    catch (Exception e) {
-                        if(requestedDebugger != null && requestedDebugger.equals(debuggerName))
-                            e.printStackTrace();
-                        continue;
-                    }
-                }
-            }
-        }
-    }
-
-
 
     /**
      * A wrapper class to associate a packet filter with a listener.
