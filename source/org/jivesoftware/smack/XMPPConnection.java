@@ -582,6 +582,7 @@ public class XMPPConnection extends Connection {
                 Constructor<?> constructor = debuggerClass
                         .getConstructor(Connection.class, ObservableWriter.class, ObservableReader.class);
                 debugger = (SmackDebugger) constructor.newInstance(this, writer, reader);
+                break;
             }
             catch (Exception e) {
                 if(requestedDebugger != null && requestedDebugger.equals(debuggerName))
