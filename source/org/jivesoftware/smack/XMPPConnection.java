@@ -581,7 +581,7 @@ public class XMPPConnection extends Connection {
                 }
             }
             else if (!wasAuthenticated) {
-                packetReader.notifyReconnection();
+                notifyReconnection();
             }
 
         }
@@ -964,7 +964,7 @@ public class XMPPConnection extends Connection {
                     login(config.getUsername(), config.getPassword(),
                             config.getResource());
                 }
-                packetReader.notifyReconnection();
+                notifyReconnection();
             }
             catch (XMPPException e) {
                 e.printStackTrace();
@@ -980,6 +980,62 @@ public class XMPPConnection extends Connection {
     private void setWasAuthenticated(boolean wasAuthenticated) {
         if (!this.wasAuthenticated) {
             this.wasAuthenticated = wasAuthenticated;
+        }
+    }
+
+    /**
+     * Sends a notification indicating that the connection was reconnected successfully.
+     */
+    protected void notifyReconnection() {
+        // Notify connection listeners of the reconnection.
+        for (ConnectionListener listener: getConnectionListeners()) {
+            try {
+                listener.reconnectionSuccessful();
+            }
+            catch (Exception e) {
+                // Catch and print any exception so we can recover
+                // from a faulty listener
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /**
+     * Sends a notification indicating that the connection was closed gracefully.
+     */
+    protected void notifyConnectionClosed() {
+        for (ConnectionListener listener: getConnectionListeners()) {
+            try {
+                listener.connectionClosed();
+            }
+            catch (Exception e) {
+                // Catch and print any exception so we can recover
+                // from a faulty listener and finish the shutdown process
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /**
+     * Sends out a notification that there was an error with the connection
+     * and closes the connection.
+     *
+     * @param e the exception that causes the connection close event.
+     */
+    protected void notifyConnectionClosedOnError(Exception e) {
+        // Print the stack trace to help catch the problem.  Include the current
+        // stack in the output.
+        e.printStackTrace();
+
+        for (ConnectionListener listener: getConnectionListeners()) {
+            try {
+                listener.connectionClosedOnError(e);
+            }
+            catch (Exception e2) {
+                // Catch and print any exception so we can recover
+                // from a faulty listener
+                e2.printStackTrace();
+            }
         }
     }
 }

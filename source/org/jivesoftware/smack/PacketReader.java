@@ -129,16 +129,7 @@ class PacketReader {
     public void shutdown() {
         // Notify connection listeners of the connection closing if done hasn't already been set.
         if (!done) {
-            for (ConnectionListener listener : connection.getConnectionListeners()) {
-                try {
-                    listener.connectionClosed();
-                }
-                catch (Exception e) {
-                    // Cath and print any exception so we can recover
-                    // from a faulty listener and finish the shutdown process
-                    e.printStackTrace();
-                }
-            }
+            connection.notifyConnectionClosed();
         }
         done = true;
 
@@ -164,36 +155,8 @@ class PacketReader {
         done = true;
         // Closes the connection temporary. A reconnection is possible
         connection.shutdown(new Presence(Presence.Type.unavailable));
-        // Print the stack trace to help catch the problem
-        e.printStackTrace();
         // Notify connection listeners of the error.
-        for (ConnectionListener listener : connection.getConnectionListeners()) {
-            try {
-                listener.connectionClosedOnError(e);
-            }
-            catch (Exception e2) {
-                // Catch and print any exception so we can recover
-                // from a faulty listener
-                e2.printStackTrace();
-            }
-        }
-    }
-
-    /**
-     * Sends a notification indicating that the connection was reconnected successfully.
-     */
-    protected void notifyReconnection() {
-        // Notify connection listeners of the reconnection.
-        for (ConnectionListener listener : connection.getConnectionListeners()) {
-            try {
-                listener.reconnectionSuccessful();
-            }
-            catch (Exception e) {
-                // Catch and print any exception so we can recover
-                // from a faulty listener
-                e.printStackTrace();
-            }
-        }
+        connection.notifyConnectionClosedOnError(e);
     }
 
     /**
