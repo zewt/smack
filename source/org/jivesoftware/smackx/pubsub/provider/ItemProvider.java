@@ -46,6 +46,8 @@ public class ItemProvider implements PacketExtensionProvider
 		}
 		else
 		{
+			while (tag != XmlPullParser.START_TAG)
+				tag = parser.next();
 			String payloadElemName = parser.getName();
 			String payloadNS = parser.getNamespace();
 			

@@ -34,7 +34,7 @@ import org.jivesoftware.smackx.pubsub.packet.SyncPacketSend;
  */
 public class LeafNode extends Node
 {
-	LeafNode(Connection connection, String nodeName)
+	public LeafNode(Connection connection, String nodeName)
 	{
 		super(connection, nodeName);
 	}

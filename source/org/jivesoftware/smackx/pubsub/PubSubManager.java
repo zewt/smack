@@ -43,8 +43,8 @@ import org.jivesoftware.smackx.pubsub.util.NodeUtils;
  */
 public class PubSubManager
 {
-	private Connection con;
-	private String to;
+	protected Connection con;
+	protected String to;
 	private Map<String, Node> nodeMap = new ConcurrentHashMap<String, Node>();
 	
 	/**

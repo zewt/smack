@@ -60,7 +60,7 @@ abstract public class Node
 	 * 
 	 *   For example, OpenFire requires the server to be prefixed by <b>pubsub</b>
 	 */
-	void setTo(String toAddress)
+	public void setTo(String toAddress)
 	{
 		to = toAddress;
 	}
