@@ -29,7 +29,6 @@ import org.jivesoftware.smack.sasl.SASLMechanism.Failure;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
-import java.beans.PropertyDescriptor;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -823,14 +822,14 @@ public class PacketParserUtils {
             if (eventType == XmlPullParser.START_TAG) {
                 String name = parser.getName();
                 String stringValue = parser.nextText();
-                PropertyDescriptor descriptor = new PropertyDescriptor(name, objectClass);
-                // Load the class type of the property.
-                Class propertyType = descriptor.getPropertyType();
+                Class propertyType = object.getClass().getMethod(
+                    "get" + Character.toUpperCase(name.charAt(0)) + name.substring(1)).getReturnType();
                 // Get the value of the property by converting it from a
                 // String to the correct object type.
                 Object value = decode(propertyType, stringValue);
                 // Set the value of the bean.
-                descriptor.getWriteMethod().invoke(object, value);
+                object.getClass().getMethod("set" + Character.toUpperCase(name.charAt(0)) + name.substring(1), propertyType)
+                .invoke(object, value);
             }
             else if (eventType == XmlPullParser.END_TAG) {
                 if (parser.getName().equals(elementName)) {
