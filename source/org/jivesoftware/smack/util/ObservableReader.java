@@ -112,7 +112,7 @@ public class ObservableReader extends Reader {
      *
      * @param str the read String to notify
      */
-    private void notifyListeners(String str) {
+    public void notifyListeners(String str) {
         ReaderListener[] readerListeners = null;
         synchronized (listeners) {
             readerListeners = new ReaderListener[listeners.size()];

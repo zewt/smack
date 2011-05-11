@@ -78,7 +78,7 @@ public class ObservableWriter extends Writer {
      * 
      * @param str the written String to notify 
      */
-    private void notifyListeners(String str) {
+    public void notifyListeners(String str) {
         WriterListener[] writerListeners = null;
         synchronized (listeners) {
             writerListeners = new WriterListener[listeners.size()];
