@@ -42,6 +42,8 @@ public class ConnectionConfiguration implements Cloneable {
      * Hostname of the XMPP server. Usually servers use the same service name as the name
      * of the server. However, there are some servers like google where host would be
      * talk.google.com and the serviceName would be gmail.com.
+     *
+     * This value is updated when we receive the hostname from the server, if they differ.
      */
     private String serviceName;
 
