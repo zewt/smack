@@ -105,7 +105,7 @@ public class ConnectionConfiguration implements Cloneable {
      * @param serviceName the name of the service provided by an XMPP server.
      */
     public ConnectionConfiguration(String serviceName) {
-        this(serviceName, null);
+        this(null, -1, serviceName, null);
     }
 	
 	/**
@@ -118,9 +118,7 @@ public class ConnectionConfiguration implements Cloneable {
      * @param proxy the proxy through which XMPP is to be connected
      */
     public ConnectionConfiguration(String serviceName,ProxyInfo proxy) {
-        // Perform DNS lookup to get host and port to use
-        DNSUtil.HostAddress address = DNSUtil.resolveXMPPDomain(serviceName);
-        init(address.getHost(), address.getPort(), serviceName, proxy);
+        this(null, -1, serviceName, proxy);
     }
 
     /**
@@ -141,7 +139,7 @@ public class ConnectionConfiguration implements Cloneable {
         this(host, port, serviceName, null);
     }
 	
-	/**
+    /**
      * Creates a new ConnectionConfiguration using the specified host, port and
      * service name. This is useful for manually overriding the DNS SRV lookup
      * process that's used with the {@link #ConnectionConfiguration(String)}
@@ -157,6 +155,18 @@ public class ConnectionConfiguration implements Cloneable {
      * @param proxy the proxy through which XMPP is to be connected
      */
     public ConnectionConfiguration(String host, int port, String serviceName, ProxyInfo proxy) {
+        if(host == null) {
+            if(serviceName == null)
+                throw new IllegalArgumentException("If host is null, serviceName must be specified");
+            if(port != -1)
+                throw new IllegalArgumentException("If host is null, port must be -1");
+
+            // Perform DNS lookup to get host and port to use
+            DNSUtil.HostAddress address = DNSUtil.resolveXMPPDomain(serviceName);
+            host = address.getHost();
+            port = address.getPort();
+        }
+
         init(host, port, serviceName, proxy);
     }
 
