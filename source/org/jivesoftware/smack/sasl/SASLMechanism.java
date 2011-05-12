@@ -60,7 +60,6 @@ public abstract class SASLMechanism implements CallbackHandler {
     protected SaslClient sc;
     protected String authenticationId;
     protected String password;
-    protected String hostname;
 
 
     public SASLMechanism(SASLAuthentication saslAuthentication) {
@@ -85,7 +84,6 @@ public abstract class SASLMechanism implements CallbackHandler {
         //Set the authenticationID as the username, since they must be the same in this case.
         this.authenticationId = username;
         this.password = password;
-        this.hostname = host;
 
         String[] mechanisms = { getName() };
         Map<String,String> props = new HashMap<String,String>();
@@ -177,8 +175,9 @@ public abstract class SASLMechanism implements CallbackHandler {
                 PasswordCallback pcb = (PasswordCallback)callbacks[i];
                 pcb.setPassword(password.toCharArray());
             } else if(callbacks[i] instanceof RealmCallback) {
+                // Use the default realm provided by the server.
                 RealmCallback rcb = (RealmCallback)callbacks[i];
-                rcb.setText(hostname);
+                rcb.setText(rcb.getDefaultText());
             } else if(callbacks[i] instanceof RealmChoiceCallback){
                 //unused
                 //RealmChoiceCallback rccb = (RealmChoiceCallback)callbacks[i];
