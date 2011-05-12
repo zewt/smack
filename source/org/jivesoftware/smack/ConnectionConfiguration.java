@@ -105,10 +105,7 @@ public class ConnectionConfiguration implements Cloneable {
      * @param serviceName the name of the service provided by an XMPP server.
      */
     public ConnectionConfiguration(String serviceName) {
-        // Perform DNS lookup to get host and port to use
-        DNSUtil.HostAddress address = DNSUtil.resolveXMPPDomain(serviceName);
-        init(address.getHost(), address.getPort(), serviceName, 
-			ProxyInfo.forDefaultProxy());
+        this(serviceName, null);
     }
 	
 	/**
@@ -141,7 +138,7 @@ public class ConnectionConfiguration implements Cloneable {
      * @param serviceName the name of the service provided by an XMPP server.
      */
     public ConnectionConfiguration(String host, int port, String serviceName) {
-        init(host, port, serviceName, ProxyInfo.forDefaultProxy());
+        this(host, port, serviceName, null);
     }
 	
 	/**
@@ -171,7 +168,7 @@ public class ConnectionConfiguration implements Cloneable {
      * @param port the port where the XMPP is listening.
      */
     public ConnectionConfiguration(String host, int port) {
-        init(host, port, host, ProxyInfo.forDefaultProxy());
+        this(host, port, host, null);
     }
 	
 	/**
@@ -183,10 +180,12 @@ public class ConnectionConfiguration implements Cloneable {
      * @param proxy the proxy through which XMPP is to be connected
      */
     public ConnectionConfiguration(String host, int port, ProxyInfo proxy) {
-        init(host, port, host, proxy);
+        this(host, port, host, proxy);
     }
 
     private void init(String host, int port, String serviceName, ProxyInfo proxy) {
+        if(proxy == null)
+            proxy = ProxyInfo.forDefaultProxy();
         this.host = host;
         this.port = port;
         this.serviceName = serviceName;
