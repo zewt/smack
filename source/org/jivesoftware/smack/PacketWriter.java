@@ -55,7 +55,6 @@ class PacketWriter {
     protected PacketWriter(XMPPConnection connection) {
         this.queue = new ArrayBlockingQueue<Packet>(500, true);
         this.connection = connection;
-        done = false;
     }
 
     /**
@@ -94,6 +93,8 @@ class PacketWriter {
     public void startup() {
         if(writerThread != null)
             throw new RuntimeException("WriterThread.startup called while already running");
+
+        done = false;
 
         writerThread = new Thread() {
             public void run() {
