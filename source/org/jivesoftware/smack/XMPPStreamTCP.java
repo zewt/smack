@@ -135,9 +135,9 @@ public class XMPPStreamTCP extends XMPPStream
             
             initReaderAndWriter();
         } catch (UnknownHostException e) {
-            throw new XMPPException("Could not connect to " + host + ":" + port + ".", XMPPError.Condition.remote_server_timeout, e);
+            throw new XMPPException("Could not connect to " + host + ":" + port, e);
         } catch(IOException e) {
-            throw new XMPPException("Could not connect to " + host + ":" + port + ".", XMPPError.Condition.remote_server_timeout, e);
+            throw new XMPPException("Could not connect to " + host + ":" + port, e);
         }
 
         /* Handle transport-level negotiation.  Read the <features/> packet to see if
