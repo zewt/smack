@@ -36,6 +36,10 @@ import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
 import java.io.Writer;
 import java.lang.reflect.Constructor;
 import java.util.Vector;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+
 import org.w3c.dom.Element;
 
 /**
@@ -57,6 +61,14 @@ public class XMPPConnection extends Connection {
      * Flag that indicates if the user is currently authenticated with the server.
      */
     private boolean authenticated = false;
+
+    /**
+     * This is false between connectUsingConfiguration calling packetReader.startup()
+     * and connection events being fired, during which time no disconnection events
+     * will be sent.
+     */
+    private boolean readyForDisconnection;
+
     /**
      * Flag that indicates if the user was authenticated with the server when the connection
      * to the server was closed (abruptly or not).
@@ -106,6 +118,7 @@ public class XMPPConnection extends Connection {
         config.setSASLAuthenticationEnabled(true);
         config.setDebuggerEnabled(DEBUG_ENABLED);
         config.setCallbackHandler(callbackHandler);
+        init();
     }
 
     /**
@@ -122,6 +135,7 @@ public class XMPPConnection extends Connection {
         config.setCompressionEnabled(false);
         config.setSASLAuthenticationEnabled(true);
         config.setDebuggerEnabled(DEBUG_ENABLED);
+        init();
     }
 
     /**
@@ -135,6 +149,7 @@ public class XMPPConnection extends Connection {
      */
     public XMPPConnection(ConnectionConfiguration config) {
         super(config);
+        init();
     }
 
     /**
@@ -158,6 +173,22 @@ public class XMPPConnection extends Connection {
     public XMPPConnection(ConnectionConfiguration config, CallbackHandler callbackHandler) {
         super(config);
         config.setCallbackHandler(callbackHandler);
+        init();
+    }
+
+    private void init() {
+        // These won't do anything until we call startup().
+        packetReader = new PacketReader(this);
+        packetWriter = new PacketWriter(this);
+
+        // If debugging is enabled, we should start the thread that will listen for
+        // all packets and then log them.
+        if (debugger != null) {
+            addPacketListener(debugger.getReaderListener(), null);
+            if (debugger.getWriterListener() != null) {
+                addPacketSendingListener(debugger.getWriterListener(), null);
+            }
+        }
     }
 
     public String getConnectionID() {
@@ -352,55 +383,35 @@ public class XMPPConnection extends Connection {
      * @param unavailablePresence the presence packet to send during shutdown.
      */
     protected void shutdown(Presence unavailablePresence) {
+        packetReader.assertNotInThread();
+
         // Set presence to offline.
         if(unavailablePresence != null)
             packetWriter.sendPacket(unavailablePresence);
 
         data_stream.disconnect();
+
+        // These will block until the threads are completely shut down.  This should happen
+        // immediately, due to calling data_stream.disconnect().
         packetReader.shutdown();
         packetWriter.shutdown();
 
-        saslAuthentication.init();
-
-        this.setWasAuthenticated(authenticated);
-        authenticated = false;
-        connected = false;
-    }
-
-    /** Close the stream and shut down the packet reader and writer threads. */
-    // XXX: This is only called from initConnection.  Merge this code path.
-    private void cleanup() {
-        // Disconnect the data stream, to ensure packetReader receives EOF and its reader
-        // thread shuts down promptly.
-        data_stream.disconnect();
-
-        if(packetReader != null) {
-            packetReader.shutdown();
-            packetReader.cleanup();
-            packetReader = null;
-        }
-
-        if(packetWriter != null) {
-            packetWriter.shutdown();
-            packetWriter.cleanup();
-            packetWriter = null;
-        }
-
         // packetReader and packetWriter are gone, so we can safely clear data_stream.
         data_stream = null;
-        
+
+        saslAuthentication.init();
+
         this.setWasAuthenticated(authenticated);
         authenticated = false;
         connected = false;
-
-        saslAuthentication.init();
     }
 
     public void disconnect(Presence unavailablePresence) {
+        packetReader.assertNotInThread();
+
         // If not connected, ignore this request.
-        if (packetReader == null || packetWriter == null) {
+        if (!connected)
             return;
-        }
 
         // Shutting down will cause I/O exceptions in the reader and writer threads;
         // suppress them.
@@ -412,13 +423,6 @@ public class XMPPConnection extends Connection {
             roster.cleanup();
             roster = null;
         }
-
-        // These will block until the threads are completely shut down.  This should happen
-        // immediately, due to shutdown() calling data_stream.disconnect().
-        packetWriter.cleanup();
-        packetWriter = null;
-        packetReader.cleanup();
-        packetReader = null;
 
         wasAuthenticated = false;
         suppressConnectionErrors = false;
@@ -492,7 +496,10 @@ public class XMPPConnection extends Connection {
      *
      * @throws XMPPException if establishing a connection to the server fails.
      */
+    boolean isFirstInitialization = true;
     private void connectUsingConfiguration(ConnectionConfiguration config) throws XMPPException {
+        packetReader.assertNotInThread();
+
         URI boshURI = config.getBoshURI();
         if(boshURI != null)
             data_stream = new XMPPStreamBOSH(config, boshURI);
@@ -503,52 +510,43 @@ public class XMPPConnection extends Connection {
         if (config.isDebuggerEnabled())
             initDebugger();
 
-        boolean isFirstInitialization = packetReader == null || packetWriter == null;
+        // Start the packet writer.  This can't fail, and it won't do anything until
+        // we receive packets.
+        packetWriter.startup();
+
+        readyForDisconnection = false;
 
         try {
-            if (isFirstInitialization) {
-                packetWriter = new PacketWriter(this);
-                packetReader = new PacketReader(this);
-
-                // If debugging is enabled, we should start the thread that will listen for
-                // all packets and then log them.
-                if (debugger != null) {
-                    addPacketListener(debugger.getReaderListener(), null);
-                    if (debugger.getWriterListener() != null) {
-                        addPacketSendingListener(debugger.getWriterListener(), null);
-                    }
-                }
-            }
-            else {
-                packetWriter.init();
-                packetReader.init();
-            }
-
-            // Start the packet writer. This will open a XMPP stream to the server
-            packetWriter.startup();
             // Start the packet reader. The startup() method will block until we
             // get an opening stream packet back from server.
             packetReader.startup();
-
-            // Make note of the fact that we're now connected.
-            connected = true;
-
-            if (isFirstInitialization) {
-                // Notify listeners that a new connection has been established
-                for (ConnectionCreationListener listener : getConnectionCreationListeners()) {
-                    listener.connectionCreated(this);
-                }
-            }
-            else if (!wasAuthenticated) {
-                notifyReconnection();
-            }
-
         }
         catch (XMPPException ex) {
             // An exception occurred in setting up the connection. Make sure we shut down the
             // readers and writers and close the socket.
-            cleanup();
-            throw ex;        // Everything stoppped. Now throw the exception.
+            shutdown(null);
+            throw ex;        // Everything stopped. Now throw the exception.
+        }
+
+        // Connection is successful.
+        connected = true;
+
+        if (isFirstInitialization) {
+            isFirstInitialization = false;
+
+            // Notify listeners that a new connection has been established
+            for (ConnectionCreationListener listener: getConnectionCreationListeners()) {
+                listener.connectionCreated(XMPPConnection.this);
+            }
+        }
+        else if (!wasAuthenticated) {
+            notifyReconnection();
+        }
+
+        // Inform readerThreadException that disconnections are now allowed.
+        synchronized(this) {
+            readyForDisconnection = true;
+            this.notifyAll();
         }
     }
 
@@ -630,6 +628,8 @@ public class XMPPConnection extends Connection {
      *      appropiate error messages to end-users.
      */
     public void connect() throws XMPPException {
+        packetReader.assertNotInThread();
+
         // Establishes the connection, readers and writers
         connectUsingConfiguration(config);
         // Automatically makes the login if the user was previouslly connected successfully
@@ -697,29 +697,7 @@ public class XMPPConnection extends Connection {
         }
     }
 
-    /**
-     * Sends out a notification that there was an error with the connection
-     * and closes the connection.
-     *
-     * @param e the exception that causes the connection close event.
-     */
     protected void notifyConnectionClosedOnError(Exception e) {
-        synchronized(this) {
-            if(suppressConnectionErrors)
-                return;
-
-            // Only send one connection error.
-            suppressConnectionErrors = true;
-        }
-
-        // Shut down the connection.  The connection has already failed, so there's
-        // no point in trying to send presence.
-        shutdown(null);
-
-        // Print the stack trace to help catch the problem.  Include the current
-        // stack in the output.
-        new Exception(e).printStackTrace();
-
         for (ConnectionListener listener: getConnectionListeners()) {
             try {
                 listener.connectionClosedOnError(e);
@@ -730,5 +708,47 @@ public class XMPPConnection extends Connection {
                 e2.printStackTrace();
             }
         }
+    }
+
+    /**
+     * Called by PacketReader when an error occurs after startup() returns successfully.
+     *
+     * @param error the exception that caused the connection close event.
+     */
+    protected void readerThreadException(Exception error) {
+        // If errors are being suppressed, do nothing.  This happens during shutdown().
+        synchronized(this) {
+            if(suppressConnectionErrors)
+                return;
+
+            // Only send one connection error.
+            suppressConnectionErrors = true;
+        }
+
+        // Print the stack trace to help catch the problem.  Include the current
+        // stack in the output.
+        new Exception(error).printStackTrace();
+
+        // PacketReader.startup() has returned, so it's guaranteed that
+        // connectUsingConfiguration will send out connection or reconnection
+        // notifications and set connected = true.  If that hasn't happened
+        // yet, wait for it, so we never send a disconnected event before its
+        // corresponding connect event.
+        synchronized(this) {
+            while(!readyForDisconnection) {
+                try {
+                    this.wait();
+                } catch(InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+
+        // Shut down the data stream.  shutdown() must be called to complete shutdown;
+        // we're running under the reader thread, which shutdown() shuts down, so we
+        // can't do that from here.  It's the responsibility of the user.
+        this.data_stream.disconnect();
+
+        notifyConnectionClosedOnError(error);
     }
 }

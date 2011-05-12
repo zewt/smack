@@ -51,35 +51,7 @@ class PacketReader {
 
     protected PacketReader(final XMPPConnection connection) {
         this.connection = connection;
-        this.init();
-    }
-
-    /**
-     * Initializes the reader in order to be used. The reader is initialized during the
-     * first connection and when reconnecting due to an abruptly disconnection.
-     */
-    protected void init() {
         done = false;
-
-        readerThread = new Thread() {
-            public void run() {
-                parsePackets(this);
-            }
-        };
-        readerThread.setName("Smack Packet Reader (" + connection.connectionCounterValue + ")");
-        readerThread.setDaemon(true);
-
-        // Create an executor to deliver incoming packets to listeners. We'll use a single
-        // thread with an unbounded queue.
-        listenerExecutor = Executors.newSingleThreadExecutor(new ThreadFactory() {
-
-            public Thread newThread(Runnable runnable) {
-                Thread thread = new Thread(runnable,
-                        "Smack Listener Processor (" + connection.connectionCounterValue + ")");
-                thread.setDaemon(true);
-                return thread;
-            }
-        });
     }
 
     /**
@@ -108,9 +80,31 @@ class PacketReader {
      * @throws XMPPException if the connection could not be established
      */
     public void startup() throws XMPPException {
+        if(readerThread != null)
+            throw new RuntimeException("ReaderThread.startup called while already running");
+
+        done = false;
         connectionSemaphore = new Semaphore(0);
 
+        // Create an executor to deliver incoming packets to listeners. We'll use a single
+        // thread with an unbounded queue.
+        listenerExecutor = Executors.newSingleThreadExecutor(new ThreadFactory() {
+            public Thread newThread(Runnable runnable) {
+                Thread thread = new Thread(runnable,
+                        "Smack Listener Processor (" + connection.connectionCounterValue + ")");
+                thread.setDaemon(true);
+                return thread;
+            }
+        });
+
         // Begin connecting.
+        readerThread = new Thread() {
+            public void run() {
+                parsePackets(this);
+            }
+        };
+        readerThread.setName("Smack Packet Reader (" + connection.connectionCounterValue + ")");
+        readerThread.setDaemon(true);
         readerThread.start();
 
         // Wait until the connection is established before returning.
@@ -133,19 +127,15 @@ class PacketReader {
 
     /**
      * Shuts the packet reader down.
+     *
+     * The caller must first shut down the data stream to ensure the thread will exit.
      */
-    public synchronized void shutdown() {
-        // The actual shutdown happens when the caller closes data_stream.
-        done = true;
-    }
-
-    /**
-     * Cleans up all resources used by the packet reader.  The caller must first
-     * shut down the data_stream, to ensure the thread will exit.
-     */
-    void cleanup() {
+    public void shutdown() {
         if(readerThread == Thread.currentThread())
-            throw new AssertionError("PacketReader.cleanup() can't be called from the packet reader thread");
+            throw new AssertionError("shutdown() can't be called from the packet reader thread");
+
+        // The actual shutdown happens due to the caller closing the data stream.
+        done = true;
 
         // Do nothing if we're already shut down.
         if(readerThread == null)
@@ -161,6 +151,12 @@ class PacketReader {
 
         // Shut down the listener executor.
         listenerExecutor.shutdown();
+    }
+
+    /** Assert that the current thread is not the reader thread. */
+    public void assertNotInThread() {
+        if(Thread.currentThread() == readerThread)
+            throw new RuntimeException("Call from within reader thread prohibited");
     }
 
     /**
@@ -265,7 +261,7 @@ class PacketReader {
                 // Close the connection and notify connection listeners of the
                 // error.
                 done = true;
-                connection.notifyConnectionClosedOnError(e);
+                connection.readerThreadException(e);
             }
         }
     }

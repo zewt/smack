@@ -55,23 +55,7 @@ class PacketWriter {
     protected PacketWriter(XMPPConnection connection) {
         this.queue = new ArrayBlockingQueue<Packet>(500, true);
         this.connection = connection;
-        init();
-    }
-
-    /** 
-    * Initializes the writer in order to be used. It is called at the first connection and also 
-    * is invoked if the connection is disconnected by an error.
-    */ 
-    protected void init() {
         done = false;
-
-        writerThread = new Thread() {
-            public void run() {
-                writePackets(this);
-            }
-        };
-        writerThread.setName("Smack Packet Writer (" + connection.connectionCounterValue + ")");
-        writerThread.setDaemon(true);
     }
 
     /**
@@ -108,6 +92,16 @@ class PacketWriter {
      * error occurs.
      */
     public void startup() {
+        if(writerThread != null)
+            throw new RuntimeException("WriterThread.startup called while already running");
+
+        writerThread = new Thread() {
+            public void run() {
+                writePackets(this);
+            }
+        };
+        writerThread.setName("Smack Packet Writer (" + connection.connectionCounterValue + ")");
+        writerThread.setDaemon(true);
         writerThread.start();
     }
 
@@ -122,15 +116,7 @@ class PacketWriter {
         synchronized (queue) {
             queue.notifyAll();
         }
-    }
 
-    /**
-     * Cleans up all resources used by the packet writer.  The caller must first
-     * shut down the data_stream, to ensure the thread will exit.
-     */
-    void cleanup() {
-        shutdown();
-        
         connection.interceptors.clear();
         connection.sendListeners.clear();
 
@@ -207,10 +193,11 @@ class PacketWriter {
             }
         }
         catch (IOException ioe){
-            if (!done) {
-                done = true;
-                connection.notifyConnectionClosedOnError(ioe);
-            }
+            // Don't report write errors.  Instead, require that any write errors at the
+            // socket layer cause reads to throw an error as well, so all error handling
+            // is consolidated in PacketReader.
+            new Exception(ioe).printStackTrace();
+            done = true;
         }
     }
 }
