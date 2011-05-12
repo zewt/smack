@@ -183,7 +183,7 @@ class PacketWriter {
                     writer.flush();
                 }
             }
-            catch (Exception e) {
+            catch (IOException e) {
                 e.printStackTrace();
             }
 
@@ -194,8 +194,7 @@ class PacketWriter {
                 Writer writer = getWriter();
                 writer.close();
             }
-            catch (RuntimeException e) { throw e; }
-            catch (Exception e) {
+            catch (IOException e) {
                 // Do nothing
             }
         }
