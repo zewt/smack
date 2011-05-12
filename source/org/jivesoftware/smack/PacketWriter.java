@@ -114,6 +114,8 @@ class PacketWriter {
     /**
      * Shuts down the packet writer. Once this method has been called, no further
      * packets will be written to the server.
+     *
+     * The caller must first shut down the data stream to ensure the thread will exit.
      */
     public void shutdown() {
         done = true;
