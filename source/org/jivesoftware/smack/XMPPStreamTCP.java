@@ -43,6 +43,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.jivesoftware.smack.packet.XMPPError;
+import org.jivesoftware.smack.util.DNSUtil;
 import org.jivesoftware.smack.util.ObservableReader;
 import org.jivesoftware.smack.util.ObservableWriter;
 import org.jivesoftware.smack.util.PacketParserUtils;
@@ -129,6 +130,15 @@ public class XMPPStreamTCP extends XMPPStream
 
         String host = config.getHost();
         int port = config.getPort();
+
+        // If no host was specified, look up the XMPP service name.
+        // XXX: This should be cancellable.
+        if(host == null) {
+            String serviceName = config.getServiceName();
+            DNSUtil.HostAddress address = DNSUtil.resolveXMPPDomain(serviceName);
+            host = address.getHost();
+            port = address.getPort();
+        }
 
         try {
             socket = config.getSocketFactory().createSocket(host, port);

@@ -21,7 +21,6 @@
 package org.jivesoftware.smack;
 
 import org.jivesoftware.smack.proxy.ProxyInfo;
-import org.jivesoftware.smack.util.DNSUtil;
 
 import javax.net.SocketFactory;
 import java.net.URI;
@@ -160,11 +159,6 @@ public class ConnectionConfiguration implements Cloneable {
                 throw new IllegalArgumentException("If host is null, serviceName must be specified");
             if(port != -1)
                 throw new IllegalArgumentException("If host is null, port must be -1");
-
-            // Perform DNS lookup to get host and port to use
-            DNSUtil.HostAddress address = DNSUtil.resolveXMPPDomain(serviceName);
-            host = address.getHost();
-            port = address.getPort();
         }
 
         init(host, port, serviceName, proxy);
