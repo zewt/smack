@@ -36,6 +36,7 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Vector;
 
 import javax.net.ssl.SSLSocket;
 import javax.xml.parsers.DocumentBuilder;
@@ -137,20 +138,20 @@ public class XMPPStreamTCP extends XMPPStream
         if(socket != null)
             throw new RuntimeException("The connection has already been initialized");
 
-        // We don't currently support autodiscovery; stop after the first attempt.
-        if(discoveryIndex > 0)
-            throw new XMPPException("No more servers to attempt", XMPPError.Condition.remote_server_not_found);
-
         String host = config.getHost();
         int port = config.getPort();
 
         // If no host was specified, look up the XMPP service name.
         // XXX: This should be cancellable.
         if(host == null) {
-            String serviceName = config.getServiceName();
-            DNSUtil.HostAddress address = DNSUtil.resolveXMPPDomain(serviceName);
-            host = address.getHost();
-            port = address.getPort();
+            // This will return the same results each time, because the weight
+            // shuffling is cached.
+            Vector<DNSUtil.HostAddress> addresses = DNSUtil.resolveXMPPDomain(config.getServiceName());
+            if(discoveryIndex >= addresses.size())
+                throw new XMPPException("No more servers to attempt (tried all " + addresses.size() + ")",
+                        XMPPError.Condition.remote_server_not_found);
+            host = addresses.get(discoveryIndex).getHost();
+            port = addresses.get(discoveryIndex).getPort();
         }
 
         try {

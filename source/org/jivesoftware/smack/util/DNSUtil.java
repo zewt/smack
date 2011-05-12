@@ -19,7 +19,13 @@
 
 package org.jivesoftware.smack.util;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
+import java.util.Vector;
 
 import org.xbill.DNS.Lookup;
 import org.xbill.DNS.Record;
@@ -38,49 +44,141 @@ public class DNSUtil {
      * Create a cache to hold the 100 most recently accessed DNS lookups for a period of
      * 10 minutes.
      */
-    private static Map<String, HostAddress> cache = new Cache(100, 1000 * 60 * 10);
+    private static Map<String, Vector<HostAddress>> cache = new Cache<String, Vector<HostAddress>>(100, 1000 * 60 * 10);
 
-    private static HostAddress resolveSRV(String domain) {
-        String bestHost = null;
-        int bestPort = -1;
-        int bestPriority = Integer.MAX_VALUE;
-        int bestWeight = 0;
-        Lookup lookup;
-        try {
-            lookup = new Lookup(domain, Type.SRV);
-            Record recs[] = lookup.run();
-            if (recs == null) { return null; }
-            for (Record rec : recs) {
-                SRVRecord record = (SRVRecord) rec;
-                if (record != null && record.getTarget() != null) {
-                    int weight = (int) (record.getWeight() * record.getWeight() * Math
-                            .random());
-                    if (record.getPriority() < bestPriority) {
-                        bestPriority = record.getPriority();
-                        bestWeight = weight;
-                        bestHost = record.getTarget().toString();
-                        bestPort = record.getPort();
-                    } else if (record.getPriority() == bestPriority) {
-                        if (weight > bestWeight) {
-                            bestPriority = record.getPriority();
-                            bestWeight = weight;
-                            bestHost = record.getTarget().toString();
-                            bestPort = record.getPort();
-                        }
-                    }
+    /**
+     * Shuffle a list of items, prioritizing the order by their weight, using a simple
+     * PRNG with the given seed.
+     * <p>
+     * For example, if items is [0, 1] and weightList is [10, 30], the result will
+     * be [0,1] 25% of the time and [1,0] 75% of the time.
+     * <p>
+     * Note that this algorithm is O(n^2), and isn't suitable for very large inputs.
+     */
+    private static <T> Vector<T> getItemsRandomizedByWeight(Vector<T> items, Vector<Integer> weightList)
+    {
+        int seed = new Random().nextInt();
+
+        Vector<T> result = new Vector<T>();
+
+        // Make a copy of items and weightList, since we're going to be modifying them.
+        items = new Vector<T>(items);
+        weightList = new Vector<Integer>(weightList);
+
+        // Shuffle the items first, so items with the same weight are chosen randomly.
+        // Reconstruct the PRNG for each shuffle, so the items and weights are kept
+        // in sync.
+        Collections.shuffle(items, new Random(seed));
+        Collections.shuffle(weightList, new Random(seed));
+
+        Random prng = new Random(seed);
+        while(!items.isEmpty()) {
+            Vector<Integer> cumulativeWeights = new Vector<Integer>(weightList.size());
+            int maxSum = 0;
+            for(int weight: weightList) {
+                // If very large weights would cause us to overflow, clamp all following weights
+                // to 0.
+                if(maxSum + weight < maxSum)
+                    weight = 0;
+                maxSum += weight;
+                cumulativeWeights.add(maxSum);
+            }
+
+            // Choose an item by weight.  Note that we may have items with zero weight,
+            // and that nextInt(0) is invalid.
+            int weight = 0;
+            if(maxSum > 0)
+                weight = prng.nextInt(maxSum);
+
+            // Search for the weight we chose.
+            int idx = Collections.binarySearch(cumulativeWeights, weight);
+            if(idx < 0) {
+                // If idx < 0, then -(idx+1) is the first element > weight, which is what we want.
+                idx = -(idx+1);
+            } else {
+                // If idx >= 0, then idx is any element equal to weight.  We want the first value
+                // greater than it, so seek forward to find it.  The last weight in cumulativeWeights
+                // is always greater than weight, so this is guaranteed to terminate.  The exception
+                // is when the list contains only zero weights, in which case we'll use the first
+                // item.
+                if(maxSum == 0)
+                    idx = 0;
+                else {
+                    while(cumulativeWeights.get(idx) <= weight)
+                        ++idx;
                 }
             }
+
+            // Add the item we selected to the result.
+            result.add(items.get(idx));
+
+            // Remove the item we selected from the source data, and restart.
+            items.remove(idx);
+            weightList.remove(idx);
+        }
+
+        return result;
+    }
+
+    private static Vector<HostAddress> resolveSRV(String domain) {
+        Vector<SRVRecord> results = new Vector<SRVRecord>();
+        try {
+            Lookup lookup = new Lookup(domain, Type.SRV);
+            Record recs[] = lookup.run();
+            if (recs == null)
+                    return new Vector<HostAddress>();
+
+            SRVRecord srecs[] = new SRVRecord[recs.length];
+            for(int i = 0; i < recs.length; ++i)
+                srecs[i] = (SRVRecord) recs[i];
+
+            // Sort the results by ascending priority.
+            Arrays.sort(srecs, new Comparator<SRVRecord>() {
+                public int compare(SRVRecord lhs, SRVRecord rhs) {
+                    return lhs.getPriority() - rhs.getPriority();
+                }
+            });
+
+            HashMap<Integer, Vector<SRVRecord>> resultsByPriority = new HashMap<Integer, Vector<SRVRecord>>();
+
+            // Separate the results by priority.
+            for(int i = 0; i < srecs.length; ++i) {
+                SRVRecord srv = srecs[i];
+                Vector<SRVRecord> list = resultsByPriority.get(srv.getPriority());
+                if(list == null) {
+                    list = new Vector<SRVRecord>();
+                    resultsByPriority.put(srv.getPriority(), list);
+                }
+                list.add(srv);
+            }
+
+            Vector<Integer> weights = new Vector<Integer>(resultsByPriority.keySet());
+            Collections.sort(weights);
+
+            // For each priority group, sort the results based on weight.  Do this
+            // in sorted order by weight, so priorities closer to 0 are earlier in
+            // the list.
+            for(int weight: weights) {
+                Vector<SRVRecord> list = resultsByPriority.get(weight);
+                Vector<Integer> weightList = new Vector<Integer>();
+                for(SRVRecord item: list)
+                    weightList.add(item.getWeight());
+
+                Vector<SRVRecord> output = getItemsRandomizedByWeight(list, weightList);
+                results.addAll(output);
+            }
         } catch (TextParseException e) {
-        } catch (NullPointerException e) {
         }
-        if (bestHost == null) {
-            return null;
+
+        Vector<HostAddress> addresses = new Vector<HostAddress>();
+        for(SRVRecord result: results) {
+            // Host entries in DNS should end with a ".".
+            String host = result.getTarget().toString();
+            if (host.endsWith("."))
+                host = host.substring(0, host.length() - 1);
+            addresses.add(new HostAddress(host, result.getPort()));
         }
-        // Host entries in DNS should end with a ".".
-        if (bestHost.endsWith(".")) {
-            bestHost = bestHost.substring(0, bestHost.length() - 1);
-        }
-        return new HostAddress(bestHost, bestPort);
+        return addresses;
     }
 
     /**
@@ -107,25 +205,25 @@ public class DNSUtil {
      * @return a HostAddress, which encompasses the hostname and port that the XMPP
      *      server can be reached at for the specified domain.
      */
-    public static HostAddress resolveXMPPDomain(String domain) {
+    public static Vector<HostAddress> resolveXMPPDomain(String domain) {
         String key = "c" + domain;
         // Return item from cache if it exists.
         if (cache.containsKey(key)) {
-            HostAddress address = (HostAddress)cache.get(key);
-            if (address != null) {
-                return address;
+            Vector<HostAddress> addresses = cache.get(key);
+            if (addresses != null) {
+                return addresses;
             }
         }
-        HostAddress address = resolveSRV("_xmpp-client._tcp." + domain);
-        if (address == null) {
-            address = resolveSRV("_jabber._tcp." + domain);
+        Vector<HostAddress> addresses = resolveSRV("_xmpp-client._tcp." + domain);
+        if (addresses.isEmpty()) {
+            addresses = resolveSRV("_jabber._tcp." + domain);
         }
-        if (address == null) {
-            address = new HostAddress(domain, 5222);
+        if (addresses.isEmpty()) {
+            addresses.add(new HostAddress(domain, 5222));
         }
         // Add item to cache.
-        cache.put(key, address);
-        return address;
+        cache.put(key, addresses);
+        return addresses;
     }
 
     /**
@@ -145,25 +243,25 @@ public class DNSUtil {
      * @return a HostAddress, which encompasses the hostname and port that the XMPP
      *      server can be reached at for the specified domain.
      */
-    public static HostAddress resolveXMPPServerDomain(String domain) {
+    public static Vector<HostAddress> resolveXMPPServerDomain(String domain) {
         String key = "s" + domain;
         // Return item from cache if it exists.
         if (cache.containsKey(key)) {
-            HostAddress address = (HostAddress)cache.get(key);
-            if (address != null) {
-                return address;
+            Vector<HostAddress> addresses = cache.get(key);
+            if (addresses != null) {
+                return addresses;
             }
         }
-        HostAddress address = resolveSRV("_xmpp-server._tcp." + domain);
-        if (address == null) {
-            address = resolveSRV("_jabber._tcp." + domain);
+        Vector<HostAddress> addresses = resolveSRV("_xmpp-server._tcp." + domain);
+        if (addresses.isEmpty()) {
+            addresses = resolveSRV("_jabber._tcp." + domain);
         }
-        if (address == null) {
-            address = new HostAddress(domain, 5269);
+        if (addresses.isEmpty()) {
+            addresses.add(new HostAddress(domain, 5269));
         }
         // Add item to cache.
-        cache.put(key, address);
-        return address;
+        cache.put(key, addresses);
+        return addresses;
     }
 
     /**
