@@ -72,6 +72,9 @@ public class XMPPConnection extends Connection {
     private boolean wasAuthenticated = false;
     private boolean anonymous = false;
 
+    /** True if we've yet to connect to a server. */
+    private boolean isFirstInitialization = true;
+
     private boolean suppressConnectionErrors;
 
     Element readPacket() throws InterruptedException, XMPPException { return data_stream.readPacket(); }
@@ -496,7 +499,6 @@ public class XMPPConnection extends Connection {
      *
      * @throws XMPPException if establishing a connection to the server fails.
      */
-    boolean isFirstInitialization = true;
     private void connectUsingConfiguration(ConnectionConfiguration config) throws XMPPException {
         packetReader.assertNotInThread();
 
