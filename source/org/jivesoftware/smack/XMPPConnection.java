@@ -108,13 +108,7 @@ public class XMPPConnection extends Connection {
      * @param callbackHandler the CallbackHandler used to prompt for the password to the keystore.
      */
     public XMPPConnection(String serviceName, CallbackHandler callbackHandler) {
-        // Create the configuration for this new connection
-        super(new ConnectionConfiguration(serviceName));
-        config.setCompressionEnabled(false);
-        config.setSASLAuthenticationEnabled(true);
-        config.setDebuggerEnabled(DEBUG_ENABLED);
-        config.setCallbackHandler(callbackHandler);
-        init();
+        this(null, callbackHandler, serviceName);
     }
 
     /**
@@ -126,12 +120,7 @@ public class XMPPConnection extends Connection {
      * @param serviceName the name of the XMPP server to connect to; e.g. <tt>example.com</tt>.
      */
     public XMPPConnection(String serviceName) {
-        // Create the configuration for this new connection
-        super(new ConnectionConfiguration(serviceName));
-        config.setCompressionEnabled(false);
-        config.setSASLAuthenticationEnabled(true);
-        config.setDebuggerEnabled(DEBUG_ENABLED);
-        init();
+        this(null, null, serviceName);
     }
 
     /**
@@ -144,8 +133,7 @@ public class XMPPConnection extends Connection {
      * @param config the connection configuration.
      */
     public XMPPConnection(ConnectionConfiguration config) {
-        super(config);
-        init();
+        this(config, null, null);
     }
 
     /**
@@ -163,16 +151,22 @@ public class XMPPConnection extends Connection {
      * an SSL certificate to the server. The CallbackHandler must handle the PasswordCallback
      * to prompt for a password to unlock the keystore containing the SSL certificate.
      *
+     * @deprecated call {@link ConnectionConfiguration#setCallbackHandler} and use {@link XMPPConnection#XMPPConnection(ConnectionConfiguration)}.
      * @param config the connection configuration.
      * @param callbackHandler the CallbackHandler used to prompt for the password to the keystore.
      */
     public XMPPConnection(ConnectionConfiguration config, CallbackHandler callbackHandler) {
-        super(config);
-        config.setCallbackHandler(callbackHandler);
-        init();
+        this(config, callbackHandler, null);
     }
 
-    private void init() {
+    /** The primary constructor. */
+    private XMPPConnection(ConnectionConfiguration config, CallbackHandler callbackHandler, String serviceName) {
+        super(config);
+        if(serviceName != null)
+            this.config.setServiceName(serviceName);
+        if(callbackHandler != null)
+            this.config.setCallbackHandler(callbackHandler);
+
         // These won't do anything until we call startup().
         packetReader = new PacketReader(this);
         packetWriter = new PacketWriter(this);
