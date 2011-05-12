@@ -61,10 +61,23 @@ public abstract class XMPPStream
 
     /**
      * Set the read and write events for this connection, which may be observed to monitor
-     * incoming and outgoing data.
+     * incoming and outgoing data.  This must be called before {@link #initializeConnection()}.
      */
     public abstract void setReadWriteEvents(ObservableReader.ReadEvent readEvent, ObservableWriter.WriteEvent writeEvent);
-    
+
+    /**
+     * If service discovery is in use, set the index of the discovered resource to connect
+     * to.  For example, when discovering XMPP servers via SRV, setDiscoveryIndex(5) indicates
+     * that the 6th SRV entry by priority order will be attempted.
+     * <p>
+     * If index is greater than the highest discovered resource, or if this service does not
+     * support discovery and index is greater than 0, initializeConnection will raise an
+     * exception with a condition of remote_server_not_found.
+     * <p>
+     * This must be called before {@link #initializeConnection()}.
+     */
+    public abstract void setDiscoveryIndex(int index);
+
     /**
      * Returns true if the connection to the server is secure.
      *

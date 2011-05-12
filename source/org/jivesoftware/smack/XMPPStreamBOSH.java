@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.io.Writer;
 import java.net.URI;
-import java.nio.channels.ClosedByInterruptException;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -70,19 +69,31 @@ public class XMPPStreamBOSH extends XMPPStream
 
     ConnectionConfiguration config;
 
-    public XMPPStreamBOSH(ConnectionConfiguration config, URI uri)
+    public XMPPStreamBOSH(ConnectionConfiguration config)
     {
-        // XXX cleanup: uri is in config anyway (but there's detectBOSH to handle later)
-        this.uri = uri;
+        this.uri = config.getBoshURI();
         this.config = config;
-
         writer = new BOSHWriter();
+        connectionClosed = true;
+    }
+
+    private int discoveryIndex;
+    public void setDiscoveryIndex(int index) {
+        discoveryIndex = index;
     }
 
     public void initializeConnection() throws XMPPException
     {
         if(bosh_client != null)
             throw new RuntimeException("The connection has already been initialized");
+
+        // If BOSH is disabled, then stop attempting this transport.
+        if(this.uri == null)
+            throw new XMPPException("BOSH is disabled", XMPPError.Condition.remote_server_not_found);
+
+        // We don't currently support autodiscovery; stop after the first attempt.
+        if(discoveryIndex > 0)
+            throw new XMPPException("No more servers to attempt", XMPPError.Condition.remote_server_not_found);
 
         android.util.Log.w("FOO", "XMPPStreamBOSH: initializeConnection");
         BOSHClientConfig.Builder cfgBuilder = BOSHClientConfig.Builder.create(uri, config.getServiceName());
@@ -154,6 +165,8 @@ public class XMPPStreamBOSH extends XMPPStream
             if(detail != null)
                 usingSecureConnection = false;
         }
+
+        connectionClosed = false;
     }
 
     private void startupConnection() throws XMPPException {

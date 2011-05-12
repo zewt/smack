@@ -109,14 +109,19 @@ public class XMPPStreamTCP extends XMPPStream
     String connectionID;
     public String getConnectionID() { return connectionID; }
     
-    XMPPStreamTCP(ConnectionConfiguration config)
+    public XMPPStreamTCP(ConnectionConfiguration config)
     {
         this.config = config;
         
         /* We update config.serviceName when we see the service name from the server,
          * but we need to retain the original value for TLS certificate checking. */
         originalServiceName = config.getServiceName();
-        keepaliveMonitorWriteEvent = new ObservableWriter.WriteEvent(); 
+        keepaliveMonitorWriteEvent = new ObservableWriter.WriteEvent();
+    }
+
+    private int discoveryIndex;
+    public void setDiscoveryIndex(int index) {
+        discoveryIndex = index;
     }
 
     public void setReadWriteEvents(ObservableReader.ReadEvent readEvent, ObservableWriter.WriteEvent writeEvent) {
@@ -131,6 +136,10 @@ public class XMPPStreamTCP extends XMPPStream
     public void initializeConnection() throws XMPPException {
         if(socket != null)
             throw new RuntimeException("The connection has already been initialized");
+
+        // We don't currently support autodiscovery; stop after the first attempt.
+        if(discoveryIndex > 0)
+            throw new XMPPException("No more servers to attempt", XMPPError.Condition.remote_server_not_found);
 
         String host = config.getHost();
         int port = config.getPort();

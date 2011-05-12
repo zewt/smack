@@ -20,12 +20,11 @@
 
 package org.jivesoftware.smack;
 
-import java.net.URI;
-
 import org.jivesoftware.smack.debugger.SmackDebugger;
 import org.jivesoftware.smack.filter.PacketFilter;
 import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.packet.Presence;
+import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.util.StringUtils;
 import org.jivesoftware.smack.util.ObservableReader;
 import org.jivesoftware.smack.util.ObservableWriter;
@@ -499,14 +498,70 @@ public class XMPPConnection extends Connection {
      *
      * @throws XMPPException if establishing a connection to the server fails.
      */
-    private void connectUsingConfiguration(ConnectionConfiguration config) throws XMPPException {
+    private void connectUsingConfiguration() throws XMPPException {
         packetReader.assertNotInThread();
 
-        URI boshURI = config.getBoshURI();
-        if(boshURI != null)
-            data_stream = new XMPPStreamBOSH(config, boshURI);
-        else
-            data_stream = new XMPPStreamTCP(config);
+        // We may have several candidates to connect to: any number of XMPP
+        // hosts via SRV discovery, and any number of BOSH hosts via TXT discovery.
+        // Try transports in order of preference.
+        Vector<Class<? extends XMPPStream>> transportsToAttempt =
+            new Vector<Class<? extends XMPPStream>>();
+        transportsToAttempt.add(XMPPStreamBOSH.class);
+        transportsToAttempt.add(XMPPStreamTCP.class);
+
+        XMPPException firstFailure = null;
+
+        for(Class<? extends XMPPStream> transport: transportsToAttempt) {
+            // Attempt to connect using this transport.  If the transport discovers more
+            // than one server to connect to, try each in order.  Note that timeouts are
+            // per-server.
+            int attempt = 0;
+            boolean connected = false;
+            while(!connected) {
+                // Create an instance of this transport.
+                Constructor<? extends XMPPStream> constructor;
+                try {
+                    constructor = transport.getConstructor(ConnectionConfiguration.class);
+                    data_stream = constructor.newInstance(config);
+                }
+                catch (Exception e) { throw new RuntimeException(e); }
+
+                // Tell the transport which discovered server to attempt.
+                data_stream.setDiscoveryIndex(attempt);
+
+                try {
+                    connectUsingConfigurationAttempt();
+                    connected = true;
+                    break;
+                } catch(XMPPException e) {
+                    // On failure, connectUsingConfigurationAttempt always clears data_stream.
+                    if(data_stream != null)
+                        throw new AssertionError("connectUsingConfigurationAttempt failed, but left data_stream set");
+
+                    // If the error is remote_server_not_found, there were no more
+                    // discovered resources to try.
+                    XMPPError error = e.getXMPPError();
+                    if(error != null && error.getCondition() == XMPPError.Condition.remote_server_not_found.toString())
+                        break;
+                    firstFailure = e;
+                }
+
+                attempt++;
+            }
+        }
+
+        if(!connected) {
+            // We didn't connect.  Report the first failure other than remote_server_not_found
+            // as the error.  XXX: not ideal
+            if(firstFailure != null)
+                throw firstFailure;
+            else
+                throw new XMPPException("Couldn't discover any servers to connect to");
+        }
+    }
+
+    private void connectUsingConfigurationAttempt() throws XMPPException {
+        packetReader.assertNotInThread();
 
         data_stream.setReadWriteEvents(readEvent, writeEvent);
 
@@ -626,7 +681,7 @@ public class XMPPConnection extends Connection {
         packetReader.assertNotInThread();
 
         // Establishes the connection, readers and writers
-        connectUsingConfiguration(config);
+        connectUsingConfiguration();
         // Automatically makes the login if the user was previouslly connected successfully
         // to the server and the connection was terminated abruptly
         if (connected && wasAuthenticated) {
