@@ -70,7 +70,7 @@ public class ConnectionConfiguration implements Cloneable {
     private URI boshURI = null;
     final static public URI AUTO_DETECT_BOSH = URI.create("bosh-xep-0156:auto");
 
-    private boolean compressionEnabled = false;
+    private boolean compressionEnabled = true;
 
     private boolean saslAuthenticationEnabled = true;
     /**
@@ -474,7 +474,7 @@ public class ConnectionConfiguration implements Cloneable {
      * Returns true if the connection is going to use stream compression. Stream compression
      * will be requested after TLS was established (if TLS was enabled) and only if the server
      * offered stream compression. With stream compression network traffic can be reduced
-     * up to 90%. By default compression is disabled.
+     * up to 90%. Default: enabled.
      *
      * @return true if the connection is going to use stream compression.
      */
@@ -486,7 +486,7 @@ public class ConnectionConfiguration implements Cloneable {
      * Sets if the connection is going to use stream compression. Stream compression
      * will be requested after TLS was established (if TLS was enabled) and only if the server
      * offered stream compression. With stream compression network traffic can be reduced
-     * up to 90%. By default compression is disabled.
+     * up to 90%. Default: enabled.
      *
      * @param compressionEnabled if the connection is going to use stream compression.
      */
