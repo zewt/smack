@@ -237,6 +237,9 @@ public class ConnectionConfiguration implements Cloneable {
         return host;
     }
 
+    /** Set the host to connect to. */
+    public void setHost(String host) { this.host = host; }
+
     /**
      * Returns the port to use when establishing the connection. The host and port to use
      * might have been resolved by a DNS lookup as specified by the XMPP spec.
@@ -246,6 +249,9 @@ public class ConnectionConfiguration implements Cloneable {
     public int getPort() {
         return port;
     }
+
+    /** Set the port to connect to. */
+    public void setPort(int port) { this.port = port; }
 
     /**
      * Return the configured proxy settings.
