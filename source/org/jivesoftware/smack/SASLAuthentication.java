@@ -96,11 +96,11 @@ public class SASLAuthentication implements UserAuthentication {
         registerSASLMechanism("PLAIN", SASLPlainMechanism.class);
         registerSASLMechanism("ANONYMOUS", SASLAnonymous.class);
 
-        supportSASLMechanism("GSSAPI",0);
-        supportSASLMechanism("DIGEST-MD5",1);
-        supportSASLMechanism("CRAM-MD5",2);
-        supportSASLMechanism("PLAIN",3);
-        supportSASLMechanism("ANONYMOUS",4);
+        supportSASLMechanism("ANONYMOUS", 0);
+        supportSASLMechanism("PLAIN", 0);
+        supportSASLMechanism("CRAM-MD5", 0);
+        supportSASLMechanism("DIGEST-MD5", 0);
+        supportSASLMechanism("GSSAPI", 0);
 
     }
 
@@ -149,6 +149,8 @@ public class SASLAuthentication implements UserAuthentication {
      * @param index preference position amongst all the implemented SASL mechanism. Starts with 0.
      */
     public static void supportSASLMechanism(String name, int index) {
+        if(index > mechanismsPreferences.size())
+            index = mechanismsPreferences.size();
         mechanismsPreferences.add(index, name);
     }
 
