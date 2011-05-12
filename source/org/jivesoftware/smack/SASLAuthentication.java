@@ -28,8 +28,10 @@ import org.jivesoftware.smack.packet.Session;
 import org.jivesoftware.smack.sasl.*;
 
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
+
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
 /**
@@ -231,9 +233,8 @@ public class SASLAuthentication implements UserAuthentication {
             // A SASL mechanism was found. Authenticate using the selected mechanism and then
             // proceed to bind a resource
             try {
-                Class<? extends SASLMechanism> mechanismClass = implementedMechanisms.get(selectedMechanism);
-                Constructor<? extends SASLMechanism> constructor = mechanismClass.getConstructor(SASLAuthentication.class);
-                currentMechanism = constructor.newInstance(this);
+                currentMechanism = createMechanism(implementedMechanisms.get(selectedMechanism));
+
                 // Trigger SASL authentication with the selected mechanism. We use
                 // connection.getHost() since GSAPI requires the FQDN of the server, which
                 // may not match the XMPP domain.
@@ -274,7 +275,7 @@ public class SASLAuthentication implements UserAuthentication {
             catch (XMPPException e) {
                 throw e;
             }
-            catch (Exception e) {
+            catch (IOException e) {
                 e.printStackTrace();
             }
         }
@@ -313,9 +314,8 @@ public class SASLAuthentication implements UserAuthentication {
             // A SASL mechanism was found. Authenticate using the selected mechanism and then
             // proceed to bind a resource
             try {
-                Class<? extends SASLMechanism> mechanismClass = implementedMechanisms.get(selectedMechanism);
-                Constructor<? extends SASLMechanism> constructor = mechanismClass.getConstructor(SASLAuthentication.class);
-                currentMechanism = constructor.newInstance(this);
+                currentMechanism = createMechanism(implementedMechanisms.get(selectedMechanism));
+
                 // Trigger SASL authentication with the selected mechanism. We use
                 // connection.getHost() since GSAPI requires the FQDN of the server, which
                 // may not match the XMPP domain.
@@ -359,7 +359,7 @@ public class SASLAuthentication implements UserAuthentication {
             catch (XMPPException e) {
                 throw e;
             }
-            catch (Exception e) {
+            catch (IOException e) {
                 e.printStackTrace();
                 // SASL authentication failed so try a Non-SASL authentication
                 return new NonSASLAuthentication(connection)
@@ -420,6 +420,20 @@ public class SASLAuthentication implements UserAuthentication {
             }
         } catch (IOException e) {
             return new NonSASLAuthentication(connection).authenticateAnonymously();
+        }
+    }
+
+    SASLMechanism createMechanism(Class<? extends SASLMechanism> mechanismClass) {
+        try {
+            Constructor<? extends SASLMechanism> constructor = mechanismClass.getConstructor(SASLAuthentication.class);
+            return constructor.newInstance(this);
+        } catch (InvocationTargetException e) {
+            // If the constructor throws an exception, it's an unexpected failure; don't
+            // mask it.
+            Throwable e2 = e.getCause();
+            throw new RuntimeException("Error instantiating mechanism", e2);
+        } catch (Exception e) {
+            return null;
         }
     }
 
