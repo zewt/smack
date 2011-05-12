@@ -84,6 +84,7 @@ class PacketReader {
             throw new RuntimeException("ReaderThread.startup called while already running");
 
         done = false;
+        connectionException = null;
         connectionSemaphore = new Semaphore(0);
 
         // Create an executor to deliver incoming packets to listeners. We'll use a single
