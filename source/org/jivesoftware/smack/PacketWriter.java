@@ -164,6 +164,8 @@ class PacketWriter {
                 Packet packet = nextPacket();
                 if (packet != null) {
                     Writer writer = getWriter();
+                    if(writer == null)
+                        throw new IOException("Wrote a packet before the connection was open");
                     synchronized (writer) {
                         writer.write(packet.toXML());
                         writer.flush();
@@ -175,9 +177,12 @@ class PacketWriter {
             // by the shutdown process.
             try {
                 Writer writer = getWriter();
+                if(writer == null)
+                    throw new IOException("Wrote a packet before the connection was open");
+
                 synchronized (writer) {
-                   while (!queue.isEmpty()) {
-                       Packet packet = queue.remove();
+                    while (!queue.isEmpty()) {
+                        Packet packet = queue.remove();
                         writer.write(packet.toXML());
                     }
                     writer.flush();
@@ -192,7 +197,8 @@ class PacketWriter {
 
             try {
                 Writer writer = getWriter();
-                writer.close();
+                if(writer != null)
+                    writer.close();
             }
             catch (IOException e) {
                 // Do nothing
