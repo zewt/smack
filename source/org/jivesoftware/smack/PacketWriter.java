@@ -166,8 +166,11 @@ class PacketWriter {
             // by the shutdown process.
             try {
                 Writer writer = getWriter();
+
+                // This happens normally when the connection is shut down abruptly
+                // due to an error.
                 if(writer == null)
-                    throw new IOException("Wrote a packet before the connection was open");
+                    throw new IOException("Wrote a packet while the connection was closed");
 
                 synchronized (writer) {
                     while (!queue.isEmpty()) {
