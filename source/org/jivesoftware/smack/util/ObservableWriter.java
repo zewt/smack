@@ -32,16 +32,21 @@ import java.util.*;
 public class ObservableWriter extends Writer {
 
     Writer wrappedWriter = null;
-    List<WriterListener> listeners = new ArrayList<WriterListener>();
+    private WriteEvent writeEvent;
 
     public ObservableWriter(Writer wrappedWriter) {
         this.wrappedWriter = wrappedWriter;
     }
 
+    public void setWriteEvent(WriteEvent writeEvent) {
+        this.writeEvent = writeEvent;
+    }
+
     public void write(char cbuf[], int off, int len) throws IOException {
         wrappedWriter.write(cbuf, off, len);
         String str = new String(cbuf, off, len);
-        notifyListeners(str);
+        if(writeEvent != null)
+            writeEvent.notifyListeners(str);
     }
 
     public void flush() throws IOException {
@@ -59,73 +64,68 @@ public class ObservableWriter extends Writer {
     public void write(char cbuf[]) throws IOException {
         wrappedWriter.write(cbuf);
         String str = new String(cbuf);
-        notifyListeners(str);
+        if(writeEvent != null)
+            writeEvent.notifyListeners(str);
     }
 
     public void write(String str) throws IOException {
         wrappedWriter.write(str);
-        notifyListeners(str);
+        if(writeEvent != null)
+            writeEvent.notifyListeners(str);
     }
 
     public void write(String str, int off, int len) throws IOException {
         wrappedWriter.write(str, off, len);
         str = str.substring(off, off + len);
-        notifyListeners(str);
+        if(writeEvent != null)
+            writeEvent.notifyListeners(str);
     }
 
-    /**
-     * Notify that a new string has been written.
-     * 
-     * @param str the written String to notify 
-     */
-    public void notifyListeners(String str) {
-        WriterListener[] writerListeners = null;
-        synchronized (listeners) {
-            writerListeners = new WriterListener[listeners.size()];
-            listeners.toArray(writerListeners);
-        }
-        for (int i = 0; i < writerListeners.length; i++) {
-            writerListeners[i].write(str);
-        }
-    }
+    static public class WriteEvent {
+        List<WriterListener> listeners = new ArrayList<WriterListener>();
 
-    /**
-     * Adds a writer listener to this writer that will be notified when
-     * new strings are sent.
-     *
-     * @param writerListener a writer listener.
-     */
-    public void addWriterListener(WriterListener writerListener) {
-        if (writerListener == null) {
-            return;
-        }
-        synchronized (listeners) {
-            if (!listeners.contains(writerListener)) {
-                listeners.add(writerListener);
+        /**
+         * Notify that a new string has been written.
+         *
+         * @param str the written String to notify
+         */
+        public void notifyListeners(String str) {
+            WriterListener[] writerListeners = null;
+            synchronized (listeners) {
+                writerListeners = new WriterListener[listeners.size()];
+                listeners.toArray(writerListeners);
+            }
+            for (int i = 0; i < writerListeners.length; i++) {
+                writerListeners[i].write(str);
             }
         }
-    }
 
-    /**
-     * Removes a writer listener from this writer.
-     *
-     * @param writerListener a writer listener.
-     */
-    public void removeWriterListener(WriterListener writerListener) {
-        synchronized (listeners) {
-            listeners.remove(writerListener);
+        /**
+         * Adds a writer listener to this writer that will be notified when
+         * new strings are sent.
+         *
+         * @param writerListener a writer listener.
+         */
+        public void addWriterListener(WriterListener writerListener) {
+            if (writerListener == null) {
+                return;
+            }
+            synchronized (listeners) {
+                if (!listeners.contains(writerListener)) {
+                    listeners.add(writerListener);
+                }
+            }
         }
-    }
 
-    /**
-     * Replace the wrapped writer.
-     *
-     * @param writer The new target writer.
-     * @return The old target writer.
-     */
-    public Writer setTarget(Writer writer) {
-        Writer oldWriter = this.wrappedWriter;
-        this.wrappedWriter = writer;
-        return oldWriter;
-    }
+        /**
+         * Removes a writer listener from this writer.
+         *
+         * @param writerListener a writer listener.
+         */
+        public void removeWriterListener(WriterListener writerListener) {
+            synchronized (listeners) {
+                listeners.remove(writerListener);
+            }
+        }
+    };
 }

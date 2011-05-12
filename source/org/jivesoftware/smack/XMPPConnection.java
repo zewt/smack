@@ -83,6 +83,9 @@ public class XMPPConnection extends Connection {
     /** The SmackDebugger allows to log and debug XML traffic. */
     protected SmackDebugger debugger = null;
 
+    final ObservableReader.ReadEvent readEvent;
+    final ObservableWriter.WriteEvent writeEvent;
+
     Roster roster = null;
 
     /**
@@ -167,6 +170,9 @@ public class XMPPConnection extends Connection {
         if(callbackHandler != null)
             this.config.setCallbackHandler(callbackHandler);
 
+        readEvent = new ObservableReader.ReadEvent();
+        writeEvent = new ObservableWriter.WriteEvent();
+
         // These won't do anything until we call startup().
         packetReader = new PacketReader(this);
         packetWriter = new PacketWriter(this);
@@ -179,6 +185,10 @@ public class XMPPConnection extends Connection {
                 addPacketSendingListener(debugger.getWriterListener(), null);
             }
         }
+
+        // If debugging is enabled, we open a window and write out all network traffic.
+        if (config.isDebuggerEnabled())
+            initDebugger();
     }
 
     public String getConnectionID() {
@@ -496,9 +506,7 @@ public class XMPPConnection extends Connection {
         else
             data_stream = new XMPPStreamTCP(config);
 
-        // If debugging is enabled, we open a window and write out all network traffic.
-        if (config.isDebuggerEnabled())
-            initDebugger();
+        data_stream.setReadWriteEvents(readEvent, writeEvent);
 
         // Start the packet writer.  This can't fail, and it won't do anything until
         // we receive packets.
@@ -548,10 +556,6 @@ public class XMPPConnection extends Connection {
      * @throws IllegalArgumentException if the SmackDebugger can't be loaded.
      */
     private void initDebugger() {
-        // If debugging is enabled, we open a window and write out all network traffic.
-        if (debugger != null)
-            return;
-
         // Detect the debugger class to use.
         // Use try block since we may not have permission to get a system
         // property (for example, when an applet).
@@ -573,9 +577,8 @@ public class XMPPConnection extends Connection {
 
                 // Attempt to create an instance of this debugger.
                 Constructor<?> constructor = debuggerClass
-                        .getConstructor(Connection.class, ObservableWriter.class, ObservableReader.class);
-                debugger = (SmackDebugger) constructor.newInstance(this,
-                        data_stream.getObservableWriter(), data_stream.getObservableReader());
+                        .getConstructor(Connection.class, ObservableWriter.WriteEvent.class, ObservableReader.ReadEvent.class);
+                debugger = (SmackDebugger) constructor.newInstance(this, writeEvent, readEvent);
                 break;
             }
             catch (Exception e) {

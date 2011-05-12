@@ -57,14 +57,16 @@ public class XMPPStreamBOSH extends XMPPStream
     // if the connection is inactive.  Just return false.
     public boolean isUsingCompression() { return false; }
 
-    private ObservableReader obsReader;
-    private ObservableWriter obsWriter;
+    private ObservableReader.ReadEvent readEvent;
+    private ObservableWriter.WriteEvent writeEvent;
 
     String authID;
     public String getConnectionID() { return authID; }
 
-    public ObservableReader getObservableReader() { return obsReader; }
-    public ObservableWriter getObservableWriter() { return obsWriter; }
+    public void setReadWriteEvents(ObservableReader.ReadEvent readEvent, ObservableWriter.WriteEvent writeEvent) {
+        this.writeEvent = writeEvent;
+        this.readEvent = readEvent;
+    }
 
     ConnectionConfiguration config;
 
@@ -73,9 +75,6 @@ public class XMPPStreamBOSH extends XMPPStream
         // XXX cleanup: uri is in config anyway (but there's detectBOSH to handle later)
         this.uri = uri;
         this.config = config;
-
-        obsReader = new ObservableReader(null);
-        obsWriter = new ObservableWriter(null);
 
         writer = new BOSHWriter();
     }
@@ -122,7 +121,7 @@ public class XMPPStreamBOSH extends XMPPStream
             public void responseReceived(BOSHMessageEvent event) {
                 if (event.getBody() == null)
                     return;
-                obsReader.notifyListeners(event.getBody().toXML());
+                readEvent.notifyListeners(event.getBody().toXML());
             }
         });
 
@@ -130,7 +129,7 @@ public class XMPPStreamBOSH extends XMPPStream
             public void requestSent(BOSHMessageEvent event) {
                 if (event.getBody() == null)
                     return;
-                obsWriter.notifyListeners(event.getBody().toXML());
+                writeEvent.notifyListeners(event.getBody().toXML());
             }
         });
 

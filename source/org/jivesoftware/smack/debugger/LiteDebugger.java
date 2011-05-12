@@ -46,12 +46,12 @@ public class LiteDebugger implements SmackDebugger {
 
     private PacketListener listener = null;
 
-    private Writer writer;
-    private Reader reader;
+    private ObservableWriter.WriteEvent writer;
+    private ObservableReader.ReadEvent reader;
     private ReaderListener readerListener;
     private WriterListener writerListener;
 
-    public LiteDebugger(Connection connection, Writer writer, Reader reader) {
+    public LiteDebugger(Connection connection, ObservableWriter.WriteEvent writer, ObservableReader.ReadEvent reader) {
         this.connection = connection;
         this.writer = writer;
         this.reader = reader;
@@ -198,7 +198,6 @@ public class LiteDebugger implements SmackDebugger {
         frame.setVisible(true);
 
         // Create a special Reader that wraps the main Reader and logs data to the GUI.
-        ObservableReader debugReader = new ObservableReader(reader);
         readerListener = new ReaderListener() {
                     public void read(String str) {
                         int index = str.lastIndexOf(">");
@@ -218,10 +217,9 @@ public class LiteDebugger implements SmackDebugger {
                         }
                     }
                 };
-        debugReader.addReaderListener(readerListener);
+        reader.addReaderListener(readerListener);
 
         // Create a special Writer that wraps the main Writer and logs data to the GUI.
-        ObservableWriter debugWriter = new ObservableWriter(writer);
         writerListener = new WriterListener() {
                     public void write(String str) {
                         sentText1.append(str);
@@ -232,12 +230,7 @@ public class LiteDebugger implements SmackDebugger {
                         }
                     }
                 };
-        debugWriter.addWriterListener(writerListener);
-
-        // Assign the reader/writer objects to use the debug versions. The packet reader
-        // and writer will use the debug versions when they are created.
-        reader = debugReader;
-        writer = debugWriter;
+        writer.addWriterListener(writerListener);
 
         // Create a thread that will listen for all incoming packets and write them to
         // the GUI. This is what we call "interpreted" packet data, since it's the packet
@@ -289,22 +282,6 @@ public class LiteDebugger implements SmackDebugger {
         }
     }
 
-    public Reader newConnectionReader(Reader newReader) {
-        ((ObservableReader)reader).removeReaderListener(readerListener);
-        ObservableReader debugReader = new ObservableReader(newReader);
-        debugReader.addReaderListener(readerListener);
-        reader = debugReader;
-        return reader;
-    }
-
-    public Writer newConnectionWriter(Writer newWriter) {
-        ((ObservableWriter)writer).removeWriterListener(writerListener);
-        ObservableWriter debugWriter = new ObservableWriter(newWriter);
-        debugWriter.addWriterListener(writerListener);
-        writer = debugWriter;
-        return writer;
-    }
-
     public void userHasLogged(String user) {
         boolean isAnonymous = "".equals(StringUtils.parseName(user));
         String title =
@@ -316,14 +293,6 @@ public class LiteDebugger implements SmackDebugger {
                 + connection.getPort();
         title += "/" + StringUtils.parseResource(user);
         frame.setTitle(title);
-    }
-
-    public Reader getReader() {
-        return reader;
-    }
-
-    public Writer getWriter() {
-        return writer;
     }
 
     public PacketListener getReaderListener() {

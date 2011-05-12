@@ -23,6 +23,8 @@ package org.jivesoftware.smack.util;
 import java.io.*;
 import java.util.*;
 
+import org.jivesoftware.smack.util.ObservableWriter.WriteEvent;
+
 /**
  * An ObservableReader is a wrapper on a Reader that notifies to its listeners when
  * reading character streams.
@@ -32,17 +34,21 @@ import java.util.*;
 public class ObservableReader extends Reader {
 
     Reader wrappedReader = null;
-    List<ReaderListener> listeners = new ArrayList<ReaderListener>();
+    private ReadEvent readEvent;
 
     public ObservableReader(Reader wrappedReader) {
         this.wrappedReader = wrappedReader;
     }
         
+    public void setReadEvent(ReadEvent readEvent) {
+        this.readEvent = readEvent;
+    }
+
     public int read(char[] cbuf, int off, int len) throws IOException {
         int count = wrappedReader.read(cbuf, off, len);
-        if (count > 0) {
+        if (count > 0 && readEvent != null) {
             String str = new String(cbuf, off, count);
-            notifyListeners(str);
+            readEvent.notifyListeners(str);
         }
         return count;
     }
@@ -79,59 +85,51 @@ public class ObservableReader extends Reader {
         wrappedReader.reset();
     }
 
-    /**
-     * Adds a reader listener to this reader that will be notified when
-     * new strings are read.
-     *
-     * @param readerListener a reader listener.
-     */
-    public void addReaderListener(ReaderListener readerListener) {
-        if (readerListener == null) {
-            return;
-        }
-        synchronized (listeners) {
-            if (!listeners.contains(readerListener)) {
-                listeners.add(readerListener);
+    static public class ReadEvent {
+        List<ReaderListener> listeners = new ArrayList<ReaderListener>();
+
+        /**
+         * Adds a reader listener to this reader that will be notified when
+         * new strings are read.
+         *
+         * @param readerListener a reader listener.
+         */
+        public void addReaderListener(ReaderListener readerListener) {
+            if (readerListener == null) {
+                return;
+            }
+            synchronized (listeners) {
+                if (!listeners.contains(readerListener)) {
+                    listeners.add(readerListener);
+                }
             }
         }
-    }
 
-    /**
-     * Removes a reader listener from this reader.
-     *
-     * @param readerListener a reader listener.
-     */
-    public void removeReaderListener(ReaderListener readerListener) {
-        synchronized (listeners) {
-            listeners.remove(readerListener);
+        /**
+         * Removes a reader listener from this reader.
+         *
+         * @param readerListener a reader listener.
+         */
+        public void removeReaderListener(ReaderListener readerListener) {
+            synchronized (listeners) {
+                listeners.remove(readerListener);
+            }
         }
-    }
 
-    /**
-     * Notify that a new string has been read.
-     *
-     * @param str the read String to notify
-     */
-    public void notifyListeners(String str) {
-        ReaderListener[] readerListeners = null;
-        synchronized (listeners) {
-            readerListeners = new ReaderListener[listeners.size()];
-            listeners.toArray(readerListeners);
+        /**
+         * Notify that a new string has been read.
+         *
+         * @param str the read String to notify
+         */
+        public void notifyListeners(String str) {
+            ReaderListener[] readerListeners = null;
+            synchronized (listeners) {
+                readerListeners = new ReaderListener[listeners.size()];
+                listeners.toArray(readerListeners);
+            }
+            for (int i = 0; i < readerListeners.length; i++) {
+                readerListeners[i].read(str);
+            }
         }
-        for (int i = 0; i < readerListeners.length; i++) {
-            readerListeners[i].read(str);
-        }
-    }
-
-    /**
-     * Replace the wrapped reader.
-     *
-     * @param reader The new source reader.
-     * @return The old source reader.
-     */
-    public Reader setSource(Reader reader) {
-        Reader oldReader = this.wrappedReader;
-        this.wrappedReader = reader;
-        return oldReader;
     }
 }

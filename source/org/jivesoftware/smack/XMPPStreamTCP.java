@@ -65,8 +65,10 @@ public class XMPPStreamTCP extends XMPPStream
     private Reader reader = null;
     private Writer writer = null;
     
-    private ObservableReader obsReader;
-    private ObservableWriter obsWriter;
+    private ObservableReader.ReadEvent readEvent;
+    private ObservableWriter.WriteEvent writeEvent;
+
+    private ObservableWriter.WriteEvent keepaliveMonitorWriteEvent;
 
     /** True if the connection is encrypted, whether or not the certificate is verified. */
     private boolean usingTLS = false;
@@ -103,8 +105,6 @@ public class XMPPStreamTCP extends XMPPStream
     public Writer getWriter() { return writer; }
     public boolean isSecureConnection() { return usingSecureConnection; }
     public boolean isUsingCompression() { return usingXMPPCompression || usingTLSCompression; }
-    public ObservableReader getObservableReader() { return obsReader; }
-    public ObservableWriter getObservableWriter() { return obsWriter; }
 
     String connectionID;
     public String getConnectionID() { return connectionID; }
@@ -116,8 +116,12 @@ public class XMPPStreamTCP extends XMPPStream
         /* We update config.serviceName when we see the service name from the server,
          * but we need to retain the original value for TLS certificate checking. */
         originalServiceName = config.getServiceName();
-        obsReader = new ObservableReader(null);
-        obsWriter = new ObservableWriter(null);
+        keepaliveMonitorWriteEvent = new ObservableWriter.WriteEvent(); 
+    }
+
+    public void setReadWriteEvents(ObservableReader.ReadEvent readEvent, ObservableWriter.WriteEvent writeEvent) {
+        this.writeEvent = writeEvent;
+        this.readEvent = readEvent;
     }
 
     /**
@@ -679,11 +683,25 @@ public class XMPPStreamTCP extends XMPPStream
         reader = new BufferedReader(new InputStreamReader(inputStream, "UTF-8"));
         writer = new BufferedWriter(new OutputStreamWriter(outputStream, "UTF-8"));
         
-        /* Point the observers at the new stream. */ 
-        obsReader.setSource(reader);
-        obsWriter.setTarget(writer);
-        reader = obsReader;
-        writer = obsWriter;
+        /* Send incoming and outgoing data to the read and write observers, if any. */
+        if(readEvent != null) {
+            ObservableReader obsReader = new ObservableReader(reader);
+            obsReader.setReadEvent(readEvent);
+            reader = obsReader;
+        }
+
+        if(writeEvent != null) {
+            ObservableWriter obsWriter = new ObservableWriter(writer);
+            obsWriter.setWriteEvent(writeEvent);
+            writer = obsWriter;
+        }
+
+        // For keepalive purposes, add an observer wrapper to monitor writes.
+        {
+            ObservableWriter obsWriter = new ObservableWriter(writer);
+            obsWriter.setWriteEvent(keepaliveMonitorWriteEvent);
+            writer = obsWriter;
+        }
         
         streamReset();
     }
@@ -843,22 +861,23 @@ public class XMPPStreamTCP extends XMPPStream
                 Thread.currentThread().interrupt();
         }
 
+        long lastActive = System.currentTimeMillis();
         public void run() {
             // Add a write listener to track the time of the most recent write.  This is used
             // to only send heartbeats when the connection is idle.
-            final long lastActive[] = {System.currentTimeMillis()};
+            long lastActive[] = {System.currentTimeMillis()};
             WriterListener listener = new WriterListener() {
                 public void write(String str) {
-                    lastActive[0] = System.currentTimeMillis();
+                    KeepAliveTask.this.lastActive = System.currentTimeMillis();
                 }
             };
-            obsWriter.addWriterListener(listener);
+            keepaliveMonitorWriteEvent.addWriterListener(listener);
             
             while (true) {
                 Writer writer = getWriter(); 
                 synchronized (writer) {
                     // Send heartbeat if no packet has been sent to the server for a given time
-                    if (System.currentTimeMillis() - lastActive[0] >= delay) {
+                    if (System.currentTimeMillis() - KeepAliveTask.this.lastActive >= delay) {
                         try {
                             writer.write(" ");
                             writer.flush();
@@ -887,7 +906,7 @@ public class XMPPStreamTCP extends XMPPStream
                 }
             }
 
-            obsWriter.removeWriterListener(listener);
+            keepaliveMonitorWriteEvent.removeWriterListener(listener);
         }
     }
 };

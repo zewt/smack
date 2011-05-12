@@ -32,12 +32,12 @@ public class ConsoleDebugger implements SmackDebugger {
     private PacketListener listener = null;
     private ConnectionListener connListener = null;
 
-    private ObservableWriter writer;
-    private ObservableReader reader;
+    private ObservableWriter.WriteEvent writer;
+    private ObservableReader.ReadEvent reader;
     private ReaderListener readerListener;
     private WriterListener writerListener;
 
-    public ConsoleDebugger(Connection connection, ObservableWriter writer, ObservableReader reader) {
+    public ConsoleDebugger(Connection connection, ObservableWriter.WriteEvent writer, ObservableReader.ReadEvent reader) {
         this.connection = connection;
         this.writer = writer;
         this.reader = reader;

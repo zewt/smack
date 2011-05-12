@@ -118,8 +118,8 @@ public class EnhancedDebugger implements SmackDebugger {
     private PacketListener packetWriterListener = null;
     private ConnectionListener connListener = null;
 
-    private ObservableWriter writer;
-    private ObservableReader reader;
+    private ObservableWriter.WriteEvent writer;
+    private ObservableReader.ReadEvent reader;
     private ReaderListener readerListener;
     private WriterListener writerListener;
 
@@ -140,7 +140,7 @@ public class EnhancedDebugger implements SmackDebugger {
 
     JTabbedPane tabbedPane;
 
-    public EnhancedDebugger(Connection connection, ObservableWriter writer, ObservableReader reader) {
+    public EnhancedDebugger(Connection connection, ObservableWriter.WriteEvent writer, ObservableReader.ReadEvent reader) {
         this.connection = connection;
         this.writer = writer;
         this.reader = reader;

@@ -60,20 +60,10 @@ public abstract class XMPPStream
     public abstract String getConnectionID();
 
     /**
-     * Return the ObservableReader for this connection; users may attach observers to
-     * it to monitor incoming data.
-     * 
-     * @return ObservableReader
+     * Set the read and write events for this connection, which may be observed to monitor
+     * incoming and outgoing data.
      */
-    public abstract ObservableReader getObservableReader();
-
-    /**
-     * Return the ObservableWriter for this connection; users may attach observers to
-     * it to monitor outgoing data.
-     * 
-     * @return ObservableWriter
-     */
-    public abstract ObservableWriter getObservableWriter();
+    public abstract void setReadWriteEvents(ObservableReader.ReadEvent readEvent, ObservableWriter.WriteEvent writeEvent);
     
     /**
      * Returns true if the connection to the server is secure.
