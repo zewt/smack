@@ -17,7 +17,8 @@ public abstract class XMPPStream
     public abstract void initializeConnection() throws XMPPException;
     
     /**
-     * Retrieve the writer for sending packets.
+     * Retrieve the writer for sending packets.  If initializeConnection has not yet
+     * been called, return null.
      * @return Writer
      */
     public abstract Writer getWriter();
