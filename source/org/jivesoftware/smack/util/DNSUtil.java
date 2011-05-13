@@ -116,53 +116,56 @@ public class DNSUtil {
 
     private static Vector<HostAddress> resolveSRV(String domain) {
         Vector<SRVRecord> results = new Vector<SRVRecord>();
+        AsyncLookup asyncLookup = new AsyncLookup(domain, Type.SRV);
+        Lookup lookup;
         try {
-            AsyncLookup asyncLookup = new AsyncLookup(domain, Type.SRV);
-            Lookup lookup = asyncLookup.run();
-            Record recs[] = lookup.getAnswers();
-            if (recs == null)
-                    return new Vector<HostAddress>();
-
-            SRVRecord srecs[] = new SRVRecord[recs.length];
-            for(int i = 0; i < recs.length; ++i)
-                srecs[i] = (SRVRecord) recs[i];
-
-            // Sort the results by ascending priority.
-            Arrays.sort(srecs, new Comparator<SRVRecord>() {
-                public int compare(SRVRecord lhs, SRVRecord rhs) {
-                    return lhs.getPriority() - rhs.getPriority();
-                }
-            });
-
-            HashMap<Integer, Vector<SRVRecord>> resultsByPriority = new HashMap<Integer, Vector<SRVRecord>>();
-
-            // Separate the results by priority.
-            for(int i = 0; i < srecs.length; ++i) {
-                SRVRecord srv = srecs[i];
-                Vector<SRVRecord> list = resultsByPriority.get(srv.getPriority());
-                if(list == null) {
-                    list = new Vector<SRVRecord>();
-                    resultsByPriority.put(srv.getPriority(), list);
-                }
-                list.add(srv);
-            }
-
-            Vector<Integer> weights = new Vector<Integer>(resultsByPriority.keySet());
-            Collections.sort(weights);
-
-            // For each priority group, sort the results based on weight.  Do this
-            // in sorted order by weight, so priorities closer to 0 are earlier in
-            // the list.
-            for(int weight: weights) {
-                Vector<SRVRecord> list = resultsByPriority.get(weight);
-                Vector<Integer> weightList = new Vector<Integer>();
-                for(SRVRecord item: list)
-                    weightList.add(item.getWeight());
-
-                Vector<SRVRecord> output = getItemsRandomizedByWeight(list, weightList);
-                results.addAll(output);
-            }
+            lookup = asyncLookup.run();
         } catch (TextParseException e) {
+            return new Vector<HostAddress>();
+        }
+
+        Record recs[] = lookup.getAnswers();
+        if (recs == null)
+                return new Vector<HostAddress>();
+
+        SRVRecord srecs[] = new SRVRecord[recs.length];
+        for(int i = 0; i < recs.length; ++i)
+            srecs[i] = (SRVRecord) recs[i];
+
+        // Sort the results by ascending priority.
+        Arrays.sort(srecs, new Comparator<SRVRecord>() {
+            public int compare(SRVRecord lhs, SRVRecord rhs) {
+                return lhs.getPriority() - rhs.getPriority();
+            }
+        });
+
+        HashMap<Integer, Vector<SRVRecord>> resultsByPriority = new HashMap<Integer, Vector<SRVRecord>>();
+
+        // Separate the results by priority.
+        for(int i = 0; i < srecs.length; ++i) {
+            SRVRecord srv = srecs[i];
+            Vector<SRVRecord> list = resultsByPriority.get(srv.getPriority());
+            if(list == null) {
+                list = new Vector<SRVRecord>();
+                resultsByPriority.put(srv.getPriority(), list);
+            }
+            list.add(srv);
+        }
+
+        Vector<Integer> weights = new Vector<Integer>(resultsByPriority.keySet());
+        Collections.sort(weights);
+
+        // For each priority group, sort the results based on weight.  Do this
+        // in sorted order by weight, so priorities closer to 0 are earlier in
+        // the list.
+        for(int weight: weights) {
+            Vector<SRVRecord> list = resultsByPriority.get(weight);
+            Vector<Integer> weightList = new Vector<Integer>();
+            for(SRVRecord item: list)
+                weightList.add(item.getWeight());
+
+            Vector<SRVRecord> output = getItemsRandomizedByWeight(list, weightList);
+            results.addAll(output);
         }
 
         Vector<HostAddress> addresses = new Vector<HostAddress>();
