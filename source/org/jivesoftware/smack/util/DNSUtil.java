@@ -117,8 +117,9 @@ public class DNSUtil {
     private static Vector<HostAddress> resolveSRV(String domain) {
         Vector<SRVRecord> results = new Vector<SRVRecord>();
         try {
-            Lookup lookup = new Lookup(domain, Type.SRV);
-            Record recs[] = lookup.run();
+            AsyncLookup asyncLookup = new AsyncLookup(domain, Type.SRV);
+            Lookup lookup = asyncLookup.run();
+            Record recs[] = lookup.getAnswers();
             if (recs == null)
                     return new Vector<HostAddress>();
 
@@ -220,14 +221,23 @@ public class DNSUtil {
         domain = "_xmppconnect." + domain;
 
         Vector<String> results = new Vector<String>();
+        AsyncLookup asyncLookup = new AsyncLookup(domain, Type.TXT);
+
         Lookup lookup;
         try {
-            lookup = new Lookup(domain, Type.TXT);
+            lookup = asyncLookup.run();
         } catch (TextParseException e) {
             return new Vector<String>();
         }
 
-        Record recs[] = lookup.run();
+        asyncLookup = new AsyncLookup(domain, Type.TXT);
+        try {
+            lookup = asyncLookup.run();
+        } catch (TextParseException e) {
+            return new Vector<String>();
+        }
+
+        Record recs[] = lookup.getAnswers();
         if (recs == null)
             return new Vector<String>();
 
@@ -274,6 +284,93 @@ public class DNSUtil {
         }
         return addresses;
     }
+
+    public static class AsyncLookup {
+        private Thread lookupThread;
+
+        /* The parameters to pass to Lookup(): */
+        private String name;
+        private int type;
+
+        /* Results.  When any of these is non-null, or cancelled is true,
+         * the operation is complete. */
+        private Lookup lookup;
+        private TextParseException error;
+        private boolean cancelled;
+
+        public AsyncLookup(String name, int type) {
+            this.name = name;
+            this.type = type;
+        }
+
+        private void thread() {
+            TextParseException exception = null;
+            Lookup lookup = null;
+            try {
+                // Beware: InetSocketAddress will do a pointless reverse lookup on the IP
+                // it's given, so this will block as well, and it may not be cancellable.
+                // The lookup thread is not joined, because we can't reliably cancel it
+                // due to this.
+                lookup = new Lookup(name, type);
+                lookup.run();
+            } catch (TextParseException e) {
+                exception = e;
+            }
+
+            synchronized(this) {
+                this.lookup = lookup;
+                this.error = exception;
+                this.notify();
+            }
+        }
+
+        /** Perform the lookup.  If the lookup completes without being interrupted,
+         *  return the Lookup object.  If the lookup is interrupted, return null. */
+        public synchronized Lookup run() throws TextParseException
+        {
+            if(cancelled)
+                return null;
+            if(lookupThread != null)
+                throw new RuntimeException("AsyncLookup#run was called multiple times");
+
+            lookupThread = new Thread() {
+                public void run() { thread(); }
+            };
+            lookupThread.setName("DNS: " + name);
+            lookupThread.start();
+
+            // Wait for the lookup to finish or be cancelled.
+            while(lookup == null && error == null && !cancelled) {
+                try {
+                    wait();
+                } catch(InterruptedException e) {
+                    // This thread was interrupted--not the lookup thread.  We didn't do
+                    // this.  Leave the interrupted flag set and return null.
+                    Thread.currentThread().interrupt();
+                    return null;
+                }
+            }
+
+            if(error != null) {
+                error.fillInStackTrace();
+                throw error;
+            }
+
+            // Whether the lookup was finished or cancelled, lookup is the result.
+            return lookup;
+        }
+
+        /**
+         * Cancel the lookup.  If run() is called, or is called in the
+         * future, an exception will be thrown.  This function can be
+         * called asynchronously.
+         */
+        public synchronized void cancel() {
+            cancelled = true;
+            if(lookupThread != null)
+                lookupThread.interrupt();
+        }
+    };
 
     /**
      * Encapsulates a hostname and port.
