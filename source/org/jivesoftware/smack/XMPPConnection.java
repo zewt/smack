@@ -518,6 +518,9 @@ public class XMPPConnection extends Connection {
             int attempt = 0;
             boolean connected = false;
             while(!connected) {
+                if(data_stream != null)
+                    throw new AssertionError("data_stream should be null");
+
                 // Create an instance of this transport.
                 Constructor<? extends XMPPStream> constructor;
                 try {
@@ -548,6 +551,8 @@ public class XMPPConnection extends Connection {
 
                 attempt++;
             }
+            if(connected)
+                break;
         }
 
         if(!connected) {
