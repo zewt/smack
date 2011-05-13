@@ -25,7 +25,9 @@ import org.jivesoftware.smack.packet.Bind;
 import org.jivesoftware.smack.packet.IQ;
 import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.packet.Session;
+import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.sasl.*;
+import org.jivesoftware.smack.sasl.SASLMechanism.MechanismNotSupported;
 
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
 
@@ -242,92 +244,105 @@ public class SASLAuthentication implements UserAuthentication {
         return authenticate(username, null, password, resource);
     }
 
+    private String authenticateUsingMechanism(String username, CallbackHandler cbh, String password, String resource,
+            String mechanism)
+            throws XMPPException, SASLMechanism.MechanismNotSupported
+    {
+        // A SASL mechanism was found. Authenticate using the selected mechanism and then
+        // proceed to bind a resource
+        currentMechanism = createMechanism(implementedMechanisms.get(mechanism));
+
+        // Trigger SASL authentication with the selected mechanism. We use
+        // connection.getHost() since GSAPI requires the FQDN of the server, which
+        // may not match the XMPP domain.
+        // XXX: But we don't always even know the XMPP server's FQDN, since BOSH
+        // routes it for us transparently.
+        try {
+            if(cbh != null)
+                currentMechanism.authenticate(username, connection.getServiceName(), cbh);
+            else
+                currentMechanism.authenticate(username, connection.getServiceName(), password);
+        } catch(IOException e) {
+            e.printStackTrace();
+            throw new XMPPException(e);
+        }
+
+        // Wait until SASL negotiation finishes
+        synchronized (this) {
+            if (!saslNegotiated && !saslFailed) {
+                try {
+                    wait(30000);
+                }
+                catch (InterruptedException e) {
+                    // Ignore
+                }
+            }
+        }
+
+        if(!saslNegotiated && !saslFailed)
+            throw new XMPPException("SASL authentication timed out", XMPPError.Condition.request_timeout);
+
+        if (saslFailed) {
+            if (errorCondition != null) {
+                throw new XMPPException("SASL authentication " + mechanism + " failed: " + errorCondition);
+            }
+            else {
+                throw new XMPPException("SASL authentication " + mechanism + " failed");
+            }
+        }
+
+        // saslNegotiated is true
+        // Bind a resource for this connection and
+        return bindResourceAndEstablishSession(resource);
+    }
+
     private String authenticate(String username, CallbackHandler cbh, String password, String resource)
             throws XMPPException
     {
         if(cbh != null && password != null)
             throw new IllegalArgumentException();
 
-        // Locate the SASLMechanism to use
-        String selectedMechanism = null;
-        for (String mechanism : mechanismsPreferences) {
-            if (implementedMechanisms.containsKey(mechanism) &&
-                    serverMechanisms.contains(mechanism)) {
-                selectedMechanism = mechanism;
+        // Try each available SASL mechanism in order of preference until we try one
+        // that works, or the server closes the connection.
+        XMPPException error = null;
+        for (String mechanism: mechanismsPreferences) {
+            if (!implementedMechanisms.containsKey(mechanism) || !serverMechanisms.contains(mechanism))
+                continue;
+
+            try {
+                return authenticateUsingMechanism(username, cbh, password, resource, mechanism);
+            }
+            catch (SASLMechanism.MechanismNotSupported e) {
+                // The mechanism isn't supported by the local system.  Keep looking.
+            }
+            catch (XMPPException e) {
+                // The mechanism was supported, but failed.  If it failed due to a timeout,
+                // stop trying and rethrow the exception.
+                XMPPError xmppError = e.getXMPPError();
+                if(xmppError != null && xmppError.getCondition().equals("request-timeout"))
+                    throw e;
+
+                // We've found a shared mechanism, and it failed to log in.  Stop looking.
+                // We could keep trying other mechanisms, which the spec allows (but doesn't
+                // require), but unless it's to work around buggy servers there seems to be
+                // no point in doing so.  It would lower security by making us attempt PLAIN
+                // when we don't need to, and it would cause password callbacks to be run
+                // repeatedly.
+                error = e;
                 break;
             }
         }
-        if (selectedMechanism != null) {
-            // A SASL mechanism was found. Authenticate using the selected mechanism and then
-            // proceed to bind a resource
-            try {
-                currentMechanism = createMechanism(implementedMechanisms.get(selectedMechanism));
 
-                // Trigger SASL authentication with the selected mechanism. We use
-                // connection.getHost() since GSAPI requires the FQDN of the server, which
-                // may not match the XMPP domain.
-                // XXX: But we don't always even know the XMPP server's FQDN, since BOSH
-                // routes it for us transparently.
-                if(cbh != null)
-                    currentMechanism.authenticate(username, connection.getServiceName(), cbh);
-                else
-                    currentMechanism.authenticate(username, connection.getServiceName(), password);
+        // If any supported SASL methods were attempted and failed, rethrow the error.
+        if(error != null)
+            throw error;
 
-                // Wait until SASL negotiation finishes
-                synchronized (this) {
-                    if (!saslNegotiated && !saslFailed) {
-                        try {
-                            wait(30000);
-                        }
-                        catch (InterruptedException e) {
-                            // Ignore
-                        }
-                    }
-                }
-
-                if (saslFailed) {
-                    // SASL authentication failed and the server may have closed the connection
-                    // so throw an exception
-                    if (errorCondition != null) {
-                        throw new XMPPException("SASL authentication " +
-                                selectedMechanism + " failed: " + errorCondition);
-                    }
-                    else {
-                        throw new XMPPException("SASL authentication failed using mechanism " +
-                                selectedMechanism);
-                    }
-                }
-
-                if (saslNegotiated) {
-                    // Bind a resource for this connection and
-                    return bindResourceAndEstablishSession(resource);
-                }
-                else {
-                    // SASL authentication failed so try a Non-SASL authentication.
-                    // Non-SASL authentication doesn't support callbacks, so just fail
-                    // in that case.
-                    if(password != null)
-                        return new NonSASLAuthentication(connection)
-                                .authenticate(username, password, resource);
-                }
-            }
-            catch (XMPPException e) {
-                throw e;
-            }
-            catch (IOException e) {
-                e.printStackTrace();
-                // SASL authentication failed so try a Non-SASL authentication
-                if(password != null)
-                    return new NonSASLAuthentication(connection)
-                        .authenticate(username, password, resource);
-            }
-        }
-        else {
-            // No SASL method was found so try a Non-SASL authentication
-            if(password != null)
-                return new NonSASLAuthentication(connection).authenticate(username, password, resource);
-        }
-        throw new XMPPException("SASL authentication failed");
+        // No supported SASL methods were found, so try legacy authentication.
+        NonSASLAuthentication legacyAuth = new NonSASLAuthentication(connection);
+        if(password != null)
+            return legacyAuth.authenticate(username, password, resource);
+        else
+            return legacyAuth.authenticate(username, password, cbh);
     }
 
     /**
@@ -344,7 +359,12 @@ public class SASLAuthentication implements UserAuthentication {
     public String authenticateAnonymously() throws XMPPException {
         try {
             currentMechanism = new SASLAnonymous(this);
-            currentMechanism.authenticate(null,null,"");
+            try {
+                currentMechanism.authenticate(null,null,"");
+            } catch (MechanismNotSupported e) {
+                // Anonymous authentication never throws MechanismNotSupported.
+                throw new RuntimeException(e);
+            }
 
             // Wait until SASL negotiation finishes
             synchronized (this) {

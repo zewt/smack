@@ -37,6 +37,7 @@ import org.apache.harmony.javax.security.sasl.RealmCallback;
 import org.apache.harmony.javax.security.sasl.RealmChoiceCallback;
 import org.apache.harmony.javax.security.sasl.Sasl;
 import org.apache.harmony.javax.security.sasl.SaslClient;
+import org.apache.harmony.javax.security.sasl.SaslClientFactory;
 import org.apache.harmony.javax.security.sasl.SaslException;
 
 /**
@@ -62,6 +63,8 @@ public abstract class SASLMechanism implements CallbackHandler {
     protected String password;
 
 
+    static public class MechanismNotSupported extends Exception {};
+
     public SASLMechanism(SASLAuthentication saslAuthentication) {
         this.saslAuthentication = saslAuthentication;
     }
@@ -76,8 +79,11 @@ public abstract class SASLMechanism implements CallbackHandler {
      * @param password the password for this account.
      * @throws IOException If a network error occurs while authenticating.
      * @throws XMPPException If a protocol error occurs or the user is not authenticated.
+     * @throws MechanismNotSupported If this mechanism is not supported by the client.
      */
-    public void authenticate(String username, String host, String password) throws IOException, XMPPException {
+    public void authenticate(String username, String host, String password)
+    throws IOException, XMPPException, MechanismNotSupported
+    {
         //Since we were not provided with a CallbackHandler, we will use our own with the given
         //information
 
@@ -88,6 +94,8 @@ public abstract class SASLMechanism implements CallbackHandler {
         String[] mechanisms = { getName() };
         Map<String,String> props = new HashMap<String,String>();
         sc = Sasl.createSaslClient(mechanisms, username, "xmpp", host, props, this);
+        if(sc == null)
+            throw new MechanismNotSupported();
         authenticate();
     }
 
@@ -100,11 +108,16 @@ public abstract class SASLMechanism implements CallbackHandler {
      * @param cbh      the CallbackHandler to obtain user information.
      * @throws IOException If a network error occures while authenticating.
      * @throws XMPPException If a protocol error occurs or the user is not authenticated.
+     * @throws MechanismNotSupported If this mechanism is not supported by the client.
      */
-    public void authenticate(String username, String host, CallbackHandler cbh) throws IOException, XMPPException {
+    public void authenticate(String username, String host, CallbackHandler cbh)
+    throws IOException, XMPPException, MechanismNotSupported
+    {
         String[] mechanisms = { getName() };
         Map<String,String> props = new HashMap<String,String>();
         sc = Sasl.createSaslClient(mechanisms, username, "xmpp", host, props, cbh);
+        if(sc == null)
+            throw new MechanismNotSupported();
         authenticate();
     }
 
