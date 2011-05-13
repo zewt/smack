@@ -40,13 +40,6 @@ import org.xbill.DNS.Type;
  * @author Matt Tucker
  */
 public class DNSUtil {
-
-    /**
-     * Create a cache to hold the 100 most recently accessed DNS lookups for a period of
-     * 10 minutes.
-     */
-    private static Map<String, Vector<HostAddress>> cache = new Cache<String, Vector<HostAddress>>(100, 1000 * 60 * 10);
-
     /**
      * Shuffle a list of items, prioritizing the order by their weight, using a simple
      * PRNG with the given seed.
@@ -207,14 +200,6 @@ public class DNSUtil {
      *      server can be reached at for the specified domain.
      */
     public static Vector<HostAddress> resolveXMPPDomain(String domain) {
-        String key = "c" + domain;
-        // Return item from cache if it exists.
-        if (cache.containsKey(key)) {
-            Vector<HostAddress> addresses = cache.get(key);
-            if (addresses != null) {
-                return addresses;
-            }
-        }
         Vector<HostAddress> addresses = resolveSRV("_xmpp-client._tcp." + domain);
         if (addresses.isEmpty()) {
             addresses = resolveSRV("_jabber._tcp." + domain);
@@ -222,8 +207,6 @@ public class DNSUtil {
         if (addresses.isEmpty()) {
             addresses.add(new HostAddress(domain, 5222));
         }
-        // Add item to cache.
-        cache.put(key, addresses);
         return addresses;
     }
 
@@ -282,14 +265,6 @@ public class DNSUtil {
      *      server can be reached at for the specified domain.
      */
     public static Vector<HostAddress> resolveXMPPServerDomain(String domain) {
-        String key = "s" + domain;
-        // Return item from cache if it exists.
-        if (cache.containsKey(key)) {
-            Vector<HostAddress> addresses = cache.get(key);
-            if (addresses != null) {
-                return addresses;
-            }
-        }
         Vector<HostAddress> addresses = resolveSRV("_xmpp-server._tcp." + domain);
         if (addresses.isEmpty()) {
             addresses = resolveSRV("_jabber._tcp." + domain);
@@ -297,8 +272,6 @@ public class DNSUtil {
         if (addresses.isEmpty()) {
             addresses.add(new HostAddress(domain, 5269));
         }
-        // Add item to cache.
-        cache.put(key, addresses);
         return addresses;
     }
 
