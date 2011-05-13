@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.io.Writer;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.Vector;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -14,6 +16,7 @@ import org.jivesoftware.smack.ConnectionConfiguration.SecurityMode;
 import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.proxy.ProxyInfo;
 import org.jivesoftware.smack.proxy.ProxyInfo.ProxyType;
+import org.jivesoftware.smack.util.DNSUtil;
 import org.jivesoftware.smack.util.ObservableReader;
 import org.jivesoftware.smack.util.ObservableWriter;
 import org.w3c.dom.Document;
@@ -91,9 +94,34 @@ public class XMPPStreamBOSH extends XMPPStream
         if(this.uri == null)
             throw new XMPPException("BOSH is disabled", XMPPError.Condition.remote_server_not_found);
 
-        // We don't currently support autodiscovery; stop after the first attempt.
-        if(discoveryIndex > 0)
-            throw new XMPPException("No more servers to attempt", XMPPError.Condition.remote_server_not_found);
+        if(this.uri == ConnectionConfiguration.AUTO_DETECT_BOSH) {
+            // This will return the same results each time, because the weight
+            // shuffling is cached.
+            // XXX: Figure out how BOSH discovery is supposed to be secured. 
+            Vector<String> addresses = DNSUtil.resolveXmppConnect(config.getServiceName(), "_xmpp-client-xbosh");
+            if(addresses.isEmpty())
+                throw new XMPPException("No BOSH servers discovered", XMPPError.Condition.remote_server_not_found);
+
+            if(discoveryIndex >= addresses.size())
+                throw new XMPPException("No more BOSH servers to attempt (tried all " + addresses.size() + ")",
+                        XMPPError.Condition.remote_server_not_found);
+
+            String url = addresses.get(discoveryIndex);
+            try {
+                uri = new URI(url);
+            } catch (URISyntaxException e) {
+                throw new XMPPException("Discovered BOSH server has bad URL: " + url);
+            }
+
+            // Only allow HTTP and HTTPS.
+            if(!uri.getScheme().equalsIgnoreCase("http") && !uri.getScheme().equalsIgnoreCase("https"))
+                throw new XMPPException("Discovered BOSH server has invalid scheme: " + url);
+
+            // We'll catch this down below, but we throw a different message here.
+            if(config.getSecurityMode() == SecurityMode.required && !uri.getScheme().equalsIgnoreCase("https"))
+                throw new XMPPException("Discovered BOSH server is not HTTPS, but security required by connection configuration.",
+                        XMPPError.Condition.forbidden);
+        }
 
         android.util.Log.w("FOO", "XMPPStreamBOSH: initializeConnection");
         BOSHClientConfig.Builder cfgBuilder = BOSHClientConfig.Builder.create(uri, config.getServiceName());

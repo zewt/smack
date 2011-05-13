@@ -66,7 +66,7 @@ public class ConnectionConfiguration implements Cloneable {
      * If not null, the parsed URI of the BOSH server to use.  If set to
      * AutoDetectBOSH, attempt to detect BOSH via XEP-0156.
      */
-    private URI boshURI = null;
+    private URI boshURI = AUTO_DETECT_BOSH;
     final static public URI AUTO_DETECT_BOSH = URI.create("bosh-xep-0156:auto");
 
     private boolean compressionEnabled = true;

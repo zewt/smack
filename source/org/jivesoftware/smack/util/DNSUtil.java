@@ -30,6 +30,7 @@ import java.util.Vector;
 import org.xbill.DNS.Lookup;
 import org.xbill.DNS.Record;
 import org.xbill.DNS.SRVRecord;
+import org.xbill.DNS.TXTRecord;
 import org.xbill.DNS.TextParseException;
 import org.xbill.DNS.Type;
 
@@ -224,6 +225,43 @@ public class DNSUtil {
         // Add item to cache.
         cache.put(key, addresses);
         return addresses;
+    }
+
+    /**
+     * Given a domain, look up the specified attribute according to XEP-0156.
+     * <p>
+     * For example, resolveXmppConnect("example.com", "_xmpp-client-xbosh")
+     * may return [http://bosh.example.com/bind].
+     */
+    public static Vector<String> resolveXmppConnect(String domain, String attribute) {
+        domain = "_xmppconnect." + domain;
+
+        Vector<String> results = new Vector<String>();
+        Lookup lookup;
+        try {
+            lookup = new Lookup(domain, Type.TXT);
+        } catch (TextParseException e) {
+            return new Vector<String>();
+        }
+
+        Record recs[] = lookup.run();
+        if (recs == null)
+            return new Vector<String>();
+
+        for(int i = 0; i < recs.length; ++i) {
+            String txt = recs[i].rdataToString();
+            // For some reason, the data is in quotes.  Remove them.
+            if(txt.length() < 2 || !txt.startsWith("\"") || !txt.endsWith("\""))
+                continue;
+            txt = txt.substring(1, txt.length()-1);
+
+            int idx = txt.indexOf("=");
+            if(idx == -1)
+                continue;
+            results.add(txt.substring(idx+1, txt.length()));
+        }
+
+        return results;
     }
 
     /**
