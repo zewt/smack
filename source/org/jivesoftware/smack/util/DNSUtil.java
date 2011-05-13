@@ -191,13 +191,6 @@ public class DNSUtil {
      * of 5222.<p>
      *
      * As an example, a lookup for "example.com" may return "im.example.com:5269".
-     * 
-     * Note on SRV record selection.
-     * We now check priority and weight, but we still don't do this correctly.
-     * The missing behavior is this: if we fail to reach a host based on its SRV
-     * record then we need to select another host from the other SRV records.
-     * In Smack 3.1.1 we're not going to be able to do the major system redesign to
-     * correct this.
      *
      * @param domain the domain.
      * @return a HostAddress, which encompasses the hostname and port that the XMPP
