@@ -98,7 +98,8 @@ public class XMPPStreamBOSH extends XMPPStream
             // This will return the same results each time, because the weight
             // shuffling is cached.
             // XXX: Figure out how BOSH discovery is supposed to be secured. 
-            Vector<String> addresses = DNSUtil.resolveXmppConnect(config.getServiceName(), "_xmpp-client-xbosh");
+            DNSUtil.XMPPConnectLookup lookup = new DNSUtil.XMPPConnectLookup(config.getServiceName(), "_xmpp-client-xbosh");
+            Vector<String> addresses = lookup.run();
             if(addresses.isEmpty())
                 throw new XMPPException("No BOSH servers discovered", XMPPError.Condition.remote_server_not_found);
 

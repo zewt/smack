@@ -146,7 +146,8 @@ public class XMPPStreamTCP extends XMPPStream
         if(host == null) {
             // This will return the same results each time, because the weight
             // shuffling is cached.
-            Vector<DNSUtil.HostAddress> addresses = DNSUtil.resolveXMPPDomain(config.getServiceName());
+            DNSUtil.XMPPDomainLookup lookup = new DNSUtil.XMPPDomainLookup(config.getServiceName(), true);
+            Vector<DNSUtil.HostAddress> addresses = lookup.run();
             if(discoveryIndex >= addresses.size())
                 throw new XMPPException("No more servers to attempt (tried all " + addresses.size() + ")",
                         XMPPError.Condition.remote_server_not_found);

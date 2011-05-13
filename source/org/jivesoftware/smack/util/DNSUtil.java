@@ -115,15 +115,16 @@ public class DNSUtil {
         return result;
     }
 
-    private static Vector<HostAddress> resolveSRV(String domain) {
+    private static Vector<HostAddress> resolveSRV(AsyncLookup asyncLookup) {
         Vector<SRVRecord> results = new Vector<SRVRecord>();
-        AsyncLookup asyncLookup = new AsyncLookup(domain, Type.SRV);
         Lookup lookup;
         try {
             lookup = asyncLookup.run();
         } catch (TextParseException e) {
             return new Vector<HostAddress>();
         }
+        if(lookup == null)
+            return null;
 
         Record recs[] = lookup.getAnswers();
         if (recs == null)
@@ -197,16 +198,36 @@ public class DNSUtil {
      * @return a HostAddress, which encompasses the hostname and port that the XMPP
      *      server can be reached at for the specified domain.
      */
-    public static Vector<HostAddress> resolveXMPPDomain(String domain) {
-        Vector<HostAddress> addresses = resolveSRV("_xmpp-client._tcp." + domain);
-        if (addresses.isEmpty()) {
-            addresses = resolveSRV("_jabber._tcp." + domain);
+    public static class XMPPDomainLookup {
+        private AsyncLookup asyncLookup1;
+        private AsyncLookup asyncLookup2;
+        private HostAddress defaultResult;
+
+        public XMPPDomainLookup(String domain, boolean client) {
+            String prefix = client? "_xmpp-client._tcp.":"_xmpp-server._tcp.";
+            asyncLookup1 = new AsyncLookup(prefix + domain, Type.SRV);
+            asyncLookup2 = new AsyncLookup("_jabber._tcp." + domain, Type.SRV);
+            defaultResult = new HostAddress(domain, client? 5222:5269);
         }
-        if (addresses.isEmpty()) {
-            addresses.add(new HostAddress(domain, 5222));
+
+        /**
+         * Perform the lookup.  If cancelled by an asynchronous call to cancel(),
+         * return null.
+         */
+        public Vector<HostAddress> run() {
+            Vector<HostAddress> addresses = resolveSRV(asyncLookup1);
+            if(addresses.isEmpty())
+                addresses = resolveSRV(asyncLookup2);
+            if(addresses.isEmpty())
+                addresses.add(defaultResult);
+            return addresses;
         }
-        return addresses;
-    }
+
+        public void cancel() {
+            asyncLookup1.cancel();
+            asyncLookup2.cancel();
+        }
+    };
 
     /**
      * Given a domain, look up the specified attribute according to XEP-0156.
@@ -214,72 +235,48 @@ public class DNSUtil {
      * For example, resolveXmppConnect("example.com", "_xmpp-client-xbosh")
      * may return [http://bosh.example.com/bind].
      */
-    public static Vector<String> resolveXmppConnect(String domain, String attribute) {
-        domain = "_xmppconnect." + domain;
-
-        Vector<String> results = new Vector<String>();
-        AsyncLookup asyncLookup = new AsyncLookup(domain, Type.TXT);
-
-        Lookup lookup;
-        try {
-            lookup = asyncLookup.run();
-        } catch (TextParseException e) {
-            return new Vector<String>();
+    public static class XMPPConnectLookup {
+        AsyncLookup asyncLookup;
+        public XMPPConnectLookup(String domain, String attribute) {
+            domain = "_xmppconnect." + domain;
+            asyncLookup = new AsyncLookup(domain, Type.TXT);
         }
 
-        asyncLookup = new AsyncLookup(domain, Type.TXT);
-        try {
-            lookup = asyncLookup.run();
-        } catch (TextParseException e) {
-            return new Vector<String>();
+        public Vector<String> run() {
+            Vector<String> results = new Vector<String>();
+
+            Lookup lookup;
+            try {
+                lookup = asyncLookup.run();
+            } catch (TextParseException e) {
+                return new Vector<String>();
+            }
+            if (lookup == null)
+                return new Vector<String>();
+
+            Record recs[] = lookup.getAnswers();
+            if (recs == null)
+                return new Vector<String>();
+
+            for(int i = 0; i < recs.length; ++i) {
+                String txt = recs[i].rdataToString();
+                // For some reason, the data is in quotes.  Remove them.
+                if(txt.length() < 2 || !txt.startsWith("\"") || !txt.endsWith("\""))
+                    continue;
+                txt = txt.substring(1, txt.length()-1);
+
+                int idx = txt.indexOf("=");
+                if(idx == -1)
+                    continue;
+                results.add(txt.substring(idx+1, txt.length()));
+            }
+
+            return results;
         }
 
-        Record recs[] = lookup.getAnswers();
-        if (recs == null)
-            return new Vector<String>();
-
-        for(int i = 0; i < recs.length; ++i) {
-            String txt = recs[i].rdataToString();
-            // For some reason, the data is in quotes.  Remove them.
-            if(txt.length() < 2 || !txt.startsWith("\"") || !txt.endsWith("\""))
-                continue;
-            txt = txt.substring(1, txt.length()-1);
-
-            int idx = txt.indexOf("=");
-            if(idx == -1)
-                continue;
-            results.add(txt.substring(idx+1, txt.length()));
+        public void cancel() {
+            asyncLookup.cancel();
         }
-
-        return results;
-    }
-
-    /**
-     * Returns the host name and port that the specified XMPP server can be
-     * reached at for server-to-server communication. A DNS lookup for a SRV
-     * record in the form "_xmpp-server._tcp.example.com" is attempted, according
-     * to section 14.4 of RFC 3920. If that lookup fails, a lookup in the older form
-     * of "_jabber._tcp.example.com" is attempted since servers that implement an
-     * older version of the protocol may be listed using that notation. If that
-     * lookup fails as well, it's assumed that the XMPP server lives at the
-     * host resolved by a DNS lookup at the specified domain on the default port
-     * of 5269.<p>
-     *
-     * As an example, a lookup for "example.com" may return "im.example.com:5269".
-     *
-     * @param domain the domain.
-     * @return a HostAddress, which encompasses the hostname and port that the XMPP
-     *      server can be reached at for the specified domain.
-     */
-    public static Vector<HostAddress> resolveXMPPServerDomain(String domain) {
-        Vector<HostAddress> addresses = resolveSRV("_xmpp-server._tcp." + domain);
-        if (addresses.isEmpty()) {
-            addresses = resolveSRV("_jabber._tcp." + domain);
-        }
-        if (addresses.isEmpty()) {
-            addresses.add(new HostAddress(domain, 5269));
-        }
-        return addresses;
     }
 
     public static class AsyncLookup {
