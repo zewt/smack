@@ -154,6 +154,10 @@ public class XMPPStreamTCP extends XMPPStream
                         XMPPError.Condition.remote_server_not_found);
             host = addresses.get(discoveryIndex).getHost();
             port = addresses.get(discoveryIndex).getPort();
+        } else {
+            // If we're not autodiscovering servers, we have only one server to try.
+            if(discoveryIndex > 0)
+                throw new XMPPException("No more servers to attempt", XMPPError.Condition.remote_server_not_found);
         }
 
         try {
