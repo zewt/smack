@@ -516,8 +516,7 @@ public class XMPPConnection extends Connection {
             // than one server to connect to, try each in order.  Note that timeouts are
             // per-server.
             int attempt = 0;
-            boolean connected = false;
-            while(!connected) {
+            while(true) {
                 if(data_stream != null)
                     throw new AssertionError("data_stream should be null");
 
@@ -534,15 +533,14 @@ public class XMPPConnection extends Connection {
 
                 try {
                     connectUsingConfigurationAttempt();
-                    connected = true;
-                    break;
+                    return;
                 } catch(XMPPException e) {
                     // On failure, connectUsingConfigurationAttempt always clears data_stream.
                     if(data_stream != null)
                         throw new AssertionError("connectUsingConfigurationAttempt failed, but left data_stream set");
 
-                    // If the error is remote_server_not_found, there were no more
-                    // discovered resources to try.
+                    // If the error is remote_server_not_found, there are no more
+                    // discovered resources to try with this transport.
                     XMPPError error = e.getXMPPError();
                     if(error != null && error.getCondition() == XMPPError.Condition.remote_server_not_found.toString())
                         break;
@@ -551,18 +549,14 @@ public class XMPPConnection extends Connection {
 
                 attempt++;
             }
-            if(connected)
-                break;
         }
 
-        if(!connected) {
-            // We didn't connect.  Report the first failure other than remote_server_not_found
-            // as the error.  XXX: not ideal
-            if(firstFailure != null)
-                throw firstFailure;
-            else
-                throw new XMPPException("Couldn't discover any servers to connect to");
-        }
+        // We didn't connect.  Report the first failure other than remote_server_not_found
+        // as the error.  XXX: not ideal
+        if(firstFailure != null)
+            throw firstFailure;
+        else
+            throw new XMPPException("Couldn't discover any servers to connect to");
     }
 
     private void connectUsingConfigurationAttempt() throws XMPPException {
