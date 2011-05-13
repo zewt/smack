@@ -36,6 +36,7 @@ import java.security.Provider;
 import java.security.SecureRandom;
 import java.security.Security;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
 import java.util.WeakHashMap;
 
 import javax.net.ssl.HandshakeCompletedEvent;
@@ -67,15 +68,15 @@ public class XMPPSSLSocketFactory {
     /** If at least one insecure connection has been created with this factory,
      * return a CertificateExceptionDetail.  If all connections have been secure,
      * return null. */
-    public ServerTrustManager.CertificateExceptionDetail getSeenInsecureConnection() { return seenInsecureConnection; } 
-    public ServerTrustManager.CertificateExceptionDetail seenInsecureConnection = null;
+    public CertificateException getSeenInsecureConnection() { return seenInsecureConnection; } 
+    public CertificateException seenInsecureConnection = null;
 
     /** Store information about each socket connection.  There's no good way to wrap
      *  an SSLSocket that another class gives to us, so we store these in a WeakHashMap. */
     private class SSLSocketInfo { 
         // If the connection is insecure, this contains the exception explaining the
         // reason.
-        ServerTrustManager.CertificateExceptionDetail insecureConnection;
+        CertificateException insecureConnection;
 
         // If compression is enabled, this contains the compression method used.  If compression
         // is not enabled, this is null.
@@ -145,7 +146,7 @@ public class XMPPSSLSocketFactory {
                         try {
                             checkSecureConnection(socket);
                             info.insecureConnection = null;
-                        } catch(ServerTrustManager.CertificateExceptionDetail e) {
+                        } catch(CertificateException e) {
                             // The connection isn't secure.  Store the reason.
                             info.insecureConnection = e;
                             seenInsecureConnection = e;
@@ -195,7 +196,7 @@ public class XMPPSSLSocketFactory {
          * trusted, throw {@link ServerTrustManager.CertificateExceptionDetail }.
          */
         private void checkSecureConnection(SSLSocket socket)
-        throws ServerTrustManager.CertificateExceptionDetail
+        throws CertificateException
         {
             SSLSession session = socket.getSession();
 
@@ -240,7 +241,7 @@ public class XMPPSSLSocketFactory {
     }
 
     /** Return true if the specified socket is over a secure connection. */
-    public ServerTrustManager.CertificateExceptionDetail isInsecureConnection(SSLSocket socket) {
+    public CertificateException isInsecureConnection(SSLSocket socket) {
         return map.get(socket).insecureConnection;
     }
 

@@ -33,6 +33,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -781,7 +782,7 @@ public class XMPPStreamTCP extends XMPPStream
         // If usingSecureConnection is false, we're encrypted but we couldn't verify
         // the server's certificate.
         usingTLS = true;
-        ServerTrustManager.CertificateExceptionDetail insecureReason = sslSocketFactory.isInsecureConnection(sslSocket);
+        CertificateException insecureReason = sslSocketFactory.isInsecureConnection(sslSocket);
         usingSecureConnection = (insecureReason == null);
 
         // Record if TLS compression is active, so we won't try to negotiate XMPP

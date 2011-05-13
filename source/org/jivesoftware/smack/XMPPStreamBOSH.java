@@ -5,6 +5,7 @@ import java.io.StringReader;
 import java.io.Writer;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.security.cert.CertificateException;
 import java.util.Vector;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -190,7 +191,7 @@ public class XMPPStreamBOSH extends XMPPStream
         // connected the socket.  Note that usingSecureConnection may already be false for
         // other reasons.
         if(xmppSocketFactory != null) {
-            ServerTrustManager.CertificateExceptionDetail detail = xmppSocketFactory.getSeenInsecureConnection();
+            CertificateException detail = xmppSocketFactory.getSeenInsecureConnection();
             if(detail != null)
                 usingSecureConnection = false;
         }

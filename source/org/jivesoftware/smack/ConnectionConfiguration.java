@@ -56,11 +56,6 @@ public class ConnectionConfiguration implements Cloneable {
     private String keystorePath;
     private String keystoreType;
     private String pkcs11Library;
-    private boolean verifyChainEnabled = true;
-    private boolean verifyRootCAEnabled = true;
-    private boolean selfSignedCertificateEnabled = false;
-    private boolean expiredCertificatesCheckEnabled = false;
-    private boolean notMatchingDomainCheckEnabled = true;
 
     /**
      * If not null, the parsed URI of the BOSH server to use.  If set to
@@ -417,67 +412,25 @@ public class ConnectionConfiguration implements Cloneable {
         this.pkcs11Library = pkcs11Library;
     }
 
-    /** Returns true if certificate chains must verify to treat a connection as secure.  Default: true. */
-    public boolean isVerifyChainEnabled() {
-        return verifyChainEnabled;
-    }
+    /** Does nothing.  To permit insecure connections, use {@link #setSecurityMode}(enabled). 
+     * @deprecated */
+    public void setVerifyChainEnabled(boolean verifyChainEnabled) { }
 
-    /** Sets if the certificate chain must verify to treat a connection as secure.  Default: true. */
-    public void setVerifyChainEnabled(boolean verifyChainEnabled) {
-        this.verifyChainEnabled = verifyChainEnabled;
-    }
+    /** Does nothing.  To permit insecure connections, use {@link #setSecurityMode}(enabled).
+     * @deprecated */
+    public void setVerifyRootCAEnabled(boolean verifyRootCAEnabled) { }
 
-    /** Returns true if the root certificate must be verified to treat a connection as secure.  Default: true. */
-    public boolean isVerifyRootCAEnabled() {
-        return verifyRootCAEnabled;
-    }
+    /** Does nothing.  To permit insecure connections, use {@link #setSecurityMode}(enabled).
+     * @deprecated */
+    public void setSelfSignedCertificateEnabled(boolean selfSignedCertificateEnabled) { }
 
-    /** Sets if the root certificate must be verified to treat a connection as secure.  Default: true. */
-    public void setVerifyRootCAEnabled(boolean verifyRootCAEnabled) {
-        this.verifyRootCAEnabled = verifyRootCAEnabled;
-    }
+    /** Does nothing.  To permit insecure connections, use {@link #setSecurityMode}(enabled).
+     * @deprecated */
+    public void setExpiredCertificatesCheckEnabled(boolean expiredCertificatesCheckEnabled) { }
 
-    /** Returns true if self-signed certificates are accepted.  Default: false. */
-    public boolean isSelfSignedCertificateEnabled() {
-        return selfSignedCertificateEnabled;
-    }
-
-    /** Sets if self-signed certificates are accepted. Default: true. */
-    public void setSelfSignedCertificateEnabled(boolean selfSignedCertificateEnabled) {
-        this.selfSignedCertificateEnabled = selfSignedCertificateEnabled;
-    }
-
-    /**
-     * Returns true if connections are considered insecure if their certificate is expired.
-     * Default: false.
-     */
-    public boolean isExpiredCertificatesCheckEnabled() {
-        return expiredCertificatesCheckEnabled;
-    }
-
-    /**
-     * Sets if a certificates presented by the server are going to be checked for their
-     * validity. Default: true.
-     */
-    public void setExpiredCertificatesCheckEnabled(boolean expiredCertificatesCheckEnabled) {
-        this.expiredCertificatesCheckEnabled = expiredCertificatesCheckEnabled;
-    }
-
-    /**
-     * Returns true if certificate domains presented by the server must match for the connection
-     * to be considered secure.
-     */
-    public boolean isNotMatchingDomainCheckEnabled() {
-        return notMatchingDomainCheckEnabled;
-    }
-
-    /**
-     * Sets if certificate domains presented by the server must match for the connection to
-     * be considered secure.  Default: true.
-     */
-    public void setNotMatchingDomainCheckEnabled(boolean notMatchingDomainCheckEnabled) {
-        this.notMatchingDomainCheckEnabled = notMatchingDomainCheckEnabled;
-    }
+    /** Does nothing.  To permit insecure connections, use {@link #setSecurityMode}(enabled).
+     * @deprecated */
+    public void setNotMatchingDomainCheckEnabled(boolean notMatchingDomainCheckEnabled) { }
 
     /**
      * Returns true if the connection is going to use stream compression. Stream compression

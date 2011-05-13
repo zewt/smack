@@ -493,6 +493,18 @@ public class XMPPConnection extends Connection {
         removePacketSendingListener(packetListener);
     }
 
+    /** Create a new XMPPStream. */
+    private static XMPPStream createDataStream(Class<? extends XMPPStream> transport, ConnectionConfiguration config) {
+        // Create an instance of this transport.
+        Constructor<? extends XMPPStream> constructor;
+        try {
+            constructor = transport.getConstructor(ConnectionConfiguration.class);
+            return constructor.newInstance(config);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     /**
      * Initializes the connection, opening an XMPP stream to the server.
      *
@@ -520,13 +532,7 @@ public class XMPPConnection extends Connection {
                 if(data_stream != null)
                     throw new AssertionError("data_stream should be null");
 
-                // Create an instance of this transport.
-                Constructor<? extends XMPPStream> constructor;
-                try {
-                    constructor = transport.getConstructor(ConnectionConfiguration.class);
-                    data_stream = constructor.newInstance(config);
-                }
-                catch (Exception e) { throw new RuntimeException(e); }
+                data_stream = createDataStream(transport, config);
 
                 // Tell the transport which discovered server to attempt.
                 data_stream.setDiscoveryIndex(attempt);

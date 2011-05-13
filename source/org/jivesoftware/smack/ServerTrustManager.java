@@ -20,19 +20,32 @@
 
 package org.jivesoftware.smack;
 
-import javax.net.ssl.X509TrustManager;
 import java.io.BufferedInputStream;
 import java.io.FileInputStream;
-import java.io.InputStream;
 import java.io.IOException;
-import java.security.*;
+import java.io.InputStream;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
+import java.security.cert.CertPath;
+import java.security.cert.CertPathValidator;
+import java.security.cert.CertPathValidatorException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
 import java.security.cert.CertificateParsingException;
+import java.security.cert.PKIXParameters;
 import java.security.cert.X509Certificate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import javax.net.ssl.X509TrustManager;
 
 /**
  * Trust manager that checks all certificates presented by the server. This class
@@ -159,28 +172,6 @@ class ServerTrustManager implements X509TrustManager {
         return trustStore;
     }
 
-    /**
-     * This exception contains details about a certificate verification failure.
-     */
-    public static class CertificateExceptionDetail extends CertificateException {
-        private static final long serialVersionUID = 9002117483237932715L;
-        X509Certificate[] certificates;
-
-        CertificateExceptionDetail(X509Certificate[] certificates, Throwable t) {
-            super(t);
-            this.certificates = certificates;
-        }
-        CertificateExceptionDetail(X509Certificate[] certificates, String message) {
-            super(message);
-            this.certificates = certificates;
-        }
-        CertificateExceptionDetail(X509Certificate[] certificates, String message, Throwable t) {
-            super(message, t);
-            this.certificates = certificates;
-        }
-
-    };
-
     public X509Certificate[] getAcceptedIssuers() {
         return new X509Certificate[0];
     }
@@ -206,127 +197,59 @@ class ServerTrustManager implements X509TrustManager {
     }
 
     public void checkCertificates(X509Certificate[] x509Certificates)
-            throws CertificateExceptionDetail {
+            throws CertificateException {
+        List<X509Certificate> certList = new ArrayList<X509Certificate>();
+        for(int i = 0; i < x509Certificates.length; ++i)
+            certList.add(x509Certificates[i]);
 
-        int nSize = x509Certificates.length;
-        if(nSize == 0)
-            throw new CertificateExceptionDetail(x509Certificates, "No peer certificates received");
+        CertPath certPath;
+        try {
+            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            certPath = cf.generateCertPath(certList);
+            PKIXParameters params = new PKIXParameters(trustStore);
 
-        List<String> peerIdentities = getPeerIdentity(x509Certificates[0]);
+            // Work around "No CRLs found for issuer" being thrown for every certificate.
+            params.setRevocationEnabled(false);
 
-        if (configuration.isVerifyChainEnabled()) {
-            // Working down the chain, for every certificate in the chain,
-            // verify that the subject of the certificate is the issuer of the
-            // next certificate in the chain.
-            Principal principalLast = null;
-            for (int i = nSize -1; i >= 0 ; i--) {
-                X509Certificate x509certificate = x509Certificates[i];
-                Principal principalIssuer = x509certificate.getIssuerDN();
-                Principal principalSubject = x509certificate.getSubjectDN();
-                if (principalLast != null) {
-                    if (principalIssuer.equals(principalLast)) {
-                        try {
-                            PublicKey publickey =
-                                    x509Certificates[i + 1].getPublicKey();
-                            x509Certificates[i].verify(publickey);
-                        }
-                        catch (GeneralSecurityException generalsecurityexception) {
-                            throw new CertificateExceptionDetail(x509Certificates,
-                                    "signature verification failed of " + peerIdentities.get(i));
-                        }
-                    }
-                    else {
-                        throw new CertificateExceptionDetail(x509Certificates,
-                                "subject/issuer verification failed of " + peerIdentities.get(i));
-                    }
-                }
-                principalLast = principalSubject;
-            }
+            CertPathValidator validator = CertPathValidator.getInstance("PKIX");
+            validator.validate(certPath, params);
+        } catch (GeneralSecurityException e) {
+            throw new CertificateException(e);
         }
 
-        if (configuration.isVerifyRootCAEnabled()) {
-            // If we couldn't find root certificates, then assume all connections are
-            // insecure.
-            if(trustStore == null)
-                throw new CertificateExceptionDetail(x509Certificates, "Couldn't load root certificates");
-
-            // Verify that the the last certificate in the chain was issued
-            // by a third-party that the client trusts.
-            boolean trusted = false;
-            try {
-                trusted = trustStore.getCertificateAlias(x509Certificates[nSize - 1]) != null;
-            }
-            catch (KeyStoreException e) {
-                // KeyStoreException is thrown if the KeyStore isn't initialized.  We've
-                // initialized it, so this is a runtime error.
-                throw new RuntimeException(e);
-            }
-
-            boolean isSelfSigned = false;
-            if (!trusted && x509Certificates.length == 1) {
-                // This isn't a trusted certificate.  Figure out if it's a self-signed certificate.
-                // Even if we accept self-signed certificates, only accept them if they're well-
-                // formed, so we don't accept certificates that won't work anywhere else, and to
-                // improve diagnostics.
-                X509Certificate cert = x509Certificates[0];
-                if(cert.getIssuerDN() == cert.getSubjectDN()) {
-                    try {
-                        PublicKey publickey = cert.getPublicKey();
-                        cert.verify(publickey);
-
-                        // This is an otherwise valid self-signed certificate.
-                        isSelfSigned = true;
-                    }
-                    catch (GeneralSecurityException generalsecurityexception) {
-                    }
-                }
-
-                if (isSelfSigned && configuration.isSelfSignedCertificateEnabled())
-                {
-                    System.out.println("Accepting self-signed certificate of remote server: " +
-                            peerIdentities);
-                    trusted = true;
-                }
-            }
-
-            if (!trusted) {
-                if(isSelfSigned)
-                    throw new CertificateExceptionDetail(x509Certificates,
-                            "Certificate \"" + getPeerIdentity(x509Certificates[0]) + "\" is self-signed");
-                else
-                    throw new CertificateExceptionDetail(x509Certificates,
-                            "Unknown root certificate for \"" + getPeerIdentity(x509Certificates[0]) + "\": " +
-                            x509Certificates[nSize-1].getIssuerDN());
-            }
-        }
-
-        if (configuration.isNotMatchingDomainCheckEnabled()) {
+        {
             // Verify that the first certificate in the chain corresponds to
             // the server we desire to authenticate.
             // Check if the certificate uses a wildcard indicating that subdomains are valid
+            List<String> peerIdentities = getPeerIdentity(x509Certificates[0]);
             if (peerIdentities.size() == 1 && peerIdentities.get(0).startsWith("*.")) {
                 // Remove the wildcard
                 String peerIdentity = peerIdentities.get(0).replace("*.", "");
                 // Check if the requested subdomain matches the certified domain
                 if (!server.endsWith(peerIdentity)) {
-                    throw new CertificateExceptionDetail(x509Certificates, "target verification failed of " + peerIdentities);
+                    CertPathValidatorException e = new CertPathValidatorException("hostname verification failed", null,
+                            certPath, 0);
+
+                    throw new CertificateException(e);
                 }
             }
             else if (!peerIdentities.contains(server)) {
-                throw new CertificateExceptionDetail(x509Certificates, "target verification failed of " + peerIdentities);
+                CertPathValidatorException e = new CertPathValidatorException("hostname verification failed", null,
+                        certPath, 0);
+                throw new CertificateException(e);
             }
         }
 
-        if (configuration.isExpiredCertificatesCheckEnabled()) {
+        {
             // For every certificate in the chain, verify that the certificate
             // is valid at the current time.
             Date date = new Date();
-            for (int i = 0; i < nSize; i++) {
+            for (int i = 0; i < x509Certificates.length; i++) {
                 try {
                     x509Certificates[i].checkValidity(date);
                 } catch (CertificateException e) {
                     // The certificate is expired, or not yet valid.
-                    throw new CertificateExceptionDetail(x509Certificates, e);
+                    throw new CertificateException(e);
                 }
             }
         }
@@ -337,7 +260,7 @@ class ServerTrustManager implements X509TrustManager {
      * Verify a certificate chain.  On success, return normally.  On verification failure,
      * throws {@link CertificateExceptionDetail}.
      */
-    public void checkCertificates(Certificate[] certificates) throws CertificateExceptionDetail {
+    public void checkCertificates(Certificate[] certificates) throws CertificateException {
         X509Certificate[] x509Certificates;
         try {
             x509Certificates = new X509Certificate[certificates.length];
@@ -349,7 +272,7 @@ class ServerTrustManager implements X509TrustManager {
         } catch(ClassCastException e) {
             // One of the certificates wasn't an X509Certificate.  Assume the connection
             // is insecure.
-            throw new CertificateExceptionDetail(new X509Certificate[]{}, "Received a non-X509 certificate", e);
+            throw new CertificateException("Received a non-X509 certificate", e);
         }
 
         checkCertificates(x509Certificates);
