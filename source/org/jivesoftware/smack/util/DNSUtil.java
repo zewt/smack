@@ -30,7 +30,6 @@ import java.util.Vector;
 import org.xbill.DNS.Lookup;
 import org.xbill.DNS.Record;
 import org.xbill.DNS.SRVRecord;
-import org.xbill.DNS.TXTRecord;
 import org.xbill.DNS.TextParseException;
 import org.xbill.DNS.Type;
 
@@ -40,6 +39,10 @@ import org.xbill.DNS.Type;
  * @author Matt Tucker
  */
 public class DNSUtil {
+    // Use the same PRNG seed for all lookups, so within a single process
+    // we always return weighted results in the same randomized order.
+    final private static int seed = new Random().nextInt();
+
     /**
      * Shuffle a list of items, prioritizing the order by their weight, using a simple
      * PRNG with the given seed.
@@ -51,8 +54,6 @@ public class DNSUtil {
      */
     private static <T> Vector<T> getItemsRandomizedByWeight(Vector<T> items, Vector<Integer> weightList)
     {
-        int seed = new Random().nextInt();
-
         Vector<T> result = new Vector<T>();
 
         // Make a copy of items and weightList, since we're going to be modifying them.
