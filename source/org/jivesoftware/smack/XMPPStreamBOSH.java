@@ -125,7 +125,7 @@ public class XMPPStreamBOSH extends XMPPStream
                         XMPPError.Condition.forbidden);
         }
 
-        android.util.Log.w("FOO", "XMPPStreamBOSH: initializeConnection");
+        // android.util.Log.w("SMACK", "XMPPStreamBOSH: initializeConnection");
         BOSHClientConfig.Builder cfgBuilder = BOSHClientConfig.Builder.create(uri, config.getServiceName());
 
         // If the BOSH server is HTTPS, set up XMPPSSLSocketFactory to handle connections.
@@ -181,7 +181,7 @@ public class XMPPStreamBOSH extends XMPPStream
         } catch(XMPPException e) {
             /* If an exception occurs while we're starting the connection, close it.
              * The connection should only be running on a successful return. */
-            android.util.Log.w("FOO", "XMPPStreamBOSH: initializeConnection: shutting down client due to error");
+            // android.util.Log.w("SMACK", "XMPPStreamBOSH: initializeConnection: shutting down client due to error");
             disconnect();
             throw e;
         }
@@ -201,7 +201,7 @@ public class XMPPStreamBOSH extends XMPPStream
     }
 
     private void startupConnection() throws XMPPException {
-        android.util.Log.w("FOO", "XMPPStreamBOSH: initializeConnectionInternal: send");
+        // android.util.Log.w("SMACK", "XMPPStreamBOSH: initializeConnectionInternal: send");
         try {
             bosh_client.send(ComposableBody.builder()
                         .setNamespaceDefinition("xmpp", "urn:xmpp:xbosh")
@@ -241,12 +241,12 @@ public class XMPPStreamBOSH extends XMPPStream
 
         /* We still need to return this from readPacket, so queue it. */
         read_queue.add(new QueuedResponse(packet));
-        android.util.Log.w("FOO", "XMPPStreamBOSH: initializeConnection: done");
+        // android.util.Log.w("SMACK", "XMPPStreamBOSH: initializeConnection: done");
     }
 
     public void close()
     {
-        android.util.Log.w("FOO", "XMPPStreamBOSH: close()");
+        // android.util.Log.w("SMACK", "XMPPStreamBOSH: close()");
 
         try {
             // If any stanzas are waiting to be sent, send them in the disconnect message.
@@ -255,7 +255,7 @@ public class XMPPStreamBOSH extends XMPPStream
         catch(BOSHException e)
         {
             // If the disconnect() fails for some reason, forcibly close the connection.
-            android.util.Log.w("FOO", "XMPPStreamBOSH: sending disconnect(): error");
+            // android.util.Log.w("SMACK", "XMPPStreamBOSH: sending disconnect(): error");
             e.printStackTrace();
             disconnect();
             return;
@@ -263,7 +263,7 @@ public class XMPPStreamBOSH extends XMPPStream
 
         // We've sent the terminate packet.  Wait for the stream to close; disconnect()
         // will set connectionClosed.
-        android.util.Log.w("FOO", "XMPPStreamBOSH: waiting for disconnect");
+        // android.util.Log.w("SMACK", "XMPPStreamBOSH: waiting for disconnect");
         long waitUntil = System.currentTimeMillis() + SmackConfiguration.getPacketReplyTimeout();
         while(!connectionClosed) {
             long ms = waitUntil - System.currentTimeMillis();
@@ -276,7 +276,7 @@ public class XMPPStreamBOSH extends XMPPStream
             }
         }
 
-        android.util.Log.w("FOO", "XMPPStreamBOSH: done waiting, " + (connectionClosed? "connection is closed":"connection is not closed"));
+        // android.util.Log.w("SMACK", "XMPPStreamBOSH: done waiting, " + (connectionClosed? "connection is closed":"connection is not closed"));
 
         // In case we timed out above and the stream isn't closed yet, forcibly close it.
         disconnect();
@@ -287,7 +287,7 @@ public class XMPPStreamBOSH extends XMPPStream
             if(connectionClosed)
                 return;
 
-            android.util.Log.w("FOO", "XMPPStreamBOSH: disconnect (queueing QueuedEnd)");
+            // android.util.Log.w("SMACK", "XMPPStreamBOSH: disconnect (queueing QueuedEnd)");
 
             boolean added = read_queue.offer(new QueuedEnd());
 
