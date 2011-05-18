@@ -132,11 +132,12 @@ public class XMPPStreamBOSH extends XMPPStream
         // Only do this if it's needed, so we don't waste time loading certificates if we're
         // not going to use them.
         XMPPSSLSocketFactory xmppSocketFactory = null;
+        // XXX HTTP factory
         if(uri.getScheme().equals("https")) {
             // If config.getSecurityMode() == required, XMPPSSLSocketFactory will take care
             // of throwing an error if the connection isn't secure.
             xmppSocketFactory = new XMPPSSLSocketFactory(config, config.getServiceName());
-            cfgBuilder.setSocketFactory(xmppSocketFactory.getSocketFactory());
+            cfgBuilder.setSocketFactoryHTTPS(xmppSocketFactory.getSocketFactory());
         } else if(uri.getScheme().equals("http")) {
             if(config.getSecurityMode() == SecurityMode.required)
                 throw new XMPPException("BOSH server is not HTTPS, but security required by connection configuration.",
