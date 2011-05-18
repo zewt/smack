@@ -523,10 +523,14 @@ public class ConnectionConfiguration implements Cloneable {
      * Sets the socket factory used to create new xmppConnection sockets.
      * This is useful when connecting through SOCKS5 proxies.
      *
-     * @param socketFactory used to create new sockets.
+     * @param socketFactory used to create new sockets, or null to use the default
+     * SocketFactory.
      */
     public void setSocketFactory(SocketFactory socketFactory) {
-        this.socketFactory = socketFactory;
+        if(socketFactory != null)
+            this.socketFactory = socketFactory;
+        else
+            this.socketFactory = ProxyInfo.forDefaultProxy().getSocketFactory();
     }
 
     /**
