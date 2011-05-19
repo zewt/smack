@@ -147,6 +147,14 @@ public class RosterEntry {
         return status;
     }
 
+    /**
+     * This entry has been added or removed from a group.
+     */
+    public void groupMembershipChanged(RosterGroup group) {
+        // Let the roster know of the change.
+        roster.entryGroupMembershipChanged(this, group);
+    }
+
     public String toString() {
         StringBuilder buf = new StringBuilder();
         if (name != null) {

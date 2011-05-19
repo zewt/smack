@@ -22,6 +22,7 @@ package org.jivesoftware.smack;
 
 import org.jivesoftware.smack.filter.PacketIDFilter;
 import org.jivesoftware.smack.packet.IQ;
+import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.packet.RosterPacket;
 import org.jivesoftware.smack.util.StringUtils;
 
@@ -196,18 +197,17 @@ public class RosterGroup {
      * Removes a roster entry from this group. If the entry does not belong to any other group 
      * then it will be considered as unfiled, therefore it will be added to the list of unfiled 
      * entries.
-     * Note that this is an asynchronous call -- Smack must wait for the server
-     * to receive the updated roster.
      *
      * @param entry a roster entry.
      * @throws XMPPException if an error occured while trying to remove the entry from the group. 
      */
-    public void removeEntry(RosterEntry entry) throws XMPPException {
+    public void removeEntry(final RosterEntry entry) throws XMPPException {
         PacketCollector collector = null;
-        // Only remove the entry if it's in the entry list.
-        // Remove the entry locally, if we wait for RosterPacketListenerprocess>>Packet(Packet)
-        // to take place the entry will exist in the group until a packet is received from the 
-        // server.
+        PacketIDFilter filter = null;
+        PacketListener removeEntryListener = new PacketListener() {
+            public void processPacket(Packet packet) { removeEntryLocal(entry); }
+        };
+
         synchronized (entries) {
             if (entries.contains(entry)) {
                 RosterPacket packet = new RosterPacket();
@@ -216,14 +216,21 @@ public class RosterGroup {
                 item.removeGroupName(this.getName());
                 packet.addRosterItem(item);
                 // Wait up to a certain number of seconds for a reply from the server.
-                collector = connection
-                        .createPacketCollector(new PacketIDFilter(packet.getPacketID()));
+                System.out.print("writing packet " + packet.getPacketID() + ":\n" + packet.toXML() + "\n");
+                filter = new PacketIDFilter(packet.getPacketID());
+                collector = connection.createPacketCollector(filter);
+                connection.addPacketListener(removeEntryListener, filter);
                 connection.sendPacket(packet);
             }
         }
+
         if (collector != null) {
+            // Wait for the response.  Collectors are guaranteed not to return a packet
+            // until after listeners have been fired, so when this returns successfully,
+            // removeEntryListener has been run.
             IQ response = (IQ) collector.nextResult(SmackConfiguration.getPacketReplyTimeout());
             collector.cancel();
+            connection.removePacketListener(removeEntryListener);
             if (response == null) {
                 throw new XMPPException("No response from the server.");
             }
@@ -240,14 +247,18 @@ public class RosterGroup {
             entries.remove(entry);
             entries.add(entry);
         }
+
+        entry.groupMembershipChanged(this);
     }
 
     void removeEntryLocal(RosterEntry entry) {
          // Only remove the entry if it's in the entry list.
         synchronized (entries) {
-            if (entries.contains(entry)) {
-                entries.remove(entry);
-            }
+            if (!entries.contains(entry))
+                return;
+            entries.remove(entry);
         }
+
+        entry.groupMembershipChanged(this);
     }
 }
