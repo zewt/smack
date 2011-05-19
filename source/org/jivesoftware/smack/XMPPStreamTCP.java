@@ -49,6 +49,7 @@ import org.jivesoftware.smack.util.DNSUtil;
 import org.jivesoftware.smack.util.ObservableReader;
 import org.jivesoftware.smack.util.ObservableWriter;
 import org.jivesoftware.smack.util.PacketParserUtils;
+import org.jivesoftware.smack.util.ThreadUtil;
 import org.jivesoftware.smack.util.WriterListener;
 import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
@@ -869,19 +870,7 @@ public class XMPPStreamTCP extends XMPPStream
                 thread.interrupt();
             }
 
-            boolean interrupted = false;
-            while(true) {
-                try {
-                    thread.join();
-                } catch(InterruptedException e) {
-                    // Defer interruptions until we're done.
-                    interrupted = true;
-                    continue;
-                }
-                break;
-            }
-            if(interrupted)
-                Thread.currentThread().interrupt();
+            ThreadUtil.uninterruptibleJoin(thread);
         }
 
         long lastActive = System.currentTimeMillis();
