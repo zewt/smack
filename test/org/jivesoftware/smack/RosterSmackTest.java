@@ -55,6 +55,7 @@ package org.jivesoftware.smack;
 import org.jivesoftware.smack.packet.Presence;
 import org.jivesoftware.smack.test.SmackTestCase;
 import org.jivesoftware.smack.util.StringUtils;
+import org.jivesoftware.smack.util.Timeout;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -88,25 +89,37 @@ public class RosterSmackTest extends SmackTestCase {
             roster.createEntry(getBareJID(2), "gato12", new String[] { "Family" });
 
             // Wait until the server confirms the new entries
-            long initial = System.currentTimeMillis();
-            while (System.currentTimeMillis() - initial < 2000 && (
+            Timeout timeout = new Timeout(2000000);
+            while (!timeout.expired() && (
                     !roster.getPresence(getBareJID(1)).isAvailable() ||
                             !roster.getPresence(getBareJID(2)).isAvailable())) {
                 Thread.sleep(100);
             }
 
+            // Wait for the entries to show up in all three accounts.
+            timeout.set(2000);
+            while (!timeout.expired() &&
+                    (getConnection(0).getRoster().getEntryCount() != 2 ||
+                    getConnection(1).getRoster().getEntryCount() != 1 ||
+                    getConnection(2).getRoster().getEntryCount() != 1)) {
+                Thread.sleep(100);
+            }
+            if (timeout.expired())
+                fail("Timed out waiting for roster additions");
             for (RosterEntry entry : roster.getEntries()) {
                 for (RosterGroup rosterGroup : entry.getGroups()) {
                     rosterGroup.removeEntry(entry);
                 }
             }
-            // Wait up to 2 seconds
-            initial = System.currentTimeMillis();
-            while (System.currentTimeMillis() - initial < 2000 &&
-                    (roster.getGroupCount() != 0 &&
-                    getConnection(2).getRoster().getEntryCount() != 2)) {
+            // Wait for the entries to be removed.
+            timeout.set(2000);
+            while (!timeout.expired() &&
+                    (roster.getGroupCount() != 0 || roster.getEntryCount() != 2)) {
                 Thread.sleep(100);
             }
+            if (timeout.expired())
+                fail("Timed out waiting for roster removals; ended with " +
+                    roster.getGroupCount() + ", " + roster.getEntryCount());
 
             assertEquals(
                 "The number of entries in connection 1 should be 1",
@@ -187,14 +200,10 @@ public class RosterSmackTest extends SmackTestCase {
         assertEquals("Wrong number of entries in connection 0", 0, roster.getEntryCount());
         assertEquals("Wrong number of groups in connection 0", 0, roster.getGroupCount());
 
-        assertEquals(
-            "Wrong number of entries in connection 1",
-            0,
-            getConnection(1).getRoster().getEntryCount());
-        assertEquals(
-            "Wrong number of groups in connection 1",
-            0,
-            getConnection(1).getRoster().getGroupCount());
+        assertEquals("Wrong number of entries in connection 1", 1,
+                getConnection(1).getRoster().getEntryCount());
+        assertEquals("Wrong number of groups in connection 1", 0,
+                getConnection(1).getRoster().getGroupCount());
     }
 
     /**
@@ -233,9 +242,7 @@ public class RosterSmackTest extends SmackTestCase {
             assertEquals("Wrong number of entries in connection 0", 0, roster.getEntryCount());
             assertEquals("Wrong number of groups in connection 0", 0, roster.getGroupCount());
 
-            assertEquals(
-                "Wrong number of entries in connection 1",
-                0,
+            assertEquals("Wrong number of entries in connection 1", 1,
                 getConnection(1).getRoster().getEntryCount());
             assertEquals(
                 "Wrong number of groups in connection 1",
@@ -528,6 +535,9 @@ public class RosterSmackTest extends SmackTestCase {
             // Close the connection so one presence must go
             conn4.disconnect();
 
+            // Wait for connection 1 to be told about connection 4's disconnection.
+            Thread.sleep(200);
+
             // Check that the returned presences are correct
             presences = roster.getPresences(getBareJID(1));
             count = 0;
@@ -721,7 +731,7 @@ public class RosterSmackTest extends SmackTestCase {
         Thread.sleep(200);
 
         // Break the connection
-        getConnection(0).packetReader.notifyConnectionError(new Exception("Simulated Error"));
+        getConnection(0).readerThreadException(new Exception("Simulated Error"));
 
         Presence presence = roster.getPresence(getBareJID(1));
         assertFalse("Unavailable presence not found for offline user", presence.isAvailable());
