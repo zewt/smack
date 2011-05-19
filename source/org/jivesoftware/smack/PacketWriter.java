@@ -121,8 +121,10 @@ class PacketWriter {
         connection.interceptors.clear();
         connection.sendListeners.clear();
 
-        ThreadUtil.uninterruptibleJoin(writerThread);
-        writerThread = null;
+        if(writerThread != null) {
+            ThreadUtil.uninterruptibleJoin(writerThread);
+            writerThread = null;
+        }
     }
 
     /**
