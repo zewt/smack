@@ -64,77 +64,78 @@ public class ReconnectionManager implements ConnectionListener {
      * </ol>
      */
     synchronized protected void reconnect() {
-        if (this.isReconnectionAllowed()) {
-            // Since there is no thread running, creates a new one to attempt
-            // the reconnection.
-            // avoid to run duplicated reconnectionThread -- fd: 16/09/2010
-            if (reconnectionThread!=null && reconnectionThread.isAlive()) return;
+        if (!isReconnectionAllowed())
+            return;
+
+        // Since there is no thread running, creates a new one to attempt
+        // the reconnection.
+        // avoid to run duplicated reconnectionThread -- fd: 16/09/2010
+        if (reconnectionThread != null && reconnectionThread.isAlive())
+            return;
             
-            reconnectionThread = new Thread() {
-             			
-                /**
-                 * Holds the current number of reconnection attempts
-                 */
-                private int attempts = 0;
+        reconnectionThread = new Thread() {
+            /**
+             * Holds the current number of reconnection attempts
+             */
+            private int attempts = 0;
 
-                /**
-                 * @return the number of seconds until the next reconnection attempt.
-                 */
-                private int timeDelay() {
-                    attempts++;
-                    if (attempts > 13) {
-                	return randomBase*6*5;      // between 2.5 and 7.5 minutes (~5 minutes)
-                    }
-                    if (attempts > 7) {
-                	return randomBase*6;       // between 30 and 90 seconds (~1 minutes)
-                    }
-                    return randomBase;       // 10 seconds
+            /**
+             * @return the number of seconds until the next reconnection attempt.
+             */
+            private int timeDelay() {
+                attempts++;
+                if (attempts > 13) {
+            	    return randomBase*6*5;      // between 2.5 and 7.5 minutes (~5 minutes)
                 }
+                if (attempts > 7) {
+            	    return randomBase*6;       // between 30 and 90 seconds (~1 minutes)
+                }
+                return randomBase;       // 10 seconds
+            }
 
-                /**
-                 * The process will try the reconnection until the connection succeed or the user
-                 * cancell it
-                 */
-                public void run() {
-                    // The process will try to reconnect until the connection is established or
-                    // the user cancel the reconnection process {@link Connection#disconnect()}
-                    while (isReconnectionAllowed()) {
-                        // Find how much time we should wait until the next reconnection
-                        int remainingSeconds = timeDelay();
-                        // Sleep until we're ready for the next reconnection attempt. Notify
-                        // listeners once per second about how much time remains before the next
-                        // reconnection attempt.
-                        while (isReconnectionAllowed() && remainingSeconds > 0)
-                        {
-                            try {
-                                Thread.sleep(1000);
-                                remainingSeconds--;
-                                notifyAttemptToReconnectIn(remainingSeconds);
-                            }
-                            catch (InterruptedException e1) {
-                                e1.printStackTrace();
-                                // Notify the reconnection has failed
-                                notifyReconnectionFailed(e1);
-                            }
-                        }
-
-                        // Makes a reconnection attempt
+            /**
+             * The process will try the reconnection until the connection succeed or the user
+             * cancell it
+             */
+            public void run() {
+                // The process will try to reconnect until the connection is established or
+                // the user cancel the reconnection process {@link Connection#disconnect()}
+                while (isReconnectionAllowed()) {
+                    // Find how much time we should wait until the next reconnection
+                    int remainingSeconds = timeDelay();
+                    // Sleep until we're ready for the next reconnection attempt. Notify
+                    // listeners once per second about how much time remains before the next
+                    // reconnection attempt.
+                    while (isReconnectionAllowed() && remainingSeconds > 0)
+                    {
                         try {
-                            if (isReconnectionAllowed()) {
-                                connection.connect();
-                            }
+                            Thread.sleep(1000);
+                            remainingSeconds--;
+                            notifyAttemptToReconnectIn(remainingSeconds);
                         }
-                        catch (XMPPException e) {
-                            // Fires the failed reconnection notification
-                            notifyReconnectionFailed(e);
+                        catch (InterruptedException e1) {
+                            e1.printStackTrace();
+                            // Notify the reconnection has failed
+                            notifyReconnectionFailed(e1);
                         }
                     }
+
+                    // Makes a reconnection attempt
+                    try {
+                        if (isReconnectionAllowed()) {
+                            connection.connect();
+                        }
+                    }
+                    catch (XMPPException e) {
+                        // Fires the failed reconnection notification
+                        notifyReconnectionFailed(e);
+                    }
                 }
-            };
-            reconnectionThread.setName("Smack Reconnection Manager");
-            reconnectionThread.setDaemon(true);
-            reconnectionThread.start();
-        }
+            }
+        };
+        reconnectionThread.setName("Smack Reconnection Manager");
+        reconnectionThread.setDaemon(true);
+        reconnectionThread.start();
     }
 
     /**
