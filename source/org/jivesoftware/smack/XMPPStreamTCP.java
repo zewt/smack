@@ -428,8 +428,7 @@ public class XMPPStreamTCP extends XMPPStream
     
     /**
      * Forcibly disconnect the stream.  If readPacket() is waiting for input, it will
-     * return end of stream immediately.  Note that we can't simply interrupt the thread
-     * that's reading; the SSL layer doesn't always implement interruption.  
+     * return end of stream immediately.
      */
     boolean connectionClosed = false;
     public void disconnect() {
@@ -442,6 +441,9 @@ public class XMPPStreamTCP extends XMPPStream
         } catch(IOException e) {
             throw new RuntimeException("Unexpected I/O error disconnecting socket", e);
         }
+
+        // Now that we've closed the socket, close() won't block for I/O.
+        close();
     }
 
     public Element readPacket() throws XMPPException {
