@@ -78,8 +78,6 @@ public class ReconnectionManager implements ConnectionListener {
                 private int attempts = 0;
 
                 /**
-                 * Returns the number of seconds until the next reconnection attempt.
-                 *
                  * @return the number of seconds until the next reconnection attempt.
                  */
                 private int timeDelay() {
