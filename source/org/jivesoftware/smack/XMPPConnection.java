@@ -429,6 +429,12 @@ public class XMPPConnection extends Connection {
             roster = null;
         }
 
+        // Clear packet listeners only on final disconnection.
+        recvListeners.clear();
+        sendListeners.clear();
+        collectors.clear();
+        interceptors.clear();
+
         wasAuthenticated = false;
         suppressConnectionErrors = false;
 

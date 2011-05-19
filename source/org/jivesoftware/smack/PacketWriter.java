@@ -118,9 +118,6 @@ class PacketWriter {
             queue.notifyAll();
         }
 
-        connection.interceptors.clear();
-        connection.sendListeners.clear();
-
         if(writerThread != null) {
             ThreadUtil.uninterruptibleJoin(writerThread);
             writerThread = null;

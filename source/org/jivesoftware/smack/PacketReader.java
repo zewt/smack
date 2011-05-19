@@ -149,9 +149,6 @@ class PacketReader {
 
         // Shut down the listener executor.
         listenerExecutor.shutdown();
-
-        connection.recvListeners.clear();
-        connection.collectors.clear();
     }
 
     /** Assert that the current thread is not the reader thread. */
