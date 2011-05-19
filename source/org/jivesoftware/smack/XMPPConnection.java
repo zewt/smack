@@ -391,7 +391,8 @@ public class XMPPConnection extends Connection {
         if(unavailablePresence != null)
             packetWriter.sendPacket(unavailablePresence);
 
-        data_stream.disconnect();
+        if (data_stream != null)
+            data_stream.disconnect();
 
         // These will block until the threads are completely shut down.  This should happen
         // immediately, due to calling data_stream.disconnect().
@@ -411,9 +412,11 @@ public class XMPPConnection extends Connection {
     public void disconnect(Presence unavailablePresence) {
         packetReader.assertNotInThread();
 
-        // If not connected, ignore this request.
-        if (!connected)
-            return;
+        boolean wasConnected;
+        synchronized(this) {
+            wasConnected = connected;
+            connected = false;
+        }
 
         // Shutting down will cause I/O exceptions in the reader and writer threads;
         // suppress them.
@@ -429,7 +432,10 @@ public class XMPPConnection extends Connection {
         wasAuthenticated = false;
         suppressConnectionErrors = false;
 
-        notifyConnectionClosed();
+        // If we're the one that cleared connected, it's our job to notify about the
+        // disconnection.
+        if(wasConnected)
+            notifyConnectionClosed();
     }
 
     public void sendPacket(Packet packet) {
@@ -685,6 +691,10 @@ public class XMPPConnection extends Connection {
     public void connect() throws XMPPException {
         packetReader.assertNotInThread();
 
+        // If we're already connected, or if we've disconnected but havn't yet cleaned
+        // up, shut down.
+        shutdown(null);
+
         // Establishes the connection, readers and writers
         connectUsingConfiguration();
         // Automatically makes the login if the user was previouslly connected successfully
@@ -784,6 +794,8 @@ public class XMPPConnection extends Connection {
         // stack in the output.
         new Exception(error).printStackTrace();
 
+        boolean wasConnected;
+
         // PacketReader.startup() has returned, so it's guaranteed that
         // connectUsingConfiguration will send out connection or reconnection
         // notifications and set connected = true.  If that hasn't happened
@@ -797,6 +809,9 @@ public class XMPPConnection extends Connection {
                     Thread.currentThread().interrupt();
                 }
             }
+
+            wasConnected = connected;
+            connected = false;
         }
 
         // Shut down the data stream.  shutdown() must be called to complete shutdown;
@@ -804,6 +819,9 @@ public class XMPPConnection extends Connection {
         // can't do that from here.  It's the responsibility of the user.
         this.data_stream.disconnect();
 
-        notifyConnectionClosedOnError(error);
+        // If we're the one that cleared connected, it's our job to notify about the
+        // disconnection.
+        if(wasConnected)
+            notifyConnectionClosedOnError(error);
     }
 }
