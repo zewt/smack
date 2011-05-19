@@ -98,37 +98,35 @@ public class ReconnectionManager implements ConnectionListener {
                 public void run() {
                     // The process will try to reconnect until the connection is established or
                     // the user cancel the reconnection process {@link Connection#disconnect()}
-                    while (ReconnectionManager.this.isReconnectionAllowed()) {
+                    while (isReconnectionAllowed()) {
                         // Find how much time we should wait until the next reconnection
                         int remainingSeconds = timeDelay();
                         // Sleep until we're ready for the next reconnection attempt. Notify
                         // listeners once per second about how much time remains before the next
                         // reconnection attempt.
-                        while (ReconnectionManager.this.isReconnectionAllowed() &&
-                                remainingSeconds > 0)
+                        while (isReconnectionAllowed() && remainingSeconds > 0)
                         {
                             try {
                                 Thread.sleep(1000);
                                 remainingSeconds--;
-                                ReconnectionManager.this
-                                        .notifyAttemptToReconnectIn(remainingSeconds);
+                                notifyAttemptToReconnectIn(remainingSeconds);
                             }
                             catch (InterruptedException e1) {
                                 e1.printStackTrace();
                                 // Notify the reconnection has failed
-                                ReconnectionManager.this.notifyReconnectionFailed(e1);
+                                notifyReconnectionFailed(e1);
                             }
                         }
 
                         // Makes a reconnection attempt
                         try {
-                            if (ReconnectionManager.this.isReconnectionAllowed()) {
+                            if (isReconnectionAllowed()) {
                                 connection.connect();
                             }
                         }
                         catch (XMPPException e) {
                             // Fires the failed reconnection notification
-                            ReconnectionManager.this.notifyReconnectionFailed(e);
+                            notifyReconnectionFailed(e);
                         }
                     }
                 }
