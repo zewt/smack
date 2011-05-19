@@ -333,7 +333,6 @@ class PacketReader {
             }
 
             // Loop through all collectors and notify the appropriate ones.
-            System.out.print("processPacket id " + packet.getPacketID());
             for (PacketCollector collector: connection.getPacketCollectors()) {
                 collector.processPacket(packet);
             }
