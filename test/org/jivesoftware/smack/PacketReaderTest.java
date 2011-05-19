@@ -60,14 +60,10 @@ import org.jivesoftware.smack.packet.*;
 import org.jivesoftware.smack.test.SmackTestCase;
 
 import java.util.Date;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 public class PacketReaderTest extends SmackTestCase {
-
-    private int counter;
-
-    private final Object mutex = new Object();
-
     /**
      * Constructor for PacketReaderTest.
      *
@@ -75,29 +71,6 @@ public class PacketReaderTest extends SmackTestCase {
      */
     public PacketReaderTest(String arg0) {
         super(arg0);
-        resetCounter();
-    }
-
-    // Counter management
-
-    private void resetCounter() {
-        synchronized (mutex) {
-            counter = 0;
-        }
-    }
-
-    public void incCounter() {
-        synchronized (mutex) {
-            counter++;
-        }
-    }
-
-    private int valCounter() {
-        int val;
-        synchronized (mutex) {
-            val = counter;
-        }
-        return val;
     }
 
     /**
@@ -203,8 +176,7 @@ public class PacketReaderTest extends SmackTestCase {
      * Tests that PacketReader adds new listeners and also removes them correctly.
      */
     public void testFiltersRemotion() {
-
-        resetCounter();
+        final AtomicInteger counter = new AtomicInteger(0);
 
         int repeat = 10;
 
@@ -213,13 +185,13 @@ public class PacketReaderTest extends SmackTestCase {
             PacketListener listener0 = new PacketListener() {
                 public void processPacket(Packet packet) {
                     System.out.println("Packet Captured");
-                    incCounter();
+                    counter.addAndGet(1);
                 }
             };
             PacketFilter pf0 = new PacketFilter() {
                 public boolean accept(Packet packet) {
                     System.out.println("Packet Filtered");
-                    incCounter();
+                    counter.addAndGet(1);
                     return true;
                 }
             };
@@ -227,13 +199,13 @@ public class PacketReaderTest extends SmackTestCase {
             PacketListener listener1 = new PacketListener() {
                 public void processPacket(Packet packet) {
                     System.out.println("Packet Captured");
-                    incCounter();
+                    counter.addAndGet(1);
                 }
             };
             PacketFilter pf1 = new PacketFilter() {
                 public boolean accept(Packet packet) {
                     System.out.println("Packet Filtered");
-                    incCounter();
+                    counter.addAndGet(1);
                     return true;
                 }
             };
@@ -282,8 +254,8 @@ public class PacketReaderTest extends SmackTestCase {
                 e.printStackTrace();
             }
         }
-        System.out.println(valCounter());
-        assertEquals(valCounter(), repeat * 2 * 10);
+        System.out.println(counter.get());
+        assertEquals(counter.get(), repeat * 2 * 10);
     }
 
     protected int getMaxConnections() {
