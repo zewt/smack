@@ -248,6 +248,11 @@ public class SASLAuthentication implements UserAuthentication {
             String mechanism)
             throws XMPPException, SASLMechanism.MechanismNotSupported
     {
+        if (saslNegotiated)
+            throw new XMPPException("Already authenticated");
+
+        init();
+
         // A SASL mechanism was found. Authenticate using the selected mechanism and then
         // proceed to bind a resource
         currentMechanism = createMechanism(implementedMechanisms.get(mechanism));
