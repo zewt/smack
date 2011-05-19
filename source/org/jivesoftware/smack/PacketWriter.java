@@ -154,7 +154,7 @@ class PacketWriter {
                 if (packet != null) {
                     Writer writer = getWriter();
                     if(writer == null)
-                        throw new IOException("Wrote a packet before the connection was open");
+                        throw new IOException("Wrote a packet while the connection was closed");
                     synchronized (writer) {
                         writer.write(packet.toXML());
                         writer.flush();
