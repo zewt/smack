@@ -120,11 +120,12 @@ public class ReconnectionManager implements ConnectionListener {
                         }
                     }
 
+                    if (!isReconnectionAllowed())
+                        break;
+
                     // Makes a reconnection attempt
                     try {
-                        if (isReconnectionAllowed()) {
-                            connection.connect();
-                        }
+                        connection.connect();
                     }
                     catch (XMPPException e) {
                         // Fires the failed reconnection notification
