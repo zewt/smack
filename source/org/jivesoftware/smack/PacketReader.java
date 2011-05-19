@@ -147,11 +147,11 @@ class PacketReader {
         ThreadUtil.uninterruptibleJoin(readerThread);
         readerThread = null;
 
-        connection.recvListeners.clear();
-        connection.collectors.clear();
-
         // Shut down the listener executor.
         listenerExecutor.shutdown();
+
+        connection.recvListeners.clear();
+        connection.collectors.clear();
     }
 
     /** Assert that the current thread is not the reader thread. */
@@ -279,11 +279,6 @@ class PacketReader {
             return;
         }
 
-        // Loop through all collectors and notify the appropriate ones.
-        for (PacketCollector collector: connection.getPacketCollectors()) {
-            collector.processPacket(packet);
-        }
-
         // Deliver the incoming packet to listeners.
         listenerExecutor.submit(new ListenerNotification(packet));
     }
@@ -333,9 +328,19 @@ class PacketReader {
         }
 
         public void run() {
+            // Listeners are run synchronously to this thread.  Run them before
+            // collectors, so a collector can be used to wait until all listeners
+            // on a packet have been run.
             for (ListenerWrapper listenerWrapper : connection.recvListeners.values()) {
                 listenerWrapper.notifyListener(packet);
             }
+
+            // Loop through all collectors and notify the appropriate ones.
+            System.out.print("processPacket id " + packet.getPacketID());
+            for (PacketCollector collector: connection.getPacketCollectors()) {
+                collector.processPacket(packet);
+            }
+
         }
     }
 }
