@@ -373,7 +373,7 @@ public class SASLAuthentication implements UserAuthentication {
 
             // Wait until SASL negotiation finishes
             synchronized (this) {
-                if (!saslNegotiated && !saslFailed) {
+                while (!saslNegotiated && !saslFailed) {
                     try {
                         wait(5000);
                     }
@@ -423,7 +423,7 @@ public class SASLAuthentication implements UserAuthentication {
     private String bindResourceAndEstablishSession(String resource) throws XMPPException {
         // Wait until server sends response containing the <bind> element
         synchronized (this) {
-            if (!resourceBinded) {
+            while (!resourceBinded) {
                 try {
                     wait(30000);
                 }
