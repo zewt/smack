@@ -580,7 +580,9 @@ public abstract class Connection {
      * @param packetListener the packet listener to remove.
      */
     public void removePacketListener(PacketListener packetListener) {
-        recvListeners.remove(packetListener);
+        ListenerWrapper removed = recvListeners.remove(packetListener);
+        if(removed == null)
+            throw new IllegalArgumentException("Listener not registered");
     }
 
     /**
