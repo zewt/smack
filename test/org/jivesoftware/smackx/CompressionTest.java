@@ -48,11 +48,7 @@ public class CompressionTest extends SmackTestCase {
         config.setCompressionEnabled(true);
         config.setSASLAuthenticationEnabled(true);
 
-        XMPPConnection connection = new XMPPConnection(config);
-        connection.connect();
-
-        // Login with the test account
-        connection.login("user0", "user0");
+        XMPPConnection connection = getConnection(0);
 
         assertTrue("Connection is not using stream compression", connection.isUsingCompression());
 
@@ -73,47 +69,16 @@ public class CompressionTest extends SmackTestCase {
 
         assertNotNull("No reply was received from the server", result);
         assertEquals("Incorrect IQ type from server", IQ.Type.RESULT, result.getType());
-
-        // Close connection
-        connection.disconnect();
     }
 
     protected int getMaxConnections() {
-        return 0;
+        return 1;
     }
 
-    /**
-     * Just create an account.
-     */
-    protected void setUp() throws Exception {
-        super.setUp();
-        XMPPConnection setupConnection = new XMPPConnection(getServiceName());
-        setupConnection.connect();
-        if (!setupConnection.getAccountManager().supportsAccountCreation())
-            fail("Server does not support account creation");
-
-        // Create the test account
-        try {
-            setupConnection.getAccountManager().createAccount("user0", "user0");
-        } catch (XMPPException e) {
-            // Do nothing if the accout already exists
-            if (!e.getXMPPError().getCondition().equals("conflict")) {
-                throw e;
-            }
-        }
+    protected ConnectionConfiguration getConnectionConfig() {
+        ConnectionConfiguration config = super.getConnectionConfig();
+        config.setCompressionEnabled(true);
+        return config;
     }
 
-    /**
-     * Deletes the created account for the test.
-     */
-    protected void tearDown() throws Exception {
-        super.tearDown();
-        XMPPConnection setupConnection = createConnection();
-        setupConnection.connect();
-        setupConnection.login("user0", "user0");
-        // Delete the created account for the test
-        setupConnection.getAccountManager().deleteAccount();
-        // Close the setupConnection
-        setupConnection.disconnect();
-    }
 }

@@ -137,6 +137,14 @@ public abstract class SmackTestCase extends TestCase {
      * @return a new XMPP connection.
      */
     protected XMPPConnection createConnection() {
+        ConnectionConfiguration config = getConnectionConfig();
+        return new XMPPConnection(getConnectionConfig());
+    }
+
+    /**
+     * Return the default configuration for this test.
+     */
+    protected ConnectionConfiguration getConnectionConfig() {
         // Create the configuration for this new connection
         ConnectionConfiguration config = new ConnectionConfiguration(host, port);
         config.setCompressionEnabled(Boolean.getBoolean("test.compressionEnabled"));
@@ -144,7 +152,7 @@ public abstract class SmackTestCase extends TestCase {
         if (getSocketFactory() == null) {
             config.setSocketFactory(getSocketFactory());
         }
-        return new XMPPConnection(config);
+        return config;
     }
 
     /**
