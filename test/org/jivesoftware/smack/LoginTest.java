@@ -124,7 +124,7 @@ public class LoginTest extends SmackTestCase {
                 conn.getAccountManager().createAccount("user_1", "user_1");
             } catch (XMPPException e) {
                 // Do nothing if the accout already exists
-                if (e.getXMPPError().getCode() != 409) {
+                if (!e.getXMPPError().getCondition().equals("conflict")) {
                     throw e;
                 }
             }
