@@ -365,57 +365,37 @@ public class XMPPError {
             this.condition = condition;
         }
 
+        private static void addError(Map<Condition, ErrorSpecification> instances,
+                Condition condition, Type type, int errorCode) {
+        }
+
         private static Map<Condition, ErrorSpecification> errorSpecifications() {
             Map<Condition, ErrorSpecification> instances = new HashMap<Condition, ErrorSpecification>(22);
-            instances.put(Condition.interna_server_error, new ErrorSpecification(
-                    Condition.interna_server_error, Type.WAIT, 500));
-            instances.put(Condition.forbidden, new ErrorSpecification(Condition.forbidden,
-                    Type.AUTH, 403));
-            instances.put(Condition.bad_request, new XMPPError.ErrorSpecification(
-                    Condition.bad_request, Type.MODIFY, 400));
-            instances.put(Condition.item_not_found, new XMPPError.ErrorSpecification(
-                    Condition.item_not_found, Type.CANCEL, 404));
-            instances.put(Condition.conflict, new XMPPError.ErrorSpecification(
-                    Condition.conflict, Type.CANCEL, 409));
-            instances.put(Condition.feature_not_implemented, new XMPPError.ErrorSpecification(
-                    Condition.feature_not_implemented, Type.CANCEL, 501));
-            instances.put(Condition.gone, new XMPPError.ErrorSpecification(
-                    Condition.gone, Type.MODIFY, 302));
-            instances.put(Condition.jid_malformed, new XMPPError.ErrorSpecification(
-                    Condition.jid_malformed, Type.MODIFY, 400));
-            instances.put(Condition.no_acceptable, new XMPPError.ErrorSpecification(
-                    Condition.no_acceptable, Type.MODIFY, 406));
-            instances.put(Condition.not_allowed, new XMPPError.ErrorSpecification(
-                    Condition.not_allowed, Type.CANCEL, 405));
-            instances.put(Condition.not_authorized, new XMPPError.ErrorSpecification(
-                    Condition.not_authorized, Type.AUTH, 401));
-            instances.put(Condition.payment_required, new XMPPError.ErrorSpecification(
-                    Condition.payment_required, Type.AUTH, 402));
-            instances.put(Condition.recipient_unavailable, new XMPPError.ErrorSpecification(
-                    Condition.recipient_unavailable, Type.WAIT, 404));
-            instances.put(Condition.redirect, new XMPPError.ErrorSpecification(
-                    Condition.redirect, Type.MODIFY, 302));
-            instances.put(Condition.registration_required, new XMPPError.ErrorSpecification(
-                    Condition.registration_required, Type.AUTH, 407));
-            instances.put(Condition.remote_server_not_found, new XMPPError.ErrorSpecification(
-                    Condition.remote_server_not_found, Type.CANCEL, 404));
-            instances.put(Condition.remote_server_timeout, new XMPPError.ErrorSpecification(
-                    Condition.remote_server_timeout, Type.WAIT, 504));
-            instances.put(Condition.remote_server_error, new XMPPError.ErrorSpecification(
-                    Condition.remote_server_error, Type.CANCEL, 502));
-            instances.put(Condition.resource_constraint, new XMPPError.ErrorSpecification(
-                    Condition.resource_constraint, Type.WAIT, 500));
-            instances.put(Condition.service_unavailable, new XMPPError.ErrorSpecification(
-                    Condition.service_unavailable, Type.CANCEL, 503));
-            instances.put(Condition.subscription_required, new XMPPError.ErrorSpecification(
-                    Condition.subscription_required, Type.AUTH, 407));
-            instances.put(Condition.undefined_condition, new XMPPError.ErrorSpecification(
-                    Condition.undefined_condition, Type.WAIT, 500));
-            instances.put(Condition.unexpected_request, new XMPPError.ErrorSpecification(
-                    Condition.unexpected_request, Type.WAIT, 400));
-            instances.put(Condition.request_timeout, new XMPPError.ErrorSpecification(
-                    Condition.request_timeout, Type.CANCEL, 408));
-
+            addError(instances, Condition.interna_server_error, Type.WAIT, 500);
+            addError(instances, Condition.interna_server_error, Type.WAIT, 500);
+            addError(instances, Condition.forbidden, Type.AUTH, 403);
+            addError(instances, Condition.bad_request, Type.MODIFY, 400);
+            addError(instances, Condition.item_not_found, Type.CANCEL, 404);
+            addError(instances, Condition.conflict, Type.CANCEL, 409);
+            addError(instances, Condition.feature_not_implemented, Type.CANCEL, 501);
+            addError(instances, Condition.gone, Type.MODIFY, 302);
+            addError(instances, Condition.jid_malformed, Type.MODIFY, 400);
+            addError(instances, Condition.no_acceptable, Type.MODIFY, 406);
+            addError(instances, Condition.not_allowed, Type.CANCEL, 405);
+            addError(instances, Condition.not_authorized, Type.AUTH, 401);
+            addError(instances, Condition.payment_required, Type.AUTH, 402);
+            addError(instances, Condition.recipient_unavailable, Type.WAIT, 404);
+            addError(instances, Condition.redirect, Type.MODIFY, 302);
+            addError(instances, Condition.registration_required, Type.AUTH, 407);
+            addError(instances, Condition.remote_server_not_found, Type.CANCEL, 404);
+            addError(instances, Condition.remote_server_timeout, Type.WAIT, 504);
+            addError(instances, Condition.remote_server_error, Type.CANCEL, 502);
+            addError(instances, Condition.resource_constraint, Type.WAIT, 500);
+            addError(instances, Condition.service_unavailable, Type.CANCEL, 503);
+            addError(instances, Condition.subscription_required, Type.AUTH, 407);
+            addError(instances, Condition.undefined_condition, Type.WAIT, 500);
+            addError(instances, Condition.unexpected_request, Type.WAIT, 400);
+            addError(instances, Condition.request_timeout, Type.CANCEL, 408);
             return instances;
         }
 
