@@ -112,7 +112,7 @@ public class XMPPConnection extends Connection {
      * @param callbackHandler the CallbackHandler used to prompt for the password to the keystore.
      */
     public XMPPConnection(String serviceName, CallbackHandler callbackHandler) {
-        this(null, callbackHandler, serviceName);
+        this(new ConnectionConfiguration(serviceName), callbackHandler, serviceName);
     }
 
     /**
@@ -124,7 +124,7 @@ public class XMPPConnection extends Connection {
      * @param serviceName the name of the XMPP server to connect to; e.g. <tt>example.com</tt>.
      */
     public XMPPConnection(String serviceName) {
-        this(null, null, serviceName);
+        this(new ConnectionConfiguration(serviceName), null, serviceName);
     }
 
     /**
