@@ -30,9 +30,13 @@ public class ReceivedPacketFilter implements PacketFilter {
     private final String namespaceURI;
 
     /**
-     * Filter messages with the given localName and namespace.
+     * Filter messages with the given localName and namespace.  If localName is
+     * null, receive all packets in the given namespace.
      */
     public ReceivedPacketFilter(String localName, String namespaceURI) {
+        if(namespaceURI.isEmpty())
+            throw new IllegalArgumentException("namespaceURI must not be null");
+
         this.localName = localName;
         this.namespaceURI = namespaceURI;
     }
@@ -43,9 +47,9 @@ public class ReceivedPacketFilter implements PacketFilter {
         }
         ReceivedPacket receivedPacket = (ReceivedPacket) packet;
         Element root = receivedPacket.getElement();
-        return
-            root.getNamespaceURI().equals(namespaceURI) &&
-            root.getLocalName().equals(localName);
+        if(localName != null && !root.getLocalName().equals(localName))
+            return false;
+        return root.getNamespaceURI().equals(namespaceURI);
     }
 
 }

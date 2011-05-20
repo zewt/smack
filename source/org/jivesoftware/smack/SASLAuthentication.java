@@ -20,10 +20,8 @@
 
 package org.jivesoftware.smack;
 
-import org.jivesoftware.smack.filter.OrFilter;
 import org.jivesoftware.smack.filter.PacketFilter;
 import org.jivesoftware.smack.filter.PacketIDFilter;
-import org.jivesoftware.smack.filter.PacketTypeFilter;
 import org.jivesoftware.smack.filter.ReceivedPacketFilter;
 import org.jivesoftware.smack.packet.Bind;
 import org.jivesoftware.smack.packet.IQ;
@@ -33,13 +31,11 @@ import org.jivesoftware.smack.packet.Session;
 import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.sasl.*;
 import org.jivesoftware.smack.sasl.SASLMechanism.AuthMechanism;
-import org.jivesoftware.smack.sasl.SASLMechanism.Challenge;
-import org.jivesoftware.smack.sasl.SASLMechanism.Failure;
 import org.jivesoftware.smack.sasl.SASLMechanism.Response;
-import org.jivesoftware.smack.sasl.SASLMechanism.Success;
 import org.jivesoftware.smack.sasl.SASLMechanism.MechanismNotSupported;
 import org.jivesoftware.smack.util.Base64;
 import org.jivesoftware.smack.util.PacketParserUtils;
+import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
@@ -271,9 +267,7 @@ public class SASLAuthentication implements UserAuthentication {
         // Trigger SASL authentication with the selected mechanism. We use
         // connection.getHost() since GSAPI requires the FQDN of the server, which
         // may not match the XMPP domain.
-        PacketFilter filter = new PacketTypeFilter(Success.class);
-        filter = new OrFilter(filter, new PacketTypeFilter(Failure.class));
-        filter = new OrFilter(filter, new PacketTypeFilter(Challenge.class));
+        PacketFilter filter = new ReceivedPacketFilter(null, "urn:ietf:params:xml:ns:xmpp-sasl");
         PacketCollector coll = connection.createPacketCollector(filter);
         try {
             /* Start authentication. */
@@ -295,15 +289,20 @@ public class SASLAuthentication implements UserAuthentication {
                 Packet packet = coll.nextResult(SmackConfiguration.getPacketReplyTimeout());
                 if(packet == null)
                     throw new XMPPException("SASL authentication timed out", XMPPError.Condition.request_timeout);
+                ReceivedPacket receivedPacket = (ReceivedPacket) packet;
+                Element element = receivedPacket.getElement();
 
-                if(packet instanceof Success) {
+                if(element.getLocalName().equals("success")) {
                     saslNegotiated = true;
                     break;
                 }
 
-                if(packet instanceof Failure) {
-                    Failure failure = (Failure) packet;
-                    String errorCondition = failure.getCondition();
+                if(element.getLocalName().equals("failure")) {
+                    String errorCondition = null;
+                    Node firstChild = element.getFirstChild();
+                    if(firstChild != null)
+                        errorCondition = firstChild.getLocalName();
+
                     if (errorCondition != null) {
                         throw new XMPPException("SASL authentication " + mechanism + " failed: " + errorCondition,
                                 XMPPError.fromErrorCondition(errorCondition));
@@ -313,19 +312,18 @@ public class SASLAuthentication implements UserAuthentication {
                     }
                 }
 
-                if(packet instanceof Challenge) {
+                if(element.getLocalName().equals("challenge")) {
                     /**
                      * The server is challenging the SASL authentication we just sent. Forward the challenge
                      * to the current SASLMechanism we are using. The SASLMechanism will send a response to
                      * the server. The length of the challenge-response sequence varies according to the
                      * SASLMechanism in use.
                      */
-                    Challenge challenge = (Challenge) packet;
                     try {
                         // Decode the challenge.
                         byte[] challengeData;
-                        if(challenge.getChallenge() != null)
-                            challengeData = Base64.decode(challenge.getChallenge());
+                        if(element.getTextContent() != null) // XXX
+                            challengeData = Base64.decode(element.getTextContent());
                         else
                             challengeData = new byte[0];
 

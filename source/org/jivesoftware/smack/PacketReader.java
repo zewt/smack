@@ -22,9 +22,6 @@ package org.jivesoftware.smack;
 
 import org.jivesoftware.smack.Connection.ListenerWrapper;
 import org.jivesoftware.smack.packet.*;
-import org.jivesoftware.smack.sasl.SASLMechanism.Challenge;
-import org.jivesoftware.smack.sasl.SASLMechanism.Failure;
-import org.jivesoftware.smack.sasl.SASLMechanism.Success;
 import org.jivesoftware.smack.util.PacketParserUtils;
 import org.jivesoftware.smack.util.ThreadUtil;
 import org.jivesoftware.smack.util.XmlPullParserDom;
@@ -213,23 +210,9 @@ class PacketReader {
                         }
 
                         processPacket(parseFeatures(packet));
-                    }
-                    else if (parser.getName().equals("failure") &&
-                            parser.getNamespace().equals("urn:ietf:params:xml:ns:xmpp-sasl")) {
-                        // SASL authentication has failed. The server may close the connection
-                        // depending on the number of retries
-                        final Failure failure = PacketParserUtils.parseSASLFailure(parser);
-                        processPacket(failure);
-                    }
-                    else if (parser.getName().equals("challenge") &&
-                        parser.getNamespace().equals("urn:ietf:params:xml:ns:xmpp-sasl")) {
-                        // The server is challenging the SASL authentication made by the client
-                        String challengeData = parser.nextText();
-                        processPacket(new Challenge(challengeData));
-                    }
-                    else if (parser.getName().equals("success") &&
-                            parser.getNamespace().equals("urn:ietf:params:xml:ns:xmpp-sasl")) {
-                        processPacket(new Success(parser.nextText()));
+                    } else {
+                        // Treat any unknown packet types generically.
+                        processPacket(new ReceivedPacket(packet));
                     }
                 }
             }
