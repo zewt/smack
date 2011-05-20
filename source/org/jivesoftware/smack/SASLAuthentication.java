@@ -24,9 +24,11 @@ import org.jivesoftware.smack.filter.OrFilter;
 import org.jivesoftware.smack.filter.PacketFilter;
 import org.jivesoftware.smack.filter.PacketIDFilter;
 import org.jivesoftware.smack.filter.PacketTypeFilter;
+import org.jivesoftware.smack.filter.ReceivedPacketFilter;
 import org.jivesoftware.smack.packet.Bind;
 import org.jivesoftware.smack.packet.IQ;
 import org.jivesoftware.smack.packet.Packet;
+import org.jivesoftware.smack.packet.ReceivedPacket;
 import org.jivesoftware.smack.packet.Session;
 import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.sasl.*;
@@ -37,6 +39,8 @@ import org.jivesoftware.smack.sasl.SASLMechanism.Response;
 import org.jivesoftware.smack.sasl.SASLMechanism.Success;
 import org.jivesoftware.smack.sasl.SASLMechanism.MechanismNotSupported;
 import org.jivesoftware.smack.util.Base64;
+import org.jivesoftware.smack.util.PacketParserUtils;
+import org.w3c.dom.Node;
 
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
 
@@ -86,12 +90,6 @@ public class SASLAuthentication implements UserAuthentication {
      * Boolean indicating if SASL negotiation has finished and was successful.
      */
     private boolean saslNegotiated;
-    /**
-     * Boolean indication if SASL authentication has failed. When failed the server may end
-     * the connection.
-     */
-    private boolean resourceBinded;
-    private boolean sessionSupported;
 
     static {
 
@@ -185,9 +183,19 @@ public class SASLAuthentication implements UserAuthentication {
         return answer;
     }
 
-    SASLAuthentication(Connection connection) {
+    SASLAuthentication(Connection connection, ReceivedPacket features) {
         super();
         this.connection = connection;
+
+        // Record the mechanisms provided in the previous features packet.
+        for(Node node: PacketParserUtils.getChildNodes(features.getElement())) {
+            if(node.getLocalName().equals("mechanisms")) {
+                // The server is reporting available SASL mechanisms. Store this information
+                // which will be used later while logging (i.e. authenticating) into
+                // the server
+                serverMechanisms = PacketParserUtils.parseMechanisms(node);
+            }
+        }
         this.init();
     }
 
@@ -342,8 +350,45 @@ public class SASLAuthentication implements UserAuthentication {
             connection.removePacketCollector(coll);
         }
 
-        // Bind a resource for this connection and
-        return bindResourceAndEstablishSession(resource);
+        PacketCollector featuresCollector = connection.createPacketCollector(
+                new ReceivedPacketFilter("features", "http://etherx.jabber.org/streams"));
+
+        boolean foundBind = false;
+        boolean sessionSupported = false;
+        try {
+            // After successful authentication, the stream must be reset.  This will trigger
+            // the next <features/>, which will enable binding.
+            connection.streamReset();
+
+            ReceivedPacket features = (ReceivedPacket) featuresCollector.nextResult(SmackConfiguration.getPacketReplyTimeout());
+            if(features == null)
+                throw new XMPPException("Timed out waiting for post-SASL features");
+
+            // Ensure that we've received the "bind" feature.
+            for(Node node: PacketParserUtils.getChildNodes(features.getElement())) {
+                if(node.getLocalName().equals("bind") &&
+                        node.getNamespaceURI().equals("urn:ietf:params:xml:ns:xmpp-bind"))
+                    foundBind = true;
+                if(node.getLocalName().equals("session") &&
+                        node.getNamespaceURI().equals("urn:ietf:params:xml:ns:xmpp-session"))
+                    sessionSupported = true;
+            }
+
+            if(!foundBind)
+                throw new XMPPException("Authentication successful, but no <bind> feature received");
+        } finally {
+            featuresCollector.cancel();
+        }
+
+        // Bind a resource for this connection.
+        String JID = bindResourceAndEstablishSession(resource);
+
+        // If sessions are supported, establish a session.  XXX: This is obsolete
+        // and removed in RFC6121.  See if this can be removed.
+        if(sessionSupported)
+            establishSession();
+
+        return JID;
     }
 
     private String authenticate(String username, CallbackHandler cbh, String password, String resource)
@@ -435,23 +480,6 @@ public class SASLAuthentication implements UserAuthentication {
     }
 
     private String bindResourceAndEstablishSession(String resource) throws XMPPException {
-        // Wait until server sends response containing the <bind> element
-        synchronized (this) {
-            while (!resourceBinded) {
-                try {
-                    wait(30000);
-                }
-                catch (InterruptedException e) {
-                    // Ignore
-                }
-            }
-        }
-
-        if (!resourceBinded) {
-            // Server never offered resource binding
-            throw new XMPPException("Resource binding not offered by server");
-        }
-
         Bind bindResource = new Bind();
         bindResource.setResource(resource);
 
@@ -469,41 +497,24 @@ public class SASLAuthentication implements UserAuthentication {
         else if (response.getType() == IQ.Type.ERROR) {
             throw new XMPPException(response.getError());
         }
-        String userJID = response.getJid();
-
-        if (sessionSupported) {
-            Session session = new Session();
-            collector = connection.createPacketCollector(new PacketIDFilter(session.getPacketID()));
-            // Send the packet
-            connection.sendPacket(session);
-            // Wait up to a certain number of seconds for a response from the server.
-            IQ ack = (IQ) collector.nextResult(SmackConfiguration.getPacketReplyTimeout());
-            collector.cancel();
-            if (ack == null) {
-                throw new XMPPException("No response from the server.");
-            }
-            // If the server replied with an error, throw an exception.
-            else if (ack.getType() == IQ.Type.ERROR) {
-                throw new XMPPException(ack.getError());
-            }
-        }
-        else {
-            // Server never offered session establishment
-            throw new XMPPException("Session establishment not offered by server");
-        }
-        return userJID;
+        return response.getJid();
     }
 
-    /**
-     * Sets the available SASL mechanism reported by the server. The server will report the
-     * available SASL mechanism once the TLS negotiation was successful. This information is
-     * stored and will be used when doing the authentication for logging in the user.
-     *
-     * @param mechanisms collection of strings with the available SASL mechanism reported
-     *                   by the server.
-     */
-    void setAvailableSASLMethods(Collection<String> mechanisms) {
-        this.serverMechanisms = mechanisms;
+    private void establishSession() throws XMPPException {
+        Session session = new Session();
+        PacketCollector collector = connection.createPacketCollector(new PacketIDFilter(session.getPacketID()));
+        // Send the packet
+        connection.sendPacket(session);
+        // Wait up to a certain number of seconds for a response from the server.
+        IQ ack = (IQ) collector.nextResult(SmackConfiguration.getPacketReplyTimeout());
+        collector.cancel();
+        if (ack == null) {
+            throw new XMPPException("No response from the server.");
+        }
+        // If the server replied with an error, throw an exception.
+        else if (ack.getType() == IQ.Type.ERROR) {
+            throw new XMPPException(ack.getError());
+        }
     }
 
     /**
@@ -514,27 +525,6 @@ public class SASLAuthentication implements UserAuthentication {
     public boolean isAuthenticated() {
         return saslNegotiated;
     }
-
-    /**
-     * Notification message saying that the server requires the client to bind a
-     * resource to the stream.
-     */
-    void bindingRequired() {
-        synchronized (this) {
-            resourceBinded = true;
-            // Wake up the thread that is waiting in the #authenticate method
-            notify();
-        }
-    }
-
-    /**
-     * Notification message saying that the server supports sessions. When a server supports
-     * sessions the client needs to send a Session packet after successfully binding a resource
-     * for the session.
-     */
-    void sessionsSupported() {
-        sessionSupported = true;
-    }
     
     /**
      * Initializes the internal state in order to be able to be reused. The authentication
@@ -543,7 +533,5 @@ public class SASLAuthentication implements UserAuthentication {
      */
     protected void init() {
         saslNegotiated = false;
-        resourceBinded = false;
-        sessionSupported = false;
     }
 }

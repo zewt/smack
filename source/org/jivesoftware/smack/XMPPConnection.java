@@ -22,8 +22,10 @@ package org.jivesoftware.smack;
 
 import org.jivesoftware.smack.debugger.SmackDebugger;
 import org.jivesoftware.smack.filter.PacketFilter;
+import org.jivesoftware.smack.filter.ReceivedPacketFilter;
 import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.packet.Presence;
+import org.jivesoftware.smack.packet.ReceivedPacket;
 import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.util.StringUtils;
 import org.jivesoftware.smack.util.ObservableReader;
@@ -32,7 +34,6 @@ import org.jivesoftware.smack.util.ObservableWriter;
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
 
 import java.io.IOException;
-import java.io.Writer;
 import java.lang.reflect.Constructor;
 import java.util.Collection;
 import java.util.Vector;
@@ -87,6 +88,15 @@ public class XMPPConnection extends Connection {
     final ObservableReader.ReadEvent readEvent;
     final ObservableWriter.WriteEvent writeEvent;
 
+    private ReceivedPacket mostRecentFeatures;
+
+    /**
+     * Retrieve the most recent <stream:features/> received from the server.  This
+     * excludes feature advertisements during TCP stream negotiation.
+     */
+    protected ReceivedPacket getMostRecentFeatures() {
+        return mostRecentFeatures;
+    }
     Roster roster = null;
 
     /**
@@ -217,16 +227,17 @@ public class XMPPConnection extends Connection {
         // Do partial version of nameprep on the username.
         username = username.toLowerCase().trim();
 
+        SASLAuthentication sasl = new SASLAuthentication(this, mostRecentFeatures);
+
         String response;
         if (config.isSASLAuthenticationEnabled() &&
-                saslAuthentication.hasNonAnonymousAuthentication()) {
+                sasl.hasNonAnonymousAuthentication()) {
             // Authenticate using SASL
             if (password != null) {
-                response = saslAuthentication.authenticate(username, password, resource);
+                response = sasl.authenticate(username, password, resource);
             }
             else {
-                response = saslAuthentication
-                        .authenticate(username, resource, config.getCallbackHandler());
+                response = sasl.authenticate(username, resource, config.getCallbackHandler());
             }
         }
         else {
@@ -283,10 +294,12 @@ public class XMPPConnection extends Connection {
             throw new IllegalStateException("Already logged in to server.");
         }
 
+        SASLAuthentication sasl = new SASLAuthentication(this, mostRecentFeatures);
+
         String response;
         if (config.isSASLAuthenticationEnabled() &&
-                saslAuthentication.hasAnonymousAuthentication()) {
-            response = saslAuthentication.authenticateAnonymously();
+                sasl.hasAnonymousAuthentication()) {
+            response = sasl.authenticateAnonymously();
         }
         else {
             // Authenticate using Non-SASL
@@ -396,8 +409,6 @@ public class XMPPConnection extends Connection {
 
         // packetReader and packetWriter are gone, so we can safely clear data_stream.
         data_stream = null;
-
-        saslAuthentication.init();
 
         this.setWasAuthenticated(authenticated);
         authenticated = false;
@@ -587,6 +598,12 @@ public class XMPPConnection extends Connection {
 
         readyForDisconnection = false;
 
+        this.addPacketListener(new PacketListener() {
+            public void processPacket(Packet packet) {
+                mostRecentFeatures = (ReceivedPacket) packet;
+            }
+        }, new ReceivedPacketFilter("features", "http://etherx.jabber.org/streams"));
+
         try {
             // Start the packet reader. The startup() method will block until we
             // get an opening stream packet back from server.
@@ -670,7 +687,7 @@ public class XMPPConnection extends Connection {
      * Called when the XMPP stream is reset, usually due to successful
      * authentication.
      */
-    void streamReset() throws XMPPException
+    public void streamReset() throws XMPPException
     {
         this.data_stream.streamReset();
     }

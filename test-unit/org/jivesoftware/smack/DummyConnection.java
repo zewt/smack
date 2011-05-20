@@ -180,6 +180,10 @@ public class DummyConnection extends Connection {
         firePacketSendingListeners(packet);
     }
 
+    @Override
+    public void streamReset() {
+    }
+
     /**
      * Returns the number of packets that's sent through {@link #sendPacket(Packet)} and
      * that has not been returned by {@link #getSentPacket()}.

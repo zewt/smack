@@ -504,7 +504,7 @@ public class PacketParserUtils {
      * @return a collection of Stings with the mechanisms included in the mechanisms stanza.
      * @throws Exception if an exception occurs while parsing the stanza.
      */
-    public static Collection<String> parseMechanisms(Node node) throws Exception {
+    public static Collection<String> parseMechanisms(Node node) {
         List<String> mechanisms = new ArrayList<String>();
         for(Node child: PacketParserUtils.getChildNodes(node)) {
             String elementName = child.getLocalName();

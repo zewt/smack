@@ -204,8 +204,6 @@ class PacketReader {
                         throw new XMPPException(PacketParserUtils.parseStreamError(parser));
                     }
                     else if (parser.getName().equals("features")) {
-                        parseFeatures(packet);
-
                         if(waitingForEstablishedConnection) {
                             /* When initializeConnection returns, the connection is established and ready to use.
                              * However, don't signal to continue until we receive the first packet, which will
@@ -213,6 +211,8 @@ class PacketReader {
                             connectionEstablished();
                             waitingForEstablishedConnection = false;
                         }
+
+                        processPacket(parseFeatures(packet));
                     }
                     else if (parser.getName().equals("failure") &&
                             parser.getNamespace().equals("urn:ietf:params:xml:ns:xmpp-sasl")) {
@@ -229,11 +229,6 @@ class PacketReader {
                     }
                     else if (parser.getName().equals("success") &&
                             parser.getNamespace().equals("urn:ietf:params:xml:ns:xmpp-sasl")) {
-                        // After a <success>, the stream is reset.  Inform the stream.  Do
-                        // this first, so we process the stream reset before sending any more
-                        // packets.
-                        connection.streamReset();
-
                         processPacket(new Success(parser.nextText()));
                     }
                 }
@@ -278,27 +273,14 @@ class PacketReader {
         listenerExecutor.submit(new ListenerNotification(packet));
     }
 
-    private void parseFeatures(Element packet) throws Exception {
+    private Packet parseFeatures(Element packet) throws Exception {
         for(Node node: PacketParserUtils.getChildNodes(packet)) {
-            if(node.getLocalName().equals("mechanisms")) {
-                // The server is reporting available SASL mechanisms. Store this information
-                // which will be used later while logging (i.e. authenticating) into
-                // the server
-                connection.getSASLAuthentication()
-                        .setAvailableSASLMethods(PacketParserUtils.parseMechanisms(node));
-            }
-            else if(node.getLocalName().equals("bind")) {
-                // The server requires the client to bind a resource to the stream
-                connection.getSASLAuthentication().bindingRequired();
-            }
-            else if(node.getLocalName().equals("session")) {
-                // The server supports sessions
-                connection.getSASLAuthentication().sessionsSupported();
-            }
-            else if(node.getLocalName().equals("register")) {
+            if(node.getLocalName().equals("register")) {
                 connection.getAccountManager().setSupportsAccountCreation(true);
             }
         }
+
+        return new ReceivedPacket(packet);
     }
 
     /**
