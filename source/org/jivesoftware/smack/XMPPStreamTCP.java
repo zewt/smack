@@ -85,6 +85,12 @@ public class XMPPStreamTCP extends XMPPStream
     /* True if TLS compression is enabled. */
     private boolean usingTLSCompression = false;
 
+    /** Set to true while close() is waiting for the connection to be closed. */
+    private boolean sessionTerminated = false;
+
+    /** Set to true after the connection has been closed. */
+    private boolean waitingForConnectionClose = false;
+
     private ConnectionConfiguration config;
     private String originalServiceName;
 
@@ -105,7 +111,15 @@ public class XMPPStreamTCP extends XMPPStream
      */
     private Element bufferedPacket = null;
 
-    public Writer getWriter() { return writer; }
+    public void writePacket(String packet) throws IOException {
+        if(writer == null)
+            throw new IOException("Wrote a packet while the connection was closed");
+
+        synchronized(writer) {
+            writer.write(packet);
+            writer.flush();
+        }
+    }
     public boolean isSecureConnection() { return usingSecureConnection; }
     public boolean isUsingCompression() { return usingXMPPCompression || usingTLSCompression; }
 
@@ -443,7 +457,7 @@ public class XMPPStreamTCP extends XMPPStream
         }
 
         // Now that we've closed the socket, close() won't block for I/O.
-        close();
+        close(null);
     }
 
     public Element readPacket() throws XMPPException {
@@ -518,11 +532,22 @@ public class XMPPStreamTCP extends XMPPStream
                 while (parser.getEventType() == XmlPullParser.TEXT)
                     parser.next();
 
-                /* If this is an END_TAG, then the </stream:stream> has been closed; the
-                 * connection is closing.  XXX: If close() was called then this is expected,
-                 * and we should return null. */
-                if (parser.getEventType() == XmlPullParser.END_TAG)
-                    throw new XMPPException("Session terminated");
+                // If we receive END_TAG, then </stream:stream> has been closed and the
+                // connection is about to be closed.  If we receive END_DOCUMENT, then the
+                // stream has been closed abruptly.
+                if (parser.getEventType() == XmlPullParser.END_TAG) {
+                    synchronized(this) {
+                        sessionTerminated = true;
+                        notifyAll();
+
+                        // If waitingForConnectionClose is true, then close() is running, and we're expecting
+                        // this; return EOF.  Otherwise, this is an unexpected disconnection, so throw.
+                        if(waitingForConnectionClose)
+                            return null;
+                        else
+                            throw new XMPPException("Session terminated");
+                    }
+                }
 
                 // END_DOCUMENT means the stream has ended.
                 if (parser.getEventType() == XmlPullParser.END_DOCUMENT)
@@ -731,20 +756,46 @@ public class XMPPStreamTCP extends XMPPStream
         
         streamReset();
     }
-    
-    public void close()
+
+    public void close(String packet)
     {
+        // Tell readPacket() that we expect the connection to be closing.
+        waitingForConnectionClose = true;
+
         /* Attempt to close the stream. */
         try {
-            if(writer != null) {
-                writer.write("</stream:stream>");
-                writer.flush();
-            }
+            if (packet == null)
+                packet = "";
+
+            // Append the final packet (if any) and </stream> and send them together,
+            // so they're sent together.
+            packet += "</stream:stream>";
+            writePacket(packet);
         }
         catch (IOException e) {
             // Do nothing
         }
-        
+
+        // If the connection wasn't already closed, give the server a chance to close
+        // gracefully.
+        if(!connectionClosed) {
+            synchronized(this) {
+                long waitUntil = System.currentTimeMillis() + SmackConfiguration.getPacketReplyTimeout();
+                while(!sessionTerminated) {
+                    long ms = waitUntil - System.currentTimeMillis();
+                    if(ms <= 0)
+                        break;
+
+                    try {
+                        wait(ms);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            }
+        }
+
         try {
             if(socket != null)
                 socket.close();
@@ -770,6 +821,8 @@ public class XMPPStreamTCP extends XMPPStream
             try { writer.close(); } catch (IOException ignore) { /* ignore */ }
             writer = null;
         }
+
+        connectionClosed = true;
     }
 
     private void proceedTLSReceived() throws Exception
@@ -888,7 +941,6 @@ public class XMPPStreamTCP extends XMPPStream
             keepaliveMonitorWriteEvent.addWriterListener(listener);
             
             while (true) {
-                Writer writer = getWriter(); 
                 synchronized (writer) {
                     // Send heartbeat if no packet has been sent to the server for a given time
                     if (System.currentTimeMillis() - KeepAliveTask.this.lastActive >= delay) {

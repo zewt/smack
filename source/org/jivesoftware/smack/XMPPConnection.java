@@ -78,33 +78,6 @@ public class XMPPConnection extends Connection {
 
     private boolean suppressConnectionErrors;
 
-    Element readPacket() throws InterruptedException, XMPPException { return data_stream.readPacket(); }
-    void writePacket(Collection<Packet> packets) throws IOException {
-        Writer writer = data_stream.getWriter();
-        if(writer == null)
-            throw new IOException("Wrote a packet while the connection was closed");
-        synchronized(writer) {
-            for(Packet packet: packets) {
-                writer.write(packet.toXML());
-            }
-
-            writer.flush();
-        }
-    }
-
-    void closeWriter() {
-        try {
-            Writer writer = getWriter();
-            if (writer != null)
-                writer.close();
-        }
-        catch (IOException e) {
-            // Do nothing
-        }
-    }
-
-    Writer getWriter() { return data_stream.getWriter(); }
-    
     private PacketWriter packetWriter;
     private PacketReader packetReader;
 
@@ -444,9 +417,9 @@ public class XMPPConnection extends Connection {
         // suppress them.
         suppressConnectionErrors = true;
 
-        // Set presence to offline.
-        if(unavailablePresence != null)
-            packetWriter.sendPacket(unavailablePresence);
+        // Cleanly close down the connection.
+        if (wasConnected)
+            data_stream.close(unavailablePresence != null? unavailablePresence.toXML():null);
 
         shutdown();
 
@@ -759,6 +732,20 @@ public class XMPPConnection extends Connection {
         if (!this.wasAuthenticated) {
             this.wasAuthenticated = wasAuthenticated;
         }
+    }
+
+    /** Read a single packet from the stream.  Used by PacketReader. */
+    protected Element readPacket() throws InterruptedException, XMPPException {
+        return data_stream.readPacket();
+    }
+
+    /** Write a list of packets to the stream.  Used by PacketWriter. */
+    protected void writePacket(Collection<Packet> packets) throws IOException {
+        StringBuffer data = new StringBuffer();
+        for(Packet packet: packets)
+            data.append(packet.toXML());
+
+        data_stream.writePacket(data.toString());
     }
 
     /**

@@ -2,7 +2,6 @@ package org.jivesoftware.smack;
 
 import java.io.IOException;
 import java.io.StringReader;
-import java.io.Writer;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.cert.CertificateException;
@@ -41,7 +40,6 @@ import com.kenai.jbosh.ComposableBody;
 
 public class XMPPStreamBOSH extends XMPPStream
 {
-    private Writer writer = null;
     private URI uri = null;
 
     // bosh_client must only be accessed while synchronized, and only when
@@ -53,7 +51,19 @@ public class XMPPStreamBOSH extends XMPPStream
     public boolean isSecureConnection() { return usingSecureConnection; }
     private boolean usingSecureConnection = false;
 
-    public Writer getWriter() { return writer; }
+    public void writePacket(String packet) throws IOException {
+        if(connectionClosed)
+            throw new IOException("Wrote a packet while the connection was closed");
+
+        try {
+            // Note that this will block if the packet can't be sent immediately.
+            bosh_client.send(createBoshPacket(packet).build());
+        } catch(BOSHException e) {
+            IOException io = new IOException("Error writing BOSH packet");
+            io.initCause(e); // IOException lacks a (message, cause) constructor
+            throw io;
+        }
+    }
 
     // Although compression may or may not be in use by the HTTP stream, that can
     // vary from connection to connection, and we won't have any meaningful response
@@ -77,7 +87,6 @@ public class XMPPStreamBOSH extends XMPPStream
     {
         this.uri = config.getBoshURI();
         this.config = config;
-        writer = new BOSHWriter();
         connectionClosed = true;
     }
 
@@ -244,13 +253,13 @@ public class XMPPStreamBOSH extends XMPPStream
         // android.util.Log.w("SMACK", "XMPPStreamBOSH: initializeConnection: done");
     }
 
-    public void close()
+    public void close(String packet)
     {
         // android.util.Log.w("SMACK", "XMPPStreamBOSH: close()");
 
         try {
             // If any stanzas are waiting to be sent, send them in the disconnect message.
-            bosh_client.disconnect(getQueuedData().build());
+            bosh_client.disconnect(createBoshPacket(packet).build());
         }
         catch(BOSHException e)
         {
@@ -265,14 +274,17 @@ public class XMPPStreamBOSH extends XMPPStream
         // will set connectionClosed.
         // android.util.Log.w("SMACK", "XMPPStreamBOSH: waiting for disconnect");
         long waitUntil = System.currentTimeMillis() + SmackConfiguration.getPacketReplyTimeout();
-        while(!connectionClosed) {
-            long ms = waitUntil - System.currentTimeMillis();
-            if(ms <= 0)
-                break;
-            try {
-                wait(ms);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+        synchronized(this) {
+            while(!read_queue.isEmpty()) {
+                long ms = waitUntil - System.currentTimeMillis();
+                if(ms <= 0)
+                    break;
+                try {
+                    wait(ms);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
         }
 
@@ -319,8 +331,6 @@ public class XMPPStreamBOSH extends XMPPStream
             /* Make sure any written data is flushed and sent to the server.  According
              * to XEP-0206, any stanzas we put in a <body restart='true'> packet will be
              * ignored. */
-            writer.flush();
-
             if(connectionClosed)
                 throw new XMPPException("Connection has closed");
 
@@ -329,9 +339,6 @@ public class XMPPStreamBOSH extends XMPPStream
                     .setAttribute(BodyQName.createWithPrefix("urn:xmpp:xbosh", "version", "xmpp"), "1.0")
                     .setAttribute(BodyQName.createWithPrefix("urn:xmpp:xbosh", "restart", "xmpp"), "true")
                     .build());
-        }
-        catch(IOException e) {
-            throw new XMPPException("Error flushing data before sending xmpp:restart", e);
         }
         catch(BOSHException e) {
             throw new XMPPException("BOSH error while sending xmpp:restart", e);
@@ -432,56 +439,17 @@ public class XMPPStreamBOSH extends XMPPStream
         }
     }
 
-    /* A plain-text list of XML stanzas waiting to be sent. */
-    private StringBuffer writeBuffer = new StringBuffer();
-
-    private ComposableBody.Builder getQueuedData() {
+    private static ComposableBody.Builder createBoshPacket(String packet) {
         ComposableBody.Builder builder = ComposableBody.builder()
             .setNamespaceDefinition("xmpp", "urn:xmpp:xbosh")
             .setAttribute(BodyQName.createWithPrefix("urn:xmpp:xbosh", "version", "xmpp"), "1.0");
 
-        if(writeBuffer.length() > 0) {
-            builder.setPayloadXML(writeBuffer.toString());
-
-            /* Erase the buffered data. */
-            writeBuffer.setLength(0);
+        if(packet != null) {
+            builder.setPayloadXML(packet);
         }
 
         return builder;
     }
-
-    private class BOSHWriter extends Writer
-    {
-        /* We don't have to do anything here to close. */
-        public void close() { }
-
-        /* Buffer data until we're flushed, then send a single BOSH packet with
-         * the packets we were given.  Usually, we're given a single packet and
-         * flush() is called immediately, so there's no point in doing anything
-         * fancier. */
-        public synchronized void write(char[] cbuf, int off, int len)
-        {
-            writeBuffer.append(cbuf, off, len);
-        }
-
-        public void flush() throws IOException
-        {
-            if(writeBuffer.length() == 0)
-                return;
-
-            try {
-                if(connectionClosed)
-                    throw new IOException("Connection has closed");
-
-                // Note that this will block if the packet can't be sent immediately.
-                bosh_client.send(getQueuedData().build());
-            } catch(BOSHException e) {
-                IOException io = new IOException("Error writing BOSH packet");
-                io.initCause(e); // IOException lacks a (message, cause) constructor
-                throw io;
-            }
-        }
-    };
 
     private class ResponseListener implements BOSHClientResponseListener
     {

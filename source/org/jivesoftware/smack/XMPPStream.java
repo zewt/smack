@@ -1,7 +1,7 @@
 package org.jivesoftware.smack;
 
 import java.io.IOException;
-import java.io.Writer;
+
 import org.jivesoftware.smack.util.ObservableReader;
 import org.jivesoftware.smack.util.ObservableWriter;
 import org.w3c.dom.Element;
@@ -17,17 +17,18 @@ public abstract class XMPPStream
     public abstract void initializeConnection() throws XMPPException;
     
     /**
-     * Retrieve the writer for sending packets.  If initializeConnection has not yet
-     * been called, return null.
-     * @return Writer
+     * Send the given packets to the server asynchronously.  This function will not
+     * block.  If the connection has already been closed, throws IOException. 
      */
-    public abstract Writer getWriter();
+    public abstract void writePacket(String packet) throws IOException;
 
     /**
      * Permanently close the connection, flushing any pending messages and cleanly
-     * disconnecting the session.  This function may block.
+     * disconnecting the session.  If non-null and the connection is not already
+     * closed, the given packets will be sent in the disconnection message.  This
+     * function may block.
      */
-    public abstract void close();
+    public abstract void close(String packet);
 
     /**
      * Forcibly disconnect the connection.  Future calls to readPacket will return

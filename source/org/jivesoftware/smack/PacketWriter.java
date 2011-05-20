@@ -46,8 +46,6 @@ class PacketWriter {
     private final BlockingQueue<Packet> queue;
     private boolean done;
 
-    private Writer getWriter() { return connection.getWriter(); }
-    
     /**
      * Creates a new packet writer with the specified connection.
      *
@@ -171,8 +169,6 @@ class PacketWriter {
 
             // Delete the queue contents (hopefully nothing is left).
             queue.clear();
-
-            connection.closeWriter();
         }
         catch (IOException ioe){
             // Don't report write errors.  Instead, require that any write errors at the
