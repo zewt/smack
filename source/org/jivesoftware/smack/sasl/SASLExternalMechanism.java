@@ -19,8 +19,6 @@
 
 package org.jivesoftware.smack.sasl;
 
-import org.jivesoftware.smack.SASLAuthentication;
-
 /**
  * Implementation of the SASL EXTERNAL mechanism.
  *
@@ -48,12 +46,7 @@ import org.jivesoftware.smack.SASLAuthentication;
  * @author Jay Kline
  */
 public class SASLExternalMechanism extends SASLMechanism  {
-
-    public SASLExternalMechanism(SASLAuthentication saslAuthentication) {
-        super(saslAuthentication);
-    }
-
-    protected String getName() {
+    public String getName() {
         return "EXTERNAL";
     }
 }

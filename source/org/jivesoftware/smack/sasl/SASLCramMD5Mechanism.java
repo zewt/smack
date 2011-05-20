@@ -19,20 +19,13 @@
 
 package org.jivesoftware.smack.sasl;
 
-import org.jivesoftware.smack.SASLAuthentication;
-
 /**
  * Implementation of the SASL CRAM-MD5 mechanism
  *
  * @author Jay Kline
  */
 public class SASLCramMD5Mechanism extends SASLMechanism {
-
-    public SASLCramMD5Mechanism(SASLAuthentication saslAuthentication) {
-        super(saslAuthentication);
-    }
-
-    protected String getName() {
+    public String getName() {
         return "CRAM-MD5";
     }
 }

@@ -30,10 +30,13 @@ import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.packet.Session;
 import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.sasl.*;
+import org.jivesoftware.smack.sasl.SASLMechanism.AuthMechanism;
 import org.jivesoftware.smack.sasl.SASLMechanism.Challenge;
 import org.jivesoftware.smack.sasl.SASLMechanism.Failure;
+import org.jivesoftware.smack.sasl.SASLMechanism.Response;
 import org.jivesoftware.smack.sasl.SASLMechanism.Success;
 import org.jivesoftware.smack.sasl.SASLMechanism.MechanismNotSupported;
+import org.jivesoftware.smack.util.Base64;
 
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
 
@@ -268,10 +271,14 @@ public class SASLAuthentication implements UserAuthentication {
         try {
             /* Start authentication. */
             try {
+                String authText;
                 if(cbh != null)
-                    currentMechanism.authenticate(username, connection.getServiceName(), cbh);
+                    authText = currentMechanism.authenticate(username, connection.getServiceName(), cbh);
                 else
-                    currentMechanism.authenticate(username, connection.getServiceName(), password);
+                    authText = currentMechanism.authenticate(username, connection.getServiceName(), password);
+
+                // Send the initial packet.
+                connection.sendPacket(new AuthMechanism(currentMechanism.getName(), authText));
             } catch(IOException e) {
                 e.printStackTrace();
                 throw new XMPPException(e);
@@ -308,7 +315,25 @@ public class SASLAuthentication implements UserAuthentication {
                      */
                     Challenge challenge = (Challenge) packet;
                     try {
-                        currentMechanism.challengeReceived(challenge.getChallenge());
+                        // Decode the challenge.
+                        byte[] challengeData;
+                        if(challenge.getChallenge() != null)
+                            challengeData = Base64.decode(challenge.getChallenge());
+                        else
+                            challengeData = new byte[0];
+
+                        // Ask the mechanism for the response.
+                        byte[] response = currentMechanism.challengeReceived(challengeData);
+
+                        // Encode the response.
+                        Packet responseStanza;
+                        if (response == null)
+                            responseStanza = new Response();
+                        else
+                            responseStanza = new Response(Base64.encodeBytes(response,Base64.DONT_BREAK_LINES));
+
+                        // Send the response to the server.
+                        connection.sendPacket(responseStanza);
                     } catch(IOException e) {
                         throw new XMPPException(e);
                     }
@@ -398,8 +423,8 @@ public class SASLAuthentication implements UserAuthentication {
 
     SASLMechanism createMechanism(Class<? extends SASLMechanism> mechanismClass) {
         try {
-            Constructor<? extends SASLMechanism> constructor = mechanismClass.getConstructor(SASLAuthentication.class);
-            return constructor.newInstance(this);
+            Constructor<? extends SASLMechanism> constructor = mechanismClass.getConstructor();
+            return constructor.newInstance();
         } catch (InvocationTargetException e) {
             // If the constructor throws an exception, it's an unexpected failure; don't
             // mask it.
@@ -501,10 +526,6 @@ public class SASLAuthentication implements UserAuthentication {
             // Wake up the thread that is waiting in the #authenticate method
             notify();
         }
-    }
-
-    public void send(Packet stanza) {
-        connection.sendPacket(stanza);
     }
 
     /**

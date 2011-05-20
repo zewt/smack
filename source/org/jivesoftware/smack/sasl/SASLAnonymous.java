@@ -19,8 +19,6 @@
 
 package org.jivesoftware.smack.sasl;
 
-import org.jivesoftware.smack.SASLAuthentication;
-
 import java.io.IOException;
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
 
@@ -31,31 +29,25 @@ import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
  */
 public class SASLAnonymous extends SASLMechanism {
 
-    public SASLAnonymous(SASLAuthentication saslAuthentication) {
-        super(saslAuthentication);
-    }
-
-    protected String getName() {
+    public String getName() {
         return "ANONYMOUS";
     }
 
-    public void authenticate(String username, String host, CallbackHandler cbh) throws IOException {
-        authenticate();
+    public String authenticate(String username, String host, CallbackHandler cbh) throws IOException {
+        return authenticate();
     }
 
-    public void authenticate(String username, String host, String password) throws IOException {
-        authenticate();
+    public String authenticate(String username, String host, String password) throws IOException {
+        return authenticate();
     }
 
-    protected void authenticate() throws IOException {
+    protected String authenticate() throws IOException {
         // Send the authentication to the server
-        getSASLAuthentication().send(new AuthMechanism(getName(), null));
+        return null;
     }
 
-    public void challengeReceived(String challenge) throws IOException {
-        // Build the challenge response stanza encoding the response text
-        // and send the authentication to the server
-        getSASLAuthentication().send(new Response());
+    public byte[] challengeReceived(byte[] challenge) throws IOException {
+        return null;
     }
 
 

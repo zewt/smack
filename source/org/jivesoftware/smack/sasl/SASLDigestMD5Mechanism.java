@@ -19,20 +19,13 @@
 
 package org.jivesoftware.smack.sasl;
 
-import org.jivesoftware.smack.SASLAuthentication;
-
 /**
  * Implementation of the SASL DIGEST-MD5 mechanism
  *
  * @author Jay Kline
  */
 public class SASLDigestMD5Mechanism extends SASLMechanism {
-
-    public SASLDigestMD5Mechanism(SASLAuthentication saslAuthentication) {
-        super(saslAuthentication);
-    }
-
-    protected String getName() {
+    public String getName() {
         return "DIGEST-MD5";
     }
 }

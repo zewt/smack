@@ -15,20 +15,13 @@
 
 package org.jivesoftware.smack.sasl;
 
-import org.jivesoftware.smack.SASLAuthentication;
-
 /**
  * Implementation of the SASL PLAIN mechanism
  *
  * @author Jay Kline
  */
 public class SASLPlainMechanism extends SASLMechanism {
-
-    public SASLPlainMechanism(SASLAuthentication saslAuthentication) {
-        super(saslAuthentication);
-    }
-
-    protected String getName() {
+    public String getName() {
         return "PLAIN";
     }
 }

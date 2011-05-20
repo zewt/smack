@@ -21,7 +21,6 @@
 package org.jivesoftware.smack.sasl;
 
 import org.jivesoftware.smack.XMPPException;
-import org.jivesoftware.smack.SASLAuthentication;
 import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.util.Base64;
 
@@ -56,18 +55,12 @@ import org.apache.harmony.javax.security.sasl.SaslException;
  * @author Jay Kline
  */
 public abstract class SASLMechanism implements CallbackHandler {
-
-    private SASLAuthentication saslAuthentication;
     protected SaslClient sc;
     protected String authenticationId;
     protected String password;
 
 
     static public class MechanismNotSupported extends Exception {};
-
-    public SASLMechanism(SASLAuthentication saslAuthentication) {
-        this.saslAuthentication = saslAuthentication;
-    }
 
     /**
      * Builds and sends the <tt>auth</tt> stanza to the server. Note that this method of
@@ -81,7 +74,7 @@ public abstract class SASLMechanism implements CallbackHandler {
      * @throws XMPPException If a protocol error occurs or the user is not authenticated.
      * @throws MechanismNotSupported If this mechanism is not supported by the client.
      */
-    public void authenticate(String username, String host, String password)
+    public String authenticate(String username, String host, String password)
     throws IOException, XMPPException, MechanismNotSupported
     {
         //Since we were not provided with a CallbackHandler, we will use our own with the given
@@ -96,7 +89,7 @@ public abstract class SASLMechanism implements CallbackHandler {
         sc = Sasl.createSaslClient(mechanisms, username, "xmpp", host, props, this);
         if(sc == null)
             throw new MechanismNotSupported();
-        authenticate();
+        return authenticate();
     }
 
     /**
@@ -110,7 +103,7 @@ public abstract class SASLMechanism implements CallbackHandler {
      * @throws XMPPException If a protocol error occurs or the user is not authenticated.
      * @throws MechanismNotSupported If this mechanism is not supported by the client.
      */
-    public void authenticate(String username, String host, CallbackHandler cbh)
+    public String authenticate(String username, String host, CallbackHandler cbh)
     throws IOException, XMPPException, MechanismNotSupported
     {
         String[] mechanisms = { getName() };
@@ -118,10 +111,10 @@ public abstract class SASLMechanism implements CallbackHandler {
         sc = Sasl.createSaslClient(mechanisms, username, "xmpp", host, props, cbh);
         if(sc == null)
             throw new MechanismNotSupported();
-        authenticate();
+        return authenticate();
     }
 
-    protected void authenticate() throws IOException, XMPPException {
+    protected String authenticate() throws IOException, XMPPException {
         String authenticationText = null;
         try {
             if(sc.hasInitialResponse()) {
@@ -133,7 +126,7 @@ public abstract class SASLMechanism implements CallbackHandler {
         }
 
         // Send the authentication to the server
-        getSASLAuthentication().send(new AuthMechanism(getName(), authenticationText));
+        return authenticationText;
     }
 
 
@@ -141,27 +134,11 @@ public abstract class SASLMechanism implements CallbackHandler {
      * The server is challenging the SASL mechanism for the stanza he just sent. Send a
      * response to the server's challenge.
      *
-     * @param challenge a base64 encoded string representing the challenge.
+     * @param challenge the decoded challenge.
      * @throws IOException if an exception sending the response occurs.
      */
-    public void challengeReceived(String challenge) throws IOException {
-        byte response[];
-        if(challenge != null) {
-            response = sc.evaluateChallenge(Base64.decode(challenge));
-        } else {
-            response = sc.evaluateChallenge(new byte[0]);
-        }
-
-        Packet responseStanza;
-        if (response == null) {
-            responseStanza = new Response();
-        }
-        else {
-            responseStanza = new Response(Base64.encodeBytes(response,Base64.DONT_BREAK_LINES));
-        }
-
-        // Send the authentication to the server
-        getSASLAuthentication().send(responseStanza);
+    public byte[] challengeReceived(byte[] challenge) throws IOException {
+        return sc.evaluateChallenge(challenge);
     }
 
     /**
@@ -169,12 +146,7 @@ public abstract class SASLMechanism implements CallbackHandler {
      *
      * @return the common name of the SASL mechanism.
      */
-    protected abstract String getName();
-
-
-    protected SASLAuthentication getSASLAuthentication() {
-        return saslAuthentication;
-    }
+    public abstract String getName();
 
     /**
      * 
@@ -203,7 +175,7 @@ public abstract class SASLMechanism implements CallbackHandler {
     /**
      * Initiating SASL authentication by select a mechanism.
      */
-    public class AuthMechanism extends Packet {
+    public static class AuthMechanism extends Packet {
         final private String name;
         final private String authenticationText;
 
@@ -254,7 +226,7 @@ public abstract class SASLMechanism implements CallbackHandler {
     /**
      * A SASL response stanza.
      */
-    public class Response extends Packet {
+    public static class Response extends Packet {
         final private String authenticationText;
 
         public Response() {
