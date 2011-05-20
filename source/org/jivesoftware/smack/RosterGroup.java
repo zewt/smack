@@ -164,8 +164,13 @@ public class RosterGroup {
      * @param entry a roster entry.
      * @throws XMPPException if an error occured while trying to add the entry to the group.
      */
-    public void addEntry(RosterEntry entry) throws XMPPException {
+    public void addEntry(final RosterEntry entry) throws XMPPException {
         PacketCollector collector = null;
+        PacketIDFilter filter = null;
+        PacketListener addEntryListener = new PacketListener() {
+            public void processPacket(Packet packet) { addEntryLocal(entry); }
+        };
+
         // Only add the entry if it isn't already in the list.
         synchronized (entries) {
             if (!entries.contains(entry)) {
@@ -175,14 +180,16 @@ public class RosterGroup {
                 item.addGroupName(getName());
                 packet.addRosterItem(item);
                 // Wait up to a certain number of seconds for a reply from the server.
-                collector = connection
-                        .createPacketCollector(new PacketIDFilter(packet.getPacketID()));
+                filter = new PacketIDFilter(packet.getPacketID());
+                collector = connection.createPacketCollector(filter);
+                connection.addPacketListener(addEntryListener, filter);
                 connection.sendPacket(packet);
             }
         }
         if (collector != null) {
             IQ response = (IQ) collector.nextResult(SmackConfiguration.getPacketReplyTimeout());
             collector.cancel();
+            connection.removePacketListener(addEntryListener);
             if (response == null) {
                 throw new XMPPException("No response from the server.");
             }
@@ -216,7 +223,6 @@ public class RosterGroup {
                 item.removeGroupName(this.getName());
                 packet.addRosterItem(item);
                 // Wait up to a certain number of seconds for a reply from the server.
-                System.out.print("writing packet " + packet.getPacketID() + ":\n" + packet.toXML() + "\n");
                 filter = new PacketIDFilter(packet.getPacketID());
                 collector = connection.createPacketCollector(filter);
                 connection.addPacketListener(removeEntryListener, filter);
@@ -225,9 +231,6 @@ public class RosterGroup {
         }
 
         if (collector != null) {
-            // Wait for the response.  Collectors are guaranteed not to return a packet
-            // until after listeners have been fired, so when this returns successfully,
-            // removeEntryListener has been run.
             IQ response = (IQ) collector.nextResult(SmackConfiguration.getPacketReplyTimeout());
             collector.cancel();
             connection.removePacketListener(removeEntryListener);
