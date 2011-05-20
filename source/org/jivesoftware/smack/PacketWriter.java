@@ -164,7 +164,7 @@ class PacketWriter {
                 connection.writePacket(packets);
             }
             catch (IOException e) {
-                e.printStackTrace();
+                // e.printStackTrace();
             }
 
             // Delete the queue contents (hopefully nothing is left).

@@ -245,7 +245,8 @@ class PacketReader {
         catch (RuntimeException e) {
             throw e; // don't handle unchecked exceptions below
         } catch (Exception e) {
-            e.printStackTrace();
+            if(!(e instanceof XMPPException))
+                e.printStackTrace();
             if(waitingForEstablishedConnection) {
                 waitingForEstablishedConnection = false;
                 // If waitingForEstablishedConnection is true, startup() is still waiting for
