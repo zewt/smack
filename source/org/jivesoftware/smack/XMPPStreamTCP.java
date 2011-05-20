@@ -130,6 +130,15 @@ public class XMPPStreamTCP extends XMPPStream
     {
         this.config = config;
         
+        try {
+            parser = XmlPullParserFactory.newInstance().newPullParser();
+            parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
+        }
+        catch (XmlPullParserException xppe) {
+            xppe.printStackTrace();
+            throw new RuntimeException(xppe);
+        }
+
         /* We update config.serviceName when we see the service name from the server,
          * but we need to retain the original value for TLS certificate checking. */
         originalServiceName = config.getServiceName();
@@ -475,19 +484,53 @@ public class XMPPStreamTCP extends XMPPStream
              * RFC6120 4.3.3 stream restart.  At other times, this will simply read
              * a packet and return it. */
             while(true) {
-                /* If we havn't yet received the opening <stream> tag, wait until we get it. */
-                if(parser.getDepth() == 0) {
-                    // Read the <stream> tag.
+                // Depth 0 means we're just starting; 1 means we've read the stream header;
+                // 2 means we've read at least one packet.  If we're at depth 2, then the
+                // previous element must be END_TAG, as a result of calling ReadNodeFromXmlPull
+                // below.
+                if (parser.getDepth() > 2)
+                    throw new RuntimeException("Unexpected parser depth: " + parser.getDepth());
+                if (parser.getDepth() == 2 && parser.getEventType() != XmlPullParser.END_TAG)
+                    throw new RuntimeException("Unexpected event type: " + parser.getEventType());
+
+                // Read the next packet.
+                parser.next();
+
+                /* If there are any text nodes between stanzas, ignore them. */
+                while (parser.getEventType() == XmlPullParser.TEXT)
                     parser.next();
 
-                    // If we get an END_DOCUMENT here, the stream closed without sending any
-                    // data other than comments and other things XmlPullParser hides from us. 
-                    if (parser.getEventType() == XmlPullParser.END_DOCUMENT)
-                        return null;
+                // END_DOCUMENT means the stream has ended.
+                if (parser.getEventType() == XmlPullParser.END_DOCUMENT)
+                    return null;
 
-                    if (parser.getEventType() != XmlPullParser.START_TAG)
-                        throw new RuntimeException("Unexpected state from XmlPullParser: " + parser.getEventType());
+                // If we receive END_TAG, then </stream:stream> has been closed and the
+                // connection is about to be closed.  If we receive END_DOCUMENT, then the
+                // stream has been closed abruptly.
+                if (parser.getEventType() == XmlPullParser.END_TAG) {
+                    synchronized(this) {
+                        sessionTerminated = true;
+                        notifyAll();
 
+                        // If waitingForConnectionClose is true, then close() is running, and we're expecting
+                        // this; return EOF.  Otherwise, this is an unexpected disconnection, so throw.
+                        if(waitingForConnectionClose)
+                            return null;
+                        else
+                            throw new XMPPException("Session terminated");
+                    }
+                }
+
+                // We've checked all other possibilities; the event type must be START_TAG.
+                if (parser.getEventType() != XmlPullParser.START_TAG)
+                    throw new RuntimeException("Unexpected state from XmlPullParser: " + parser.getEventType());
+
+                // We must now be at depth 1 (<stream> starting) or 2 (a new stanza).
+                if (parser.getDepth() != 1 && parser.getDepth() != 2)
+                    throw new RuntimeException("Unexpected post-packet parser depth: " + parser.getDepth());
+
+                /* If we havn't yet received the opening <stream> tag, wait until we get it. */
+                if(parser.getDepth() == 1) {
                     // Check that the opening stream is what we expect.
                     if (!parser.getName().equals("stream") ||
                             !parser.getNamespace().equals("http://etherx.jabber.org/streams") ||
@@ -523,40 +566,10 @@ public class XMPPStreamTCP extends XMPPStream
                             throw new RuntimeException("Unexpected error", e);
                         }
                     }
+                } else {
+                    // We have an XMPP stanza.  Read the whole thing into a DOM node and return it.
+                    return ReadNodeFromXmlPull(parser);
                 }
-                
-                // Read the next packet.
-                parser.next();
-                
-                /* If there are any text nodes between stanzas, ignore them. */
-                while (parser.getEventType() == XmlPullParser.TEXT)
-                    parser.next();
-
-                // If we receive END_TAG, then </stream:stream> has been closed and the
-                // connection is about to be closed.  If we receive END_DOCUMENT, then the
-                // stream has been closed abruptly.
-                if (parser.getEventType() == XmlPullParser.END_TAG) {
-                    synchronized(this) {
-                        sessionTerminated = true;
-                        notifyAll();
-
-                        // If waitingForConnectionClose is true, then close() is running, and we're expecting
-                        // this; return EOF.  Otherwise, this is an unexpected disconnection, so throw.
-                        if(waitingForConnectionClose)
-                            return null;
-                        else
-                            throw new XMPPException("Session terminated");
-                    }
-                }
-
-                // END_DOCUMENT means the stream has ended.
-                if (parser.getEventType() == XmlPullParser.END_DOCUMENT)
-                    return null;
-
-                assert(parser.getDepth() == 2);
-
-                /* We have an XMPP stanza.  Read the whole thing into a DOM node and return it. */
-                return ReadNodeFromXmlPull(parser);
             }
         }
         catch (XmlPullParserException e) {
@@ -671,13 +684,32 @@ public class XMPPStreamTCP extends XMPPStream
      */
     private void resetParser()
     {
+        /*
+         * There are two distinct cases where we need a stream reset.
+         *
+         * During transport negotiation, when compression and/or encryption are enabled,
+         * a stream reset is performed.  In this case, the input stream has changed, replaced
+         * with compression/encryption wrappers.
+         *
+         * Later on, higher-level systems like SASL require a stream reset.  (This seems to
+         * serve no purpose other than complicating clients.)  In this case, we don't need to
+         * change streams, since the stream is the same.
+         *
+         * The important distinction is that when a transport-level reset happens and changes
+         * the stream, readPacket is never being executed.  If it was, it would get confused:
+         * the existing parser would continue to operate on the old stream.
+         *
+         * When a higher-level reset happens, readPacket is likely to be currently running,
+         * so it's important that we not recreate the parser or change the stream.  We still
+         * call setInput, in order to reset the stream state, but we're giving it the same
+         * stream it already had.
+         */
         try {
-            parser = XmlPullParserFactory.newInstance().newPullParser();
-            parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
             parser.setInput(reader);
         }
         catch (XmlPullParserException xppe) {
             xppe.printStackTrace();
+            throw new RuntimeException(xppe);
         }
     }
 
