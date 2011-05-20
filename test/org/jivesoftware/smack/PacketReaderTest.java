@@ -175,7 +175,7 @@ public class PacketReaderTest extends SmackTestCase {
     /**
      * Tests that PacketReader adds new listeners and also removes them correctly.
      */
-    public void testFiltersRemotion() {
+    public void testFiltersRemotion() throws Exception {
         final AtomicInteger counter = new AtomicInteger(0);
 
         int repeat = 10;
@@ -190,72 +190,55 @@ public class PacketReaderTest extends SmackTestCase {
             };
             PacketFilter pf0 = new PacketFilter() {
                 public boolean accept(Packet packet) {
+                    if (!(packet instanceof Message))
+                        return false;
                     System.out.println("Packet Filtered");
-                    counter.addAndGet(1);
-                    return true;
-                }
-            };
-
-            PacketListener listener1 = new PacketListener() {
-                public void processPacket(Packet packet) {
-                    System.out.println("Packet Captured");
-                    counter.addAndGet(1);
-                }
-            };
-            PacketFilter pf1 = new PacketFilter() {
-                public boolean accept(Packet packet) {
-                    System.out.println("Packet Filtered");
-                    counter.addAndGet(1);
                     return true;
                 }
             };
 
             getConnection(0).addPacketListener(listener0, pf0);
-            getConnection(1).addPacketListener(listener1, pf1);
+
+            PacketCollector collector = getConnection(0).createPacketCollector(pf0);
 
             // Check that the listener was added
 
             Message msg0 = new Message(getConnection(0).getUser(), Message.Type.normal);
-            Message msg1 = new Message(getConnection(1).getUser(), Message.Type.normal);
-
 
             for (int i = 0; i < 5; i++) {
                 getConnection(1).sendPacket(msg0);
-                getConnection(0).sendPacket(msg1);
             }
 
-            try {
-                Thread.sleep(100);
-            }
-            catch (InterruptedException e) {
-                e.printStackTrace();
+            // Wait for the packets to be received.  Collectors always receive packets
+            // after listeners.
+            for (int i = 0; i < 5; i++) {
+                Packet response = collector.nextResult(1000);
+                if (response == null)
+                    fail("Timed out waiting for packet collector");
             }
 
             // Remove the listener
             getConnection(0).removePacketListener(listener0);
-            getConnection(1).removePacketListener(listener1);
 
-            try {
-                Thread.sleep(300);
-            }
-            catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            // No more packets should arrive.
+            Thread.sleep(250);
+            assertEquals(null, collector.pollResult());
 
+            // Send the packets with no listeners attached.
             for (int i = 0; i < 10; i++) {
-                getConnection(0).sendPacket(msg1);
                 getConnection(1).sendPacket(msg0);
             }
 
-            try {
-                Thread.sleep(100);
+            // Wait for the packets to be received.
+            for (int i = 0; i < 10; i++) {
+                Packet response = collector.nextResult(1000);
+                if (response == null)
+                    fail("Timed out waiting for packet collector");
             }
-            catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+
+            collector.cancel();
         }
-        System.out.println(counter.get());
-        assertEquals(counter.get(), repeat * 2 * 10);
+        assertEquals(counter.get(), repeat * 5);
     }
 
     protected int getMaxConnections() {
