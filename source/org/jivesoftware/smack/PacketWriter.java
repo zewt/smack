@@ -25,6 +25,7 @@ import org.jivesoftware.smack.util.ThreadUtil;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.Vector;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
@@ -151,33 +152,18 @@ class PacketWriter {
             while (!done && (writerThread == thisThread)) {
                 Packet packet = nextPacket();
                 if (packet != null) {
-                    Writer writer = getWriter();
-                    if(writer == null)
-                        throw new IOException("Wrote a packet while the connection was closed");
-                    synchronized (writer) {
-                        writer.write(packet.toXML());
-                        writer.flush();
-                    }
+                    Vector<Packet> packets = new Vector<Packet>();
+                    packets.add(packet);
+                    connection.writePacket(packets);
                 }
             }
             // Flush out the rest of the queue. If the queue is extremely large, it's possible
             // we won't have time to entirely flush it before the socket is forced closed
             // by the shutdown process.
             try {
-                Writer writer = getWriter();
-
-                // This happens normally when the connection is shut down abruptly
-                // due to an error.
-                if(writer == null)
-                    throw new IOException("Wrote a packet while the connection was closed");
-
-                synchronized (writer) {
-                    while (!queue.isEmpty()) {
-                        Packet packet = queue.remove();
-                        writer.write(packet.toXML());
-                    }
-                    writer.flush();
-                }
+                Vector<Packet> packets = new Vector<Packet>();
+                packets.addAll(queue);
+                connection.writePacket(packets);
             }
             catch (IOException e) {
                 e.printStackTrace();
@@ -186,14 +172,7 @@ class PacketWriter {
             // Delete the queue contents (hopefully nothing is left).
             queue.clear();
 
-            try {
-                Writer writer = getWriter();
-                if(writer != null)
-                    writer.close();
-            }
-            catch (IOException e) {
-                // Do nothing
-            }
+            connection.closeWriter();
         }
         catch (IOException ioe){
             // Don't report write errors.  Instead, require that any write errors at the

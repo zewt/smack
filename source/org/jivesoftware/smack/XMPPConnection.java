@@ -31,8 +31,10 @@ import org.jivesoftware.smack.util.ObservableWriter;
 
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
 
+import java.io.IOException;
 import java.io.Writer;
 import java.lang.reflect.Constructor;
+import java.util.Collection;
 import java.util.Vector;
 
 import org.w3c.dom.Element;
@@ -77,6 +79,30 @@ public class XMPPConnection extends Connection {
     private boolean suppressConnectionErrors;
 
     Element readPacket() throws InterruptedException, XMPPException { return data_stream.readPacket(); }
+    void writePacket(Collection<Packet> packets) throws IOException {
+        Writer writer = data_stream.getWriter();
+        if(writer == null)
+            throw new IOException("Wrote a packet while the connection was closed");
+        synchronized(writer) {
+            for(Packet packet: packets) {
+                writer.write(packet.toXML());
+            }
+
+            writer.flush();
+        }
+    }
+
+    void closeWriter() {
+        try {
+            Writer writer = getWriter();
+            if (writer != null)
+                writer.close();
+        }
+        catch (IOException e) {
+            // Do nothing
+        }
+    }
+
     Writer getWriter() { return data_stream.getWriter(); }
     
     private PacketWriter packetWriter;
