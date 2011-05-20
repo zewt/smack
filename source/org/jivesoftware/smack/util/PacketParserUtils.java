@@ -28,6 +28,7 @@ import org.jivesoftware.smack.provider.ProviderManager;
 import org.jivesoftware.smack.sasl.SASLMechanism.Failure;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
+import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.w3c.dom.Text;
@@ -503,22 +504,12 @@ public class PacketParserUtils {
      * @return a collection of Stings with the mechanisms included in the mechanisms stanza.
      * @throws Exception if an exception occurs while parsing the stanza.
      */
-    public static Collection<String> parseMechanisms(XmlPullParser parser) throws Exception {
+    public static Collection<String> parseMechanisms(Node node) throws Exception {
         List<String> mechanisms = new ArrayList<String>();
-        boolean done = false;
-        while (!done) {
-            int eventType = parser.next();
-
-            if (eventType == XmlPullParser.START_TAG) {
-                String elementName = parser.getName();
-                if (elementName.equals("mechanism")) {
-                    mechanisms.add(parser.nextText());
-                }
-            }
-            else if (eventType == XmlPullParser.END_TAG) {
-                if (parser.getName().equals("mechanisms")) {
-                    done = true;
-                }
+        for(Node child: PacketParserUtils.getChildNodes(node)) {
+            String elementName = child.getLocalName();
+            if (elementName.equals("mechanism")) {
+                mechanisms.add(child.getTextContent());
             }
         }
         return mechanisms;

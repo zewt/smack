@@ -29,6 +29,7 @@ import org.jivesoftware.smack.util.PacketParserUtils;
 import org.jivesoftware.smack.util.ThreadUtil;
 import org.jivesoftware.smack.util.XmlPullParserDom;
 import org.w3c.dom.Element;
+import org.w3c.dom.Node;
 import org.xmlpull.v1.XmlPullParser;
 
 import java.util.concurrent.*;
@@ -203,7 +204,7 @@ class PacketReader {
                         throw new XMPPException(PacketParserUtils.parseStreamError(parser));
                     }
                     else if (parser.getName().equals("features")) {
-                        parseFeatures(parser);
+                        parseFeatures(packet);
 
                         if(waitingForEstablishedConnection) {
                             /* When initializeConnection returns, the connection is established and ready to use.
@@ -277,35 +278,25 @@ class PacketReader {
         listenerExecutor.submit(new ListenerNotification(packet));
     }
 
-    private void parseFeatures(XmlPullParser parser) throws Exception {
-        boolean done = false;
-        while (!done) {
-            int eventType = parser.next();
-
-            if (eventType == XmlPullParser.START_TAG) {
-                if (parser.getName().equals("mechanisms")) {
-                    // The server is reporting available SASL mechanisms. Store this information
-                    // which will be used later while logging (i.e. authenticating) into
-                    // the server
-                    connection.getSASLAuthentication()
-                            .setAvailableSASLMethods(PacketParserUtils.parseMechanisms(parser));
-                }
-                else if (parser.getName().equals("bind")) {
-                    // The server requires the client to bind a resource to the stream
-                    connection.getSASLAuthentication().bindingRequired();
-                }
-                else if (parser.getName().equals("session")) {
-                    // The server supports sessions
-                    connection.getSASLAuthentication().sessionsSupported();
-                }
-                else if (parser.getName().equals("register")) {
-                    connection.getAccountManager().setSupportsAccountCreation(true);
-                }
+    private void parseFeatures(Element packet) throws Exception {
+        for(Node node: PacketParserUtils.getChildNodes(packet)) {
+            if(node.getLocalName().equals("mechanisms")) {
+                // The server is reporting available SASL mechanisms. Store this information
+                // which will be used later while logging (i.e. authenticating) into
+                // the server
+                connection.getSASLAuthentication()
+                        .setAvailableSASLMethods(PacketParserUtils.parseMechanisms(node));
             }
-            else if (eventType == XmlPullParser.END_TAG) {
-                if (parser.getName().equals("features")) {
-                    done = true;
-                }
+            else if(node.getLocalName().equals("bind")) {
+                // The server requires the client to bind a resource to the stream
+                connection.getSASLAuthentication().bindingRequired();
+            }
+            else if(node.getLocalName().equals("session")) {
+                // The server supports sessions
+                connection.getSASLAuthentication().sessionsSupported();
+            }
+            else if(node.getLocalName().equals("register")) {
+                connection.getAccountManager().setSupportsAccountCreation(true);
             }
         }
     }
