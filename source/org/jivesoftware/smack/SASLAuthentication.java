@@ -20,13 +20,19 @@
 
 package org.jivesoftware.smack;
 
+import org.jivesoftware.smack.filter.OrFilter;
+import org.jivesoftware.smack.filter.PacketFilter;
 import org.jivesoftware.smack.filter.PacketIDFilter;
+import org.jivesoftware.smack.filter.PacketTypeFilter;
 import org.jivesoftware.smack.packet.Bind;
 import org.jivesoftware.smack.packet.IQ;
 import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.packet.Session;
 import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.sasl.*;
+import org.jivesoftware.smack.sasl.SASLMechanism.Challenge;
+import org.jivesoftware.smack.sasl.SASLMechanism.Failure;
+import org.jivesoftware.smack.sasl.SASLMechanism.Success;
 import org.jivesoftware.smack.sasl.SASLMechanism.MechanismNotSupported;
 
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
@@ -82,13 +88,8 @@ public class SASLAuthentication implements UserAuthentication {
      * Boolean indication if SASL authentication has failed. When failed the server may end
      * the connection.
      */
-    private boolean saslFailed;
     private boolean resourceBinded;
     private boolean sessionSupported;
-    /**
-     * The SASL related error condition if there was one provided by the server.
-     */
-    private String errorCondition;
 
     static {
 
@@ -260,44 +261,63 @@ public class SASLAuthentication implements UserAuthentication {
         // Trigger SASL authentication with the selected mechanism. We use
         // connection.getHost() since GSAPI requires the FQDN of the server, which
         // may not match the XMPP domain.
-        // XXX: But we don't always even know the XMPP server's FQDN, since BOSH
-        // routes it for us transparently.
+        PacketFilter filter = new PacketTypeFilter(Success.class);
+        filter = new OrFilter(filter, new PacketTypeFilter(Failure.class));
+        filter = new OrFilter(filter, new PacketTypeFilter(Challenge.class));
+        PacketCollector coll = connection.createPacketCollector(filter);
         try {
-            if(cbh != null)
-                currentMechanism.authenticate(username, connection.getServiceName(), cbh);
-            else
-                currentMechanism.authenticate(username, connection.getServiceName(), password);
-        } catch(IOException e) {
-            e.printStackTrace();
-            throw new XMPPException(e);
-        }
+            /* Start authentication. */
+            try {
+                if(cbh != null)
+                    currentMechanism.authenticate(username, connection.getServiceName(), cbh);
+                else
+                    currentMechanism.authenticate(username, connection.getServiceName(), password);
+            } catch(IOException e) {
+                e.printStackTrace();
+                throw new XMPPException(e);
+            }
 
-        // Wait until SASL negotiation finishes
-        synchronized (this) {
-            if (!saslNegotiated && !saslFailed) {
-                try {
-                    wait(30000);
+            while(true) {
+                Packet packet = coll.nextResult(SmackConfiguration.getPacketReplyTimeout());
+                if(packet == null)
+                    throw new XMPPException("SASL authentication timed out", XMPPError.Condition.request_timeout);
+
+                if(packet instanceof Success) {
+                    saslNegotiated = true;
+                    break;
                 }
-                catch (InterruptedException e) {
-                    // Ignore
+
+                if(packet instanceof Failure) {
+                    Failure failure = (Failure) packet;
+                    String errorCondition = failure.getCondition();
+                    if (errorCondition != null) {
+                        throw new XMPPException("SASL authentication " + mechanism + " failed: " + errorCondition,
+                                XMPPError.fromErrorCondition(errorCondition));
+                    }
+                    else {
+                        throw new XMPPException("SASL authentication " + mechanism + " failed");
+                    }
+                }
+
+                if(packet instanceof Challenge) {
+                    /**
+                     * The server is challenging the SASL authentication we just sent. Forward the challenge
+                     * to the current SASLMechanism we are using. The SASLMechanism will send a response to
+                     * the server. The length of the challenge-response sequence varies according to the
+                     * SASLMechanism in use.
+                     */
+                    Challenge challenge = (Challenge) packet;
+                    try {
+                        currentMechanism.challengeReceived(challenge.getChallenge());
+                    } catch(IOException e) {
+                        throw new XMPPException(e);
+                    }
                 }
             }
+        } finally {
+            connection.removePacketCollector(coll);
         }
 
-        if(!saslNegotiated && !saslFailed)
-            throw new XMPPException("SASL authentication timed out", XMPPError.Condition.request_timeout);
-
-        if (saslFailed) {
-            if (errorCondition != null) {
-                throw new XMPPException("SASL authentication " + mechanism + " failed: " + errorCondition,
-                        XMPPError.fromErrorCondition(errorCondition));
-            }
-            else {
-                throw new XMPPException("SASL authentication " + mechanism + " failed");
-            }
-        }
-
-        // saslNegotiated is true
         // Bind a resource for this connection and
         return bindResourceAndEstablishSession(resource);
     }
@@ -364,45 +384,14 @@ public class SASLAuthentication implements UserAuthentication {
      */
     public String authenticateAnonymously() throws XMPPException {
         try {
-            currentMechanism = new SASLAnonymous(this);
             try {
-                currentMechanism.authenticate(null,null,"");
+                return authenticateUsingMechanism("", null, "", "", "ANONYMOUS");
             } catch (MechanismNotSupported e) {
                 // Anonymous authentication never throws MechanismNotSupported.
                 throw new RuntimeException(e);
             }
-
-            // Wait until SASL negotiation finishes
-            synchronized (this) {
-                while (!saslNegotiated && !saslFailed) {
-                    try {
-                        wait(5000);
-                    }
-                    catch (InterruptedException e) {
-                        // Ignore
-                    }
-                }
-            }
-
-            if (saslFailed) {
-                // SASL authentication failed and the server may have closed the connection
-                // so throw an exception
-                if (errorCondition != null) {
-                    throw new XMPPException("SASL authentication failed: " + errorCondition);
-                }
-                else {
-                    throw new XMPPException("SASL authentication failed");
-                }
-            }
-
-            if (saslNegotiated) {
-                // Bind a resource for this connection and
-                return bindResourceAndEstablishSession(null);
-            }
-            else {
-                return new NonSASLAuthentication(connection).authenticateAnonymously();
-            }
-        } catch (IOException e) {
+        } catch (XMPPException e) {
+            // XXX: Don't throw away the error.
             return new NonSASLAuthentication(connection).authenticateAnonymously();
         }
     }
@@ -503,56 +492,6 @@ public class SASLAuthentication implements UserAuthentication {
     }
 
     /**
-     * The server is challenging the SASL authentication we just sent. Forward the challenge
-     * to the current SASLMechanism we are using. The SASLMechanism will send a response to
-     * the server. The length of the challenge-response sequence varies according to the
-     * SASLMechanism in use.
-     *
-     * @param challenge a base64 encoded string representing the challenge.
-     * @throws IOException If a network error occures while authenticating.
-     */
-    void challengeReceived(String challenge) throws IOException {
-        currentMechanism.challengeReceived(challenge);
-    }
-
-    /**
-     * Notification message saying that SASL authentication was successful. The next step
-     * would be to bind the resource.
-     */
-    void authenticated() {
-        synchronized (this) {
-            saslNegotiated = true;
-            // Wake up the thread that is waiting in the #authenticate method
-            notify();
-        }
-    }
-
-    /**
-     * Notification message saying that SASL authentication has failed. The server may have
-     * closed the connection depending on the number of possible retries.
-     * 
-     * @deprecated replaced by {@see #authenticationFailed(String)}.
-     */
-    void authenticationFailed() {
-        authenticationFailed(null);
-    }
-
-    /**
-     * Notification message saying that SASL authentication has failed. The server may have
-     * closed the connection depending on the number of possible retries.
-     * 
-     * @param condition the error condition provided by the server.
-     */
-    void authenticationFailed(String condition) {
-        synchronized (this) {
-            saslFailed = true;
-            errorCondition = condition;
-            // Wake up the thread that is waiting in the #authenticate method
-            notify();
-        }
-    }
-
-    /**
      * Notification message saying that the server requires the client to bind a
      * resource to the stream.
      */
@@ -584,7 +523,6 @@ public class SASLAuthentication implements UserAuthentication {
      */
     protected void init() {
         saslNegotiated = false;
-        saslFailed = false;
         resourceBinded = false;
         sessionSupported = false;
     }

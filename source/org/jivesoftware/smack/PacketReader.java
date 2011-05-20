@@ -219,25 +219,21 @@ class PacketReader {
                         // depending on the number of retries
                         final Failure failure = PacketParserUtils.parseSASLFailure(parser);
                         processPacket(failure);
-                        connection.getSASLAuthentication().authenticationFailed(failure.getCondition());
                     }
                     else if (parser.getName().equals("challenge") &&
                         parser.getNamespace().equals("urn:ietf:params:xml:ns:xmpp-sasl")) {
                         // The server is challenging the SASL authentication made by the client
                         String challengeData = parser.nextText();
                         processPacket(new Challenge(challengeData));
-                        connection.getSASLAuthentication().challengeReceived(challengeData);
                     }
                     else if (parser.getName().equals("success") &&
                             parser.getNamespace().equals("urn:ietf:params:xml:ns:xmpp-sasl")) {
-                        processPacket(new Success(parser.nextText()));
-
-                        // After a <success>, the stream is reset.  Inform the stream.
+                        // After a <success>, the stream is reset.  Inform the stream.  Do
+                        // this first, so we process the stream reset before sending any more
+                        // packets.
                         connection.streamReset();
 
-                        // The SASL authentication with the server was successful. The next step
-                        // will be to bind the resource
-                        connection.getSASLAuthentication().authenticated();
+                        processPacket(new Success(parser.nextText()));
                     }
                 }
             }
