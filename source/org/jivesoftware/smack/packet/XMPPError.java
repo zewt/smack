@@ -147,7 +147,7 @@ public class XMPPError {
      */
     private void init(Condition condition) {
         // Look for the condition and its default code and type
-        ErrorSpecification defaultErrorSpecification = ErrorSpecification.specFor(condition);
+        ErrorSpecification defaultErrorSpecification = ErrorSpecification.specFor(condition.toString());
         this.condition = condition.value;
         if (defaultErrorSpecification != null) {
             // If there is a default error specification for the received condition,
@@ -399,7 +399,7 @@ public class XMPPError {
             return instances;
         }
 
-        protected static ErrorSpecification specFor(Condition condition) {
+        protected static ErrorSpecification specFor(String condition) {
             return instances.get(condition.toString());
         }
 
