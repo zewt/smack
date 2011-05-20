@@ -367,6 +367,7 @@ public class XMPPError {
 
         private static void addError(Map<Condition, ErrorSpecification> instances,
                 Condition condition, Type type, int errorCode) {
+            instances.put(condition, new XMPPError.ErrorSpecification(condition, type, errorCode));
         }
 
         private static Map<Condition, ErrorSpecification> errorSpecifications() {
