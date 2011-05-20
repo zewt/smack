@@ -137,7 +137,6 @@ public abstract class SmackTestCase extends TestCase {
      * @return a new XMPP connection.
      */
     protected XMPPConnection createConnection() {
-        ConnectionConfiguration config = getConnectionConfig();
         return new XMPPConnection(getConnectionConfig());
     }
 
