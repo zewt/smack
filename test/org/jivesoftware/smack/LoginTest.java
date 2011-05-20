@@ -114,35 +114,28 @@ public class LoginTest extends SmackTestCase {
     }
 
     /**
-     * Check that the server does not allow to log in without specifying a resource.
+     * Check server-assigned resources.
      */
     public void testLoginWithNoResource() throws Exception {
+        XMPPConnection conn = createConnection();
+        conn.connect();
         try {
-            XMPPConnection conn = createConnection();
-            conn.connect();
-            try {
-                conn.getAccountManager().createAccount("user_1", "user_1");
-            } catch (XMPPException e) {
-                // Do nothing if the accout already exists
-                if (!e.getXMPPError().getCondition().equals("conflict")) {
-                    throw e;
-                }
-            }
-            conn.login("user_1", "user_1", (String) null);
-            if (conn.getSASLAuthentication().isAuthenticated()) {
-                // Check that the server assigned a resource
-                assertNotNull("JID assigned by server is missing", conn.getUser());
-                assertNotNull("JID assigned by server does not have a resource",
-                        StringUtils.parseResource(conn.getUser()));
-                conn.disconnect();
-            }
-            else {
-                fail("User with no resource was able to log into the server");
-            }
-
+            conn.getAccountManager().createAccount("user_1", "user_1");
         } catch (XMPPException e) {
-            assertEquals("Wrong error code returned", 406, e.getXMPPError().getCode());
+            // Do nothing if the account already exists.
+            if (!e.getXMPPError().getCondition().equals("conflict")) {
+                throw e;
+            }
         }
+        conn.login("user_1", "user_1", (String) null);
+        if (!conn.getSASLAuthentication().isAuthenticated())
+            fail("User with no resource was unable to log into the server");
+
+        // Check that the server assigned a resource.
+        assertNotNull("JID assigned by server is missing", conn.getUser());
+        assertNotNull("JID assigned by server does not have a resource",
+                StringUtils.parseResource(conn.getUser()));
+        conn.disconnect();
     }
 
     protected int getMaxConnections() {
