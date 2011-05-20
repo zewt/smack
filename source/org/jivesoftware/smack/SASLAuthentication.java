@@ -290,7 +290,7 @@ public class SASLAuthentication implements UserAuthentication {
         if (saslFailed) {
             if (errorCondition != null) {
                 throw new XMPPException("SASL authentication " + mechanism + " failed: " + errorCondition,
-                        XMPPError.fromErrorType(errorCondition));
+                        XMPPError.fromErrorCondition(errorCondition));
             }
             else {
                 throw new XMPPException("SASL authentication " + mechanism + " failed");

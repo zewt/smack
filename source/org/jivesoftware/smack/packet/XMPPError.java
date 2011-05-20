@@ -152,14 +152,7 @@ public class XMPPError {
     }
 
     public static XMPPError fromErrorType(String condition) {
-        ErrorSpecification spec = ErrorSpecification.specFor(condition.toString());
-        int code = -1;
-        Type type = null;
-        if(spec != null) {
-            code = spec.code;
-            type = spec.type;
-        }
-        return new XMPPError(code, type, condition, null, null);
+        return new XMPPError(-1, null, condition, null, null);
     }
 
     /**
