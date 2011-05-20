@@ -384,12 +384,8 @@ public class XMPPConnection extends Connection {
      *
      * @param unavailablePresence the presence packet to send during shutdown.
      */
-    protected void shutdown(Presence unavailablePresence) {
+    protected void shutdown() {
         packetReader.assertNotInThread();
-
-        // Set presence to offline.
-        if(unavailablePresence != null)
-            packetWriter.sendPacket(unavailablePresence);
 
         if (data_stream != null)
             data_stream.disconnect();
@@ -422,7 +418,11 @@ public class XMPPConnection extends Connection {
         // suppress them.
         suppressConnectionErrors = true;
 
-        shutdown(unavailablePresence);
+        // Set presence to offline.
+        if(unavailablePresence != null)
+            packetWriter.sendPacket(unavailablePresence);
+
+        shutdown();
 
         if (roster != null) {
             roster.cleanup();
@@ -596,7 +596,7 @@ public class XMPPConnection extends Connection {
         catch (XMPPException ex) {
             // An exception occurred in setting up the connection. Make sure we shut down the
             // readers and writers and close the socket.
-            shutdown(null);
+            shutdown();
             throw ex;        // Everything stopped. Now throw the exception.
         }
 
@@ -699,7 +699,7 @@ public class XMPPConnection extends Connection {
 
         // If we're already connected, or if we've disconnected but havn't yet cleaned
         // up, shut down.
-        shutdown(null);
+        shutdown();
 
         // Establishes the connection, readers and writers
         connectUsingConfiguration();
