@@ -49,10 +49,10 @@ public class LoginTest extends SmackTestCase {
                 fail("Invalid user was able to log into the server");
             }
             catch (XMPPException e) {
-                if (e.getXMPPError() != null) {
-                    assertEquals("Incorrect error code while login with an invalid user", 401,
-                            e.getXMPPError().getCode());
-                }
+                assertNotNull("XMPPError isn't set", e.getXMPPError());
+
+                assertEquals("Incorrect error code while login with an invalid user", 401,
+                        e.getXMPPError().getCode());
             }
             // Wait here while trying tests with exodus
             //Thread.sleep(300);
