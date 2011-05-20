@@ -69,7 +69,7 @@ public class IQTest extends SmackTestCase {
             fail("The server didn't reply with an error packet");
         }
         else {
-            assertEquals("Server answered an incorrect error code", 503, result.getError().getCode());
+            assertEquals("Server answered an incorrect error code", "service-unavailable", result.getError().getCondition());
         }
     }
 
@@ -96,7 +96,7 @@ public class IQTest extends SmackTestCase {
         collector.cancel();
         assertNotNull("No response from server", result);
         assertEquals("The server didn't reply with an error packet", IQ.Type.ERROR, result.getType());
-        assertEquals("Server answered an incorrect error code", 503, result.getError().getCode());
+        assertEquals("Server answered an incorrect error code", "service-unavailable", result.getError().getCondition());
     }
 
     protected int getMaxConnections() {
