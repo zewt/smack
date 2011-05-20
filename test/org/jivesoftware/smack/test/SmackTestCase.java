@@ -296,24 +296,24 @@ public abstract class SmackTestCase extends TestCase {
     }
 
     private void createAccount(int connectionIdx, String username, String password)
-	{
+    {
         // Create the test account
         try {
             getConnection(connectionIdx).getAccountManager().createAccount(username, password);
             createdUserIdx.add(connectionIdx);
         } catch (XMPPException e) {
-        	e.printStackTrace();
-        	fail(e.getMessage());
+            e.printStackTrace();
+            fail(e.getMessage());
         }
-	}
+    }
 
-	protected void tearDown() throws Exception {
+    protected void tearDown() throws Exception {
         super.tearDown();
 
         for (int i = 0; i < getMaxConnections(); i++)
-		{
-        	if (createdUserIdx.contains(i))
-        	{
+        {
+            if (createdUserIdx.contains(i))
+            {
                 try {
                     // If not connected, connect so that we can delete the account.
                     if (!getConnection(i).isConnected()) {
@@ -330,7 +330,7 @@ public abstract class SmackTestCase extends TestCase {
                 catch (Exception e) {
                     e.printStackTrace();
                 }
-        	}
+            }
             if (getConnection(i).isConnected()) {
                 // Close the connection
                 getConnection(i).disconnect();
