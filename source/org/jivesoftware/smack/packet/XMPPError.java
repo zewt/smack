@@ -357,7 +357,7 @@ public class XMPPError {
         private int code;
         private Type type;
         private Condition condition;
-        private static Map<Condition, ErrorSpecification> instances = errorSpecifications();
+        private static Map<String, ErrorSpecification> instances = errorSpecifications();
 
         private ErrorSpecification(Condition condition, Type type, int code) {
             this.code = code;
@@ -365,14 +365,13 @@ public class XMPPError {
             this.condition = condition;
         }
 
-        private static void addError(Map<Condition, ErrorSpecification> instances,
+        private static void addError(Map<String, ErrorSpecification> instances,
                 Condition condition, Type type, int errorCode) {
-            instances.put(condition, new XMPPError.ErrorSpecification(condition, type, errorCode));
+            instances.put(condition.toString(), new XMPPError.ErrorSpecification(condition, type, errorCode));
         }
 
-        private static Map<Condition, ErrorSpecification> errorSpecifications() {
-            Map<Condition, ErrorSpecification> instances = new HashMap<Condition, ErrorSpecification>(22);
-            addError(instances, Condition.interna_server_error, Type.WAIT, 500);
+        private static Map<String, ErrorSpecification> errorSpecifications() {
+            Map<String, ErrorSpecification> instances = new HashMap<String, ErrorSpecification>(22);
             addError(instances, Condition.interna_server_error, Type.WAIT, 500);
             addError(instances, Condition.forbidden, Type.AUTH, 403);
             addError(instances, Condition.bad_request, Type.MODIFY, 400);
@@ -401,7 +400,7 @@ public class XMPPError {
         }
 
         protected static ErrorSpecification specFor(Condition condition) {
-            return instances.get(condition);
+            return instances.get(condition.toString());
         }
 
         /**
