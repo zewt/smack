@@ -130,7 +130,7 @@ public class XMPPException extends Exception {
      */
     public XMPPException(String message, Condition condition, Throwable wrappedThrowable) {
         super(message, wrappedThrowable);
-        this.error = new XMPPError(condition, message);
+        this.error = new XMPPError(condition);
     }
 
     /**
@@ -142,7 +142,7 @@ public class XMPPException extends Exception {
      */
     public XMPPException(String message, Condition condition) {
         super(message);
-        this.error = new XMPPError(condition, message);
+        this.error = new XMPPError(condition);
     }
 
     /**
