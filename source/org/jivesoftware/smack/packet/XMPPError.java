@@ -76,8 +76,7 @@ public class XMPPError {
      * @param condition the error condition.
      */
     public XMPPError(Condition condition) {
-        this.init(condition);
-        this.message = null;
+        this(-1, null, condition.toString(), null, null);
     }
 
     /**
@@ -91,8 +90,7 @@ public class XMPPError {
      * @param messageText a message describing the error.
      */
     public XMPPError(Condition condition, String messageText) {
-        this.init(condition);
-        this.message = messageText;
+        this(-1, null, condition.toString(), messageText, null);
     }
 
     /**
@@ -151,26 +149,10 @@ public class XMPPError {
         }
     }
 
-    public static XMPPError fromErrorType(String condition) {
+    public static XMPPError fromErrorCondition(String condition) {
         return new XMPPError(-1, null, condition, null, null);
     }
 
-    /**
-     * Initialize the error infering the type and code for the received condition.
-     * 
-     * @param condition the error condition.
-     */
-    private void init(Condition condition) {
-        // Look for the condition and its default code and type
-        ErrorSpecification defaultErrorSpecification = ErrorSpecification.specFor(condition.toString());
-        this.condition = condition.value;
-        if (defaultErrorSpecification != null) {
-            // If there is a default error specification for the received condition,
-            // it get configured with the infered type and code.
-            this.type = defaultErrorSpecification.getType();
-            this.code = defaultErrorSpecification.getCode();
-        }
-    }
     /**
      * Returns the error condition.
      *
