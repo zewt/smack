@@ -237,6 +237,7 @@ public abstract class SASLMechanism implements CallbackHandler {
         public Challenge(String data) {
             this.data = data;
         }
+        public String getChallenge() { return data; }
 
         public String toXML() {
             StringBuilder stanza = new StringBuilder();
