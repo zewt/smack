@@ -82,7 +82,6 @@ public class SASLAuthentication implements UserAuthentication {
 
     private Connection connection;
     private Collection<String> serverMechanisms = new ArrayList<String>();
-    private SASLMechanism currentMechanism = null;
     /**
      * Boolean indicating if SASL negotiation has finished and was successful.
      */
@@ -259,7 +258,7 @@ public class SASLAuthentication implements UserAuthentication {
 
         // A SASL mechanism was found. Authenticate using the selected mechanism and then
         // proceed to bind a resource
-        currentMechanism = createMechanism(implementedMechanisms.get(mechanism));
+        SASLMechanism currentMechanism = createMechanism(implementedMechanisms.get(mechanism));
 
         // Trigger SASL authentication with the selected mechanism. We use
         // connection.getHost() since GSAPI requires the FQDN of the server, which
