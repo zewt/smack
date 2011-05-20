@@ -319,9 +319,7 @@ public class FileTransferNegotiator {
         }
 
         if (!isByteStream && !isIBB) {
-            XMPPError error = new XMPPError(XMPPError.Condition.bad_request,
-                    "No acceptable transfer mechanism");
-            throw new XMPPException(error.getMessage(), error);
+            throw new XMPPException("No acceptable transfer mechanism", XMPPError.Condition.bad_request);
         }
 
         if (isByteStream && isIBB && field.getType().equals(FormField.TYPE_LIST_MULTI)) {
@@ -453,9 +451,7 @@ public class FileTransferNegotiator {
         }
 
         if (!isByteStream && !isIBB) {
-            XMPPError error = new XMPPError(XMPPError.Condition.bad_request,
-                    "No acceptable transfer mechanism");
-            throw new XMPPException(error.getMessage(), error);
+            throw new XMPPException("No acceptable transfer mechanism", XMPPError.Condition.bad_request);
         }
 
         if (isByteStream && isIBB) {
