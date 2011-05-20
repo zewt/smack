@@ -38,111 +38,85 @@ public class LoginTest extends SmackTestCase {
      * Check that the server is returning the correct error when trying to login using an invalid
      * (i.e. non-existent) user.
      */
-    public void testInvalidLogin() {
+    public void testInvalidLogin() throws Exception {
+        XMPPConnection connection = createConnection();
+        connection.connect();
         try {
-            XMPPConnection connection = createConnection();
-            connection.connect();
-            try {
-                // Login with an invalid user
-                connection.login("invaliduser" , "invalidpass");
-                connection.disconnect();
-                fail("Invalid user was able to log into the server");
-            }
-            catch (XMPPException e) {
-                assertNotNull("XMPPError isn't set", e.getXMPPError());
-
-                assertEquals("Incorrect error code while login with an invalid user", 401,
-                        e.getXMPPError().getCode());
-            }
-            // Wait here while trying tests with exodus
-            //Thread.sleep(300);
+            // Login with an invalid user
+            connection.login("invaliduser" , "invalidpass");
+            connection.disconnect();
+            fail("Invalid user was able to log into the server");
         }
-        catch (Exception e) {
-            e.printStackTrace();
-            fail(e.getMessage());
+        catch (XMPPException e) {
+            assertNotNull("XMPPError isn't set", e.getXMPPError());
+
+            assertEquals("Incorrect error code while login with an invalid user", 401,
+                    e.getXMPPError().getCode());
         }
     }
 
     /**
      * Check that the server handles anonymous users correctly.
      */
-    public void testSASLAnonymousLogin() {
+    public void testSASLAnonymousLogin() throws Exception {
+        XMPPConnection conn1 = createConnection();
+        XMPPConnection conn2 = createConnection();
+        conn1.connect();
+        conn2.connect();
         try {
-            XMPPConnection conn1 = createConnection();
-            XMPPConnection conn2 = createConnection();
-            conn1.connect();
-            conn2.connect();
-            try {
-                // Try to login anonymously
-                conn1.loginAnonymously();
-                conn2.loginAnonymously();
+            // Try to login anonymously
+            conn1.loginAnonymously();
+            conn2.loginAnonymously();
 
-                assertNotNull("Resource is null", StringUtils.parseResource(conn1.getUser()));
-                assertNotNull("Resource is null", StringUtils.parseResource(conn2.getUser()));
+            assertNotNull("Resource is null", StringUtils.parseResource(conn1.getUser()));
+            assertNotNull("Resource is null", StringUtils.parseResource(conn2.getUser()));
 
-                assertNotNull("Username is null", StringUtils.parseName(conn1.getUser()));
-                assertNotNull("Username is null", StringUtils.parseName(conn2.getUser()));
-            }
-            catch (XMPPException e) {
-                e.printStackTrace();
-                //fail(e.getMessage());
-            }
-            finally {
-                // Close the connection
-                conn1.disconnect();
-                conn2.disconnect();
-            }
+            assertNotNull("Username is null", StringUtils.parseName(conn1.getUser()));
+            assertNotNull("Username is null", StringUtils.parseName(conn2.getUser()));
         }
-        catch (Exception e) {
-            e.printStackTrace();
-            fail(e.getMessage());
-        }
-    }
-
-    /**
-     * Check that the server handles anonymous users correctly.
-     */
-    public void testNonSASLAnonymousLogin() {
-        try {
-            ConnectionConfiguration config = new ConnectionConfiguration(getHost(), getPort());
-            config.setSASLAuthenticationEnabled(false);
-            XMPPConnection conn1 = new XMPPConnection(config);
-            conn1.connect();
-
-            config = new ConnectionConfiguration(getHost(), getPort());
-            config.setSASLAuthenticationEnabled(false);
-            XMPPConnection conn2 = new XMPPConnection(config);
-            conn2.connect();
-            
-            try {
-                // Try to login anonymously
-                conn1.loginAnonymously();
-                conn2.loginAnonymously();
-
-                assertNotNull("Resource is null", StringUtils.parseResource(conn1.getUser()));
-                assertNotNull("Resource is null", StringUtils.parseResource(conn2.getUser()));
-
-                assertNotNull("Username is null", StringUtils.parseName(conn1.getUser()));
-                assertNotNull("Username is null", StringUtils.parseName(conn2.getUser()));
-            }
-            catch (XMPPException e) {
-                e.printStackTrace();
-                fail(e.getMessage());
-            }
+        finally {
             // Close the connection
             conn1.disconnect();
             conn2.disconnect();
         }
-        catch (Exception e) {
-            e.printStackTrace();
-            fail(e.getMessage());
+    }
+
+    /**
+     * Check that the server handles anonymous users correctly.
+     */
+    public void testNonSASLAnonymousLogin() throws Exception {
+        ConnectionConfiguration config = new ConnectionConfiguration(getHost(), getPort());
+        config.setSASLAuthenticationEnabled(false);
+        XMPPConnection conn1 = new XMPPConnection(config);
+        conn1.connect();
+
+        config = new ConnectionConfiguration(getHost(), getPort());
+        config.setSASLAuthenticationEnabled(false);
+        XMPPConnection conn2 = new XMPPConnection(config);
+        conn2.connect();
+
+        try {
+            // Try to login anonymously
+            conn1.loginAnonymously();
+            conn2.loginAnonymously();
+
+            assertNotNull("Resource is null", StringUtils.parseResource(conn1.getUser()));
+            assertNotNull("Resource is null", StringUtils.parseResource(conn2.getUser()));
+
+            assertNotNull("Username is null", StringUtils.parseName(conn1.getUser()));
+            assertNotNull("Username is null", StringUtils.parseName(conn2.getUser()));
+        }
+        finally {
+            // Close the connection
+            conn1.disconnect();
+            conn2.disconnect();
         }
     }
 
     /**
      * Check that the server does not allow to log in without specifying a resource.
      */
-    public void testLoginWithNoResource() {
+    public void testLoginWithNoResource() throws Exception {
         try {
             XMPPConnection conn = createConnection();
             conn.connect();
