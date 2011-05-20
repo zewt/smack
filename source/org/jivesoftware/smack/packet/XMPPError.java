@@ -138,6 +138,17 @@ public class XMPPError {
         this.condition = condition;
         this.message = message;
         this.applicationExtensions = extension;
+
+        // Backwards-compatibility: if no error code was supplied, see if we know it.
+        if (this.code == -1 || this.type == null) {
+            ErrorSpecification spec = ErrorSpecification.specFor(condition);
+            if (spec != null) {
+                if (this.code == -1)
+                    this.code = spec.code;
+                if (this.type == null)
+                    this.type = spec.type;
+            }
+        }
     }
 
     public static XMPPError fromErrorType(String condition) {
