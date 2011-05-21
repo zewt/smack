@@ -442,37 +442,25 @@ public class SASLAuthentication implements UserAuthentication {
         Bind bindResource = new Bind();
         bindResource.setResource(resource);
 
-        PacketCollector collector = connection
-                .createPacketCollector(new PacketIDFilter(bindResource.getPacketID()));
-        // Send the packet
+        PacketCollector<Bind> collector = connection.createPacketCollector(new PacketIDFilter(bindResource), Bind.class);
         connection.sendPacket(bindResource);
-        // Wait up to a certain number of seconds for a response from the server.
-        Bind response = (Bind) collector.nextResult(SmackConfiguration.getPacketReplyTimeout());
-        collector.cancel();
-        if (response == null) {
-            throw new XMPPException("No response from the server.");
+        try {
+            Bind response = collector.getResult(0);
+            response.throwIfError();
+            return response.getJid();
+        } finally {
+            collector.cancel();
         }
-        // If the server replied with an error, throw an exception.
-        else if (response.getType() == IQ.Type.ERROR) {
-            throw new XMPPException(response.getError());
-        }
-        return response.getJid();
     }
 
     private void establishSession() throws XMPPException {
         Session session = new Session();
-        PacketCollector collector = connection.createPacketCollector(new PacketIDFilter(session.getPacketID()));
-        // Send the packet
+        PacketCollector<IQ> collector = connection.createPacketCollector(new PacketIDFilter(session), IQ.class);
         connection.sendPacket(session);
-        // Wait up to a certain number of seconds for a response from the server.
-        IQ ack = (IQ) collector.nextResult(SmackConfiguration.getPacketReplyTimeout());
-        collector.cancel();
-        if (ack == null) {
-            throw new XMPPException("No response from the server.");
-        }
-        // If the server replied with an error, throw an exception.
-        else if (ack.getType() == IQ.Type.ERROR) {
-            throw new XMPPException(ack.getError());
+        try {
+            collector.getResult(0).throwIfError();
+        } finally {
+            collector.cancel();
         }
     }
 
