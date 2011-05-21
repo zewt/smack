@@ -263,8 +263,6 @@ public abstract class SmackTestCase extends TestCase {
                         i--;
                     }
                 }
-                // Let the server process the available presences
-                Thread.sleep(150);
             }
         }
         catch (Exception e) {
