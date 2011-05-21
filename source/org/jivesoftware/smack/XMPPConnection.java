@@ -229,27 +229,49 @@ public class XMPPConnection extends Connection {
 
         SASLAuthentication sasl = new SASLAuthentication(this, mostRecentFeatures);
 
-        String response;
-        if (config.isSASLAuthenticationEnabled() &&
-                sasl.hasNonAnonymousAuthentication()) {
-            // Authenticate using SASL
-            if (password != null) {
-                response = sasl.authenticate(username, password, resource);
+        String JID = null;
+        XMPPException error = null;
+        try {
+            if (config.isSASLAuthenticationEnabled() &&
+                    sasl.hasNonAnonymousAuthentication()) {
+                try {
+                    // Authenticate using SASL
+                    if (password != null)
+                        JID = sasl.authenticate(username, password, resource);
+                    else
+                        JID = sasl.authenticate(username, resource, config.getCallbackHandler());
+                } catch(XMPPException e) {
+                    // On not_authorized, fail.
+                    if(e.getXMPPError() != null || e.getXMPPError().getCondition() == "not_authorized")
+                        throw e;
+                    
+                    // If we fail for another reason, continue to try non-SASL.
+                    error = e;
+                }
             }
-            else {
-                response = sasl.authenticate(username, resource, config.getCallbackHandler());
+
+            if(JID == null) {
+                // Attempt non-SASL authentication.
+                NonSASLAuthentication legacyAuth = new NonSASLAuthentication(this);
+                if(password != null)
+                    JID = legacyAuth.authenticate(username, password, resource);
+                else
+                    JID = legacyAuth.authenticate(username, password, config.getCallbackHandler());
             }
-        }
-        else {
-            // Authenticate using Non-SASL
-            response = new NonSASLAuthentication(this).authenticate(username, password, resource);
+        } catch(XMPPException e) {
+            // If we attempted SASL first and it failed, throw the first error and ignore
+            // the second non-SASL error.
+            if(error == null)
+                error = e;
+
+            throw error;
         }
 
         // Set the user.
-        if (response != null) {
-            this.user = response;
+        if (JID != null) {
+            this.user = JID;
             // Update the serviceName with the one returned by the server
-            config.setServiceName(StringUtils.parseServer(response));
+            config.setServiceName(StringUtils.parseServer(JID));
         }
         else {
             this.user = username + "@" + getServiceName();
@@ -296,20 +318,37 @@ public class XMPPConnection extends Connection {
 
         SASLAuthentication sasl = new SASLAuthentication(this, mostRecentFeatures);
 
-        String response;
-        if (config.isSASLAuthenticationEnabled() &&
-                sasl.hasAnonymousAuthentication()) {
-            response = sasl.authenticateAnonymously();
-        }
-        else {
-            // Authenticate using Non-SASL
-            response = new NonSASLAuthentication(this).authenticateAnonymously();
+        String JID = null;
+        XMPPException error = null;
+        try {
+            if (config.isSASLAuthenticationEnabled() &&
+                    sasl.hasAnonymousAuthentication()) {
+                try {
+                    JID = sasl.authenticateAnonymously();
+                } catch(XMPPException e) {
+                    // If SASL fails, continue to try non-SASL.  Store the error, so we can
+                    // throw this one if the below also fails.
+                    error = e;
+                }
+            }
+
+            if(JID == null) {
+                // Authenticate using Non-SASL
+                JID = new NonSASLAuthentication(this).authenticateAnonymously();
+            }
+        } catch(XMPPException e) {
+            // If we attempted SASL first and it failed, throw the first error and ignore
+            // the second non-SASL error.
+            if(error == null)
+                error = e;
+
+            throw error;
         }
 
         // Set the user value.
-        this.user = response;
+        this.user = JID;
         // Update the serviceName with the one returned by the server
-        config.setServiceName(StringUtils.parseServer(response));
+        config.setServiceName(StringUtils.parseServer(JID));
 
         // Set presence to online.
         packetWriter.sendPacket(new Presence(Presence.Type.available));

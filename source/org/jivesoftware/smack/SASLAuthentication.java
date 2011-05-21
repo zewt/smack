@@ -430,12 +430,7 @@ public class SASLAuthentication implements UserAuthentication {
         if(error != null)
             throw error;
 
-        // No supported SASL methods were found, so try legacy authentication.
-        NonSASLAuthentication legacyAuth = new NonSASLAuthentication(connection);
-        if(password != null)
-            return legacyAuth.authenticate(username, password, resource);
-        else
-            return legacyAuth.authenticate(username, password, cbh);
+        throw new XMPPException("No supported SASL methods found");
     }
 
     /**
@@ -451,15 +446,10 @@ public class SASLAuthentication implements UserAuthentication {
      */
     public String authenticateAnonymously() throws XMPPException {
         try {
-            try {
-                return authenticateUsingMechanism("", null, "", "", "ANONYMOUS");
-            } catch (MechanismNotSupported e) {
-                // Anonymous authentication never throws MechanismNotSupported.
-                throw new RuntimeException(e);
-            }
-        } catch (XMPPException e) {
-            // XXX: Don't throw away the error.
-            return new NonSASLAuthentication(connection).authenticateAnonymously();
+            return authenticateUsingMechanism("", null, "", "", "ANONYMOUS");
+        } catch (MechanismNotSupported e) {
+            // Anonymous authentication never throws MechanismNotSupported.
+            throw new RuntimeException(e);
         }
     }
 
