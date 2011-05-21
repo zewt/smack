@@ -88,15 +88,7 @@ public class XMPPConnection extends Connection {
     final ObservableReader.ReadEvent readEvent;
     final ObservableWriter.WriteEvent writeEvent;
 
-    private ReceivedPacket mostRecentFeatures;
-
-    /**
-     * Retrieve the most recent <stream:features/> received from the server.  This
-     * excludes feature advertisements during TCP stream negotiation.
-     */
-    protected ReceivedPacket getMostRecentFeatures() {
-        return mostRecentFeatures;
-    }
+    private ReceivedPacket initialFeatures;
     Roster roster = null;
 
     /**
@@ -228,7 +220,7 @@ public class XMPPConnection extends Connection {
             throw new IllegalStateException("Already logged in to server.");
         }
 
-        SASLAuthentication sasl = new SASLAuthentication(this, mostRecentFeatures);
+        SASLAuthentication sasl = new SASLAuthentication(this, initialFeatures);
 
         String JID = null;
         XMPPException error = null;
@@ -593,26 +585,29 @@ public class XMPPConnection extends Connection {
 
         readyForDisconnection = false;
 
-        this.addPacketListener(new PacketListener() {
-            public void processPacket(Packet packet) {
-                mostRecentFeatures = (ReceivedPacket) packet;
-            }
-        }, new ReceivedPacketFilter("features", "http://etherx.jabber.org/streams"));
+        PacketCollector<ReceivedPacket> coll =
+            this.createPacketCollector(new ReceivedPacketFilter("features", "http://etherx.jabber.org/streams"),
+                ReceivedPacket.class);
 
         try {
             // Start the packet reader. The startup() method will block until we
             // get an opening stream packet back from server.
             packetReader.startup();
+
+            // Connection is successful.
+            connected = true;
+
+            // A <features/> packet has been received.  Read it; we'll need it for login.
+            initialFeatures = coll.getResult(0);
         }
         catch (XMPPException ex) {
             // An exception occurred in setting up the connection. Make sure we shut down the
             // readers and writers and close the socket.
             shutdown();
             throw ex;        // Everything stopped. Now throw the exception.
+        } finally {
+            coll.cancel();
         }
-
-        // Connection is successful.
-        connected = true;
 
         if (isFirstInitialization) {
             isFirstInitialization = false;
