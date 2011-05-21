@@ -241,6 +241,13 @@ class PacketReader {
                 done = true;
                 connection.readerThreadException(e);
             }
+
+            // Wake up any thread waiting for a packet collector, so they notice
+            // that we're disconnected.  This must be done after notifying connection,
+            // so connection.isConnected returns false.
+            if(connection.isConnected())
+                throw new AssertionError("Should be disconnected");
+            notifyCollectorsOfDisconnection();
         }
     }
 
@@ -252,6 +259,12 @@ class PacketReader {
         }
 
         return new ReceivedPacket(packet);
+    }
+
+    private void notifyCollectorsOfDisconnection() {
+        for (PacketCollector collector: connection.getPacketCollectors()) {
+            collector.connectionLost();
+        }
     }
 
     /**

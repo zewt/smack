@@ -176,8 +176,6 @@ public class PacketCollector<T extends Packet> {
      * @throws XMPPException if the timeout expires, or if the returned packet is not
      * compatible with the type of this PacketCollector
      */
-    // XXX: Implement error handling when the connection is thrown; currently this
-    // always times out.
     public synchronized T getResult(long timeout) throws XMPPException {
         if(timeout == 0)
             timeout = SmackConfiguration.getPacketReplyTimeout();
@@ -187,7 +185,18 @@ public class PacketCollector<T extends Packet> {
         try {
             // Keep waiting until the specified amount of time has elapsed, or
             // a packet is available to return.
-            while (resultQueue.isEmpty()) {
+            while (true) {
+                // Check the connection first.  This guarantees that if a thread
+                // calls connection.disconnect() and immediately calls getResult(),
+                // we deterministically throw here, whether messages are waiting or
+                // not.
+                if(!connection.isConnected())
+                    throw new XMPPException("Connection lost");
+
+                if(!resultQueue.isEmpty()) {
+                    return castToType(resultQueue.removeLast());
+                }
+
                 long waitTime = waitUntil - System.currentTimeMillis();
                 if (waitTime <= 0)
                     throw new XMPPException("Response timed out");
@@ -199,8 +208,6 @@ public class PacketCollector<T extends Packet> {
             Thread.currentThread().interrupt();
             throw new XMPPException("Thread interrupted", ie);
         }
-
-        return castToType(resultQueue.removeLast());
     }
 
     /**
@@ -223,6 +230,18 @@ public class PacketCollector<T extends Packet> {
             // Notify waiting threads a result is available.
             notifyAll();
         }
+    }
+
+    /**
+     * This is called by PacketReader when the connection has been lost.
+     * <p>
+     * Disconnection tests against connection.isConnected().  As we're not
+     * synchronized against connection, isConnected() must already return
+     * false before this function is called in order to prevent race conditions.
+     */
+    public synchronized void connectionLost() {
+        // Wake up anyone waiting for a packet.
+        notifyAll();
     }
 
     /**
