@@ -128,7 +128,7 @@ public class LoginTest extends SmackTestCase {
             }
         }
         conn.login("user_1", "user_1", (String) null);
-        if (!conn.getSASLAuthentication().isAuthenticated())
+        if (!conn.isAuthenticated())
             fail("User with no resource was unable to log into the server");
 
         // Check that the server assigned a resource.
