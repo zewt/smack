@@ -188,14 +188,15 @@ class PacketReader {
                     if(parser.getEventType() != XmlPullParser.START_TAG)
                         continue;
 
+                    Packet receivedPacket;
                     if (parser.getName().equals("message")) {
-                        processPacket(PacketParserUtils.parseMessage(parser));
+                        receivedPacket = PacketParserUtils.parseMessage(parser);
                     }
                     else if (parser.getName().equals("iq")) {
-                        processPacket(PacketParserUtils.parseIQ(parser, connection));
+                        receivedPacket = PacketParserUtils.parseIQ(parser, connection);
                     }
                     else if (parser.getName().equals("presence")) {
-                        processPacket(PacketParserUtils.parsePresence(parser));
+                        receivedPacket = PacketParserUtils.parsePresence(parser);
                     }
                     else if (parser.getName().equals("error")) {
                         throw new XMPPException(PacketParserUtils.parseStreamError(parser));
@@ -209,11 +210,14 @@ class PacketReader {
                             waitingForEstablishedConnection = false;
                         }
 
-                        processPacket(parseFeatures(packet));
+                        receivedPacket = parseFeatures(packet);
                     } else {
                         // Treat any unknown packet types generically.
-                        processPacket(new ReceivedPacket(packet));
+                        receivedPacket = new ReceivedPacket(packet);
                     }
+
+                    // Deliver the received packet to listeners.
+                    listenerExecutor.submit(new ListenerNotification(receivedPacket));
                 }
             }
         }
@@ -238,22 +242,6 @@ class PacketReader {
                 connection.readerThreadException(e);
             }
         }
-    }
-
-    /**
-     * Processes a packet after it's been fully parsed by looping through the installed
-     * packet collectors and listeners and letting them examine the packet to see if
-     * they are a match with the filter.
-     *
-     * @param packet the packet to process.
-     */
-    private void processPacket(Packet packet) {
-        if (packet == null) {
-            return;
-        }
-
-        // Deliver the incoming packet to listeners.
-        listenerExecutor.submit(new ListenerNotification(packet));
     }
 
     private Packet parseFeatures(Element packet) throws Exception {
