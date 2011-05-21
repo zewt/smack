@@ -154,38 +154,10 @@ public class PacketCollector<T extends Packet> {
      * @deprecated see {@link #getResult(long)}
      */
     public synchronized Packet nextResult(long timeout) {
-        // Wait up to the specified amount of time for a result.
-        if (resultQueue.isEmpty()) {
-            long waitTime = timeout;
-            long start = System.currentTimeMillis();
-            try {
-                // Keep waiting until the specified amount of time has elapsed, or
-                // a packet is available to return.
-                while (resultQueue.isEmpty()) {
-                    if (waitTime <= 0) {
-                        break;
-                    }
-                    wait(waitTime);
-                    long now = System.currentTimeMillis();
-                    waitTime -= (now - start);
-                    start = now;
-                }
-            }
-            catch (InterruptedException ie) {
-                // Ignore.
-            }
-            // Still haven't found a result, so return null.
-            if (resultQueue.isEmpty()) {
-                return null;
-            }
-            // Return the packet that was found.
-            else {
-                return resultQueue.removeLast();
-            }
-        }
-        // There's already a packet waiting, so return it.
-        else {
-            return resultQueue.removeLast();
+        try {
+            return getResult(timeout);
+        } catch(XMPPException e) {
+            return null;
         }
     }
 
@@ -210,11 +182,25 @@ public class PacketCollector<T extends Packet> {
         if(timeout == 0)
             timeout = SmackConfiguration.getPacketReplyTimeout();
 
-        Packet result = nextResult(timeout);
-        if(result == null)
-            throw new XMPPException("No response from the server.");
+        // Wait up to the specified amount of time for a result.
+        long waitUntil = System.currentTimeMillis() + timeout;
+        try {
+            // Keep waiting until the specified amount of time has elapsed, or
+            // a packet is available to return.
+            while (resultQueue.isEmpty()) {
+                long waitTime = waitUntil - System.currentTimeMillis();
+                if (waitTime <= 0)
+                    throw new XMPPException("Response timed out");
 
-        return castToType(result);
+                wait(waitTime);
+            }
+        }
+        catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new XMPPException("Thread interrupted", ie);
+        }
+
+        return castToType(resultQueue.removeLast());
     }
 
     /**
