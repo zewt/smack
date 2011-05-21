@@ -360,7 +360,7 @@ public class SASLAuthentication implements UserAuthentication {
         }
 
         // Bind a resource for this connection.
-        String JID = bindResourceAndEstablishSession(resource);
+        String JID = bindResource(resource);
 
         // If sessions are supported, establish a session.  XXX: This is obsolete
         // and removed in RFC6121.  See if this can be removed.
@@ -438,7 +438,7 @@ public class SASLAuthentication implements UserAuthentication {
         }
     }
 
-    private String bindResourceAndEstablishSession(String resource) throws XMPPException {
+    private String bindResource(String resource) throws XMPPException {
         Bind bindResource = new Bind();
         bindResource.setResource(resource);
 
