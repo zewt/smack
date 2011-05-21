@@ -22,10 +22,6 @@ import org.jivesoftware.smack.packet.Message;
 import org.jivesoftware.smack.test.SmackTestCase;
 
 public class PacketCollectorTest extends SmackTestCase {
-    public PacketCollectorTest(String name) {
-        super(name);
-    }
-
     /**
      * Test basic packet collector functionality.
      */

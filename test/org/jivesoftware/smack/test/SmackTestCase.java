@@ -64,13 +64,8 @@ public abstract class SmackTestCase extends TestCase {
 
     private XMPPConnection[] connections = null;
 
-    /**
-     * Constructor for SmackTestCase.
-     * @param arg0 arg for SmackTestCase
-     */
-    public SmackTestCase(String arg0) {
-        super(arg0);
-    }
+    public SmackTestCase() { }
+    public SmackTestCase(String arg0) { super(arg0); }
 
     /**
      * Returns the maximum number of connections to initialize for this test case. All the 
