@@ -38,7 +38,7 @@ import java.util.LinkedList;
  * @see Connection#createPacketCollector(PacketFilter)
  * @author Matt Tucker
  */
-public class PacketCollector {
+public class PacketCollector<T extends Packet> {
 
     /**
      * Max number of packets that any one collector can hold. After the max is
@@ -49,20 +49,33 @@ public class PacketCollector {
 
     private PacketFilter packetFilter;
     private LinkedList<Packet> resultQueue;
-    private Connection conection;
+    private Connection connection;
     private boolean cancelled = false;
+    private Class<T> packetClass;
 
     /**
      * Creates a new packet collector. If the packet filter is <tt>null</tt>, then
      * all packets will match this collector.
+     * <p>
+     * If cls is null, calls to getPacket will not be typesafe.  When created using
+     * connection.createPacketCollector(filter, cls), cls will be specified.
+     * <p>
+     * See also {@link #PacketCollector(Connection, PacketFilter)}.
      *
-     * @param conection the connection the collector is tied to.
+     * @param connection the connection the collector is tied to.
      * @param packetFilter determines which packets will be returned by this collector.
+     * @param cls the packet type to return
      */
-    protected PacketCollector(Connection conection, PacketFilter packetFilter) {
-        this.conection = conection;
+    protected PacketCollector(Connection connection, PacketFilter packetFilter, Class<T> cls) {
+        if (connection == null)
+            throw new IllegalArgumentException("connection may not be null");
+        if (cls == null)
+            throw new IllegalArgumentException("cls may not be null");
+
+        this.connection = connection;
         this.packetFilter = packetFilter;
         this.resultQueue = new LinkedList<Packet>();
+        this.packetClass = cls;
     }
 
     /**
@@ -74,7 +87,7 @@ public class PacketCollector {
         // If the packet collector has already been cancelled, do nothing.
         if (!cancelled) {
             cancelled = true;
-            conection.removePacketCollector(this);
+            connection.removePacketCollector(this);
         }
     }
 
@@ -92,16 +105,22 @@ public class PacketCollector {
      * Polls to see if a packet is currently available and returns it, or
      * immediately returns <tt>null</tt> if no packets are currently in the
      * result queue.
-     *
+     * <p>
+     * If a packet is available, but of a mismatched packet type, <tt>null</tt> is returned.
+     * <p>
      * @return the next packet result, or <tt>null</tt> if there are no more
      *      results.
      */
-    public synchronized Packet pollResult() {
+    public synchronized T pollResult() {
         if (resultQueue.isEmpty()) {
             return null;
         }
-        else {
-            return resultQueue.removeLast();
+
+        Packet packet = resultQueue.removeLast();
+        try {
+            return castToType(packet);
+        } catch(XMPPException e) {
+            return null;
         }
     }
 
@@ -110,6 +129,7 @@ public class PacketCollector {
      * until a packet is available.
      *
      * @return the next available packet.
+     * @deprecated see {@link #getResult(long)}
      */
     public synchronized Packet nextResult() {
         // Wait indefinitely until there is a result to return.
@@ -131,6 +151,7 @@ public class PacketCollector {
      *
      * @param timeout the amount of time to wait for the next packet (in milleseconds).
      * @return the next available packet.
+     * @deprecated see {@link #getResult(long)}
      */
     public synchronized Packet nextResult(long timeout) {
         // Wait up to the specified amount of time for a result.
@@ -169,6 +190,34 @@ public class PacketCollector {
     }
 
     /**
+     * Returns the next available packet. The method call will block until a packet
+     * is available or <tt>timeout</tt> has elapased. If the timeout elapses without
+     * a result, <tt>XMPPException</tt> will be thrown.
+     * <p>
+     * If timeout is 0, the default timeout is used.
+     * <p>
+     * If the connection is closed before a packet is received, XMPPException is
+     * thrown.
+     * <p>
+     * @param timeout the amount of time to wait for the next packet, in milliseconds
+     * @return the next available packet
+     * @throws XMPPException if the timeout expires, or if the returned packet is not
+     * compatible with the type of this PacketCollector
+     */
+    // XXX: Implement error handling when the connection is thrown; currently this
+    // always times out.
+    public synchronized T getResult(long timeout) throws XMPPException {
+        if(timeout == 0)
+            timeout = SmackConfiguration.getPacketReplyTimeout();
+
+        Packet result = nextResult(timeout);
+        if(result == null)
+            throw new XMPPException("No response from the server.");
+
+        return castToType(result);
+    }
+
+    /**
      * Processes a packet to see if it meets the criteria for this packet collector.
      * If so, the packet is added to the result queue.
      *
@@ -187,6 +236,19 @@ public class PacketCollector {
             resultQueue.addFirst(packet);
             // Notify waiting threads a result is available.
             notifyAll();
+        }
+    }
+
+    /**
+     * Cast the given packet to the type of this PacketCollector.  Throws
+     * XMPPException if the packet is of an incorrect type.
+     */
+    private T castToType(Packet packet) throws XMPPException {
+        try {
+            return packetClass.cast(packet);
+        }
+        catch(ClassCastException e) {
+            throw new XMPPException("Unexpected packet type received (got " + packet.getClass().getName() + ")");
         }
     }
 }

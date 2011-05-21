@@ -522,8 +522,19 @@ public abstract class Connection {
      * @param packetFilter the packet filter to use.
      * @return a new packet collector.
      */
-    public PacketCollector createPacketCollector(PacketFilter packetFilter) {
-        PacketCollector collector = new PacketCollector(this, packetFilter);
+    public PacketCollector<Packet> createPacketCollector(PacketFilter packetFilter) {
+        return createPacketCollector(packetFilter, Packet.class);
+    }
+
+    /**
+     * Create a new typed packet collector for this connection.  The returned PacketCollector
+     * will only return packets of the specified type; received packets of other types will
+     * throw XMPPException.
+     * <p>
+     * See {@link #createPacketCollector(PacketFilter)}.
+     */
+    public <T extends Packet> PacketCollector<T> createPacketCollector(PacketFilter packetFilter, Class<T> packetType) {
+        PacketCollector<T> collector = new PacketCollector<T>(this, packetFilter, packetType);
         // Add the collector to the list of active collectors.
         collectors.add(collector);
         return collector;
