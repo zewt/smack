@@ -24,7 +24,6 @@ import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.util.ThreadUtil;
 
 import java.io.IOException;
-import java.io.Writer;
 import java.util.Vector;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -67,15 +66,11 @@ class PacketWriter {
             // may modify the content of the packet.
             connection.firePacketInterceptors(packet);
 
-            try {
-                queue.put(packet);
-            }
-            catch (InterruptedException ie) {
-                ie.printStackTrace();
-                return;
-            }
-            synchronized (queue) {
-                queue.notifyAll();
+            synchronized(this) {
+                if(!queue.offer(packet)) {
+                    throw new RuntimeException("Queue overflow");
+                }
+                this.notifyAll();
             }
 
             // Process packet writer listeners. Note that we're using the sending
@@ -112,9 +107,9 @@ class PacketWriter {
      * The caller must first shut down the data stream to ensure the thread will exit.
      */
     public void shutdown() {
-        done = true;
-        synchronized (queue) {
-            queue.notifyAll();
+        synchronized(this) {
+            done = true;
+            this.notifyAll();
         }
 
         if(writerThread != null) {
@@ -128,17 +123,17 @@ class PacketWriter {
      *
      * @return the next packet for writing.
      */
-    private Packet nextPacket() {
-        Packet packet = null;
+    private synchronized Packet nextPacket() {
         // Wait until there's a packet or we're done.
+        Packet packet = null;
         while (!done && (packet = queue.poll()) == null) {
             try {
-                synchronized (queue) {
-                    queue.wait();
-                }
+                this.wait();
             }
             catch (InterruptedException ie) {
-                // Do nothing
+                Thread.currentThread().interrupt();
+                done = true;
+                this.notifyAll();
             }
         }
         return packet;
