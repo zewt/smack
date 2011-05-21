@@ -4,6 +4,7 @@
  * $Date: $
  *
  * Copyright 2003-2005 Jive Software.
+ * Copyright 2001-2006 The Apache Software Foundation.
  *
  * All rights reserved. Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +32,9 @@ import java.security.cert.CertPathValidator;
 import java.security.cert.CertPathValidatorException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
+import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateFactory;
+import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.CertificateParsingException;
 import java.security.cert.PKIXParameters;
 import java.security.cert.X509Certificate;
@@ -42,6 +45,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Vector;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -109,6 +113,8 @@ class ServerTrustManager implements X509TrustManager {
         };
 
         for(String candidate: Arrays.asList(defaultTruststorePaths)) {
+            if(candidate == null)
+                continue;
             try {
                 return new FileInputStream(candidate);
             } catch(IOException e) {
@@ -202,10 +208,17 @@ class ServerTrustManager implements X509TrustManager {
         for(int i = 0; i < x509Certificates.length; ++i)
             certList.add(x509Certificates[i]);
 
-        CertPath certPath;
+        CertificateFactory cf = CertificateFactory.getInstance("X.509");
+        CertPath certPath = cf.generateCertPath(certList);
+
+        List<String> peerIdentities = getPeerIdentity(x509Certificates[0]);
+        if(!hostMatchesCertificate(peerIdentities, server)) {
+            CertPathValidatorException e = new CertPathValidatorException("Hostname verification failed", null,
+                certPath, 0);
+            throw new CertificateException(e);
+        }
+
         try {
-            CertificateFactory cf = CertificateFactory.getInstance("X.509");
-            certPath = cf.generateCertPath(certList);
             PKIXParameters params = new PKIXParameters(trustStore);
 
             // Work around "No CRLs found for issuer" being thrown for every certificate.
@@ -216,44 +229,72 @@ class ServerTrustManager implements X509TrustManager {
         } catch (GeneralSecurityException e) {
             throw new CertificateException(e);
         }
+    }
 
-        {
-            // Verify that the first certificate in the chain corresponds to
-            // the server we desire to authenticate.
-            // Check if the certificate uses a wildcard indicating that subdomains are valid
-            List<String> peerIdentities = getPeerIdentity(x509Certificates[0]);
-            if (peerIdentities.size() == 1 && peerIdentities.get(0).startsWith("*.")) {
+    // Parts of the following based on org.apache.http:
+    static boolean hostMatchesCertificate(List<String> peerIdentities, String fqdn) {
+        for(String identity: peerIdentities) {
+            boolean doWildcard =
+                identity.startsWith("*.") &&
+                countDots(identity) >= 2 && // never allow *.com
+                acceptableCountryWildcard(identity) &&
+                !isIPv4Address(fqdn);
+
+            if (doWildcard) {
                 // Remove the wildcard
-                String peerIdentity = peerIdentities.get(0).replace("*.", "");
+                String peerIdentity = peerIdentities.get(0).substring(1);
+
                 // Check if the requested subdomain matches the certified domain
-                if (!server.endsWith(peerIdentity)) {
-                    CertPathValidatorException e = new CertPathValidatorException("hostname verification failed", null,
-                            certPath, 0);
-
-                    throw new CertificateException(e);
-                }
-            }
-            else if (!peerIdentities.contains(server)) {
-                CertPathValidatorException e = new CertPathValidatorException("hostname verification failed", null,
-                        certPath, 0);
-                throw new CertificateException(e);
+                if (fqdn.endsWith(peerIdentity) && countDots(peerIdentity) == countDots(fqdn))
+                    return true;
+            } else if(fqdn.equals(identity)) {
+                return true;
             }
         }
 
-        {
-            // For every certificate in the chain, verify that the certificate
-            // is valid at the current time.
-            Date date = new Date();
-            for (int i = 0; i < x509Certificates.length; i++) {
-                try {
-                    x509Certificates[i].checkValidity(date);
-                } catch (CertificateException e) {
-                    // The certificate is expired, or not yet valid.
-                    throw new CertificateException(e);
-                }
+        return false;
+    }
+
+    private final static String[] BAD_COUNTRY_2LDS = {
+        "ac", "co", "com", "ed", "edu", "go", "gouv", "gov", "info",
+        "lg", "ne", "net", "or", "org"
+    };
+
+    private static boolean acceptableCountryWildcard(String cn) {
+        int cnLen = cn.length();
+        if(cnLen >= 7 && cnLen <= 9) {
+            // Look for the '.' in the 3rd-last position:
+            if(cn.charAt(cnLen - 3) == '.') {
+                // Trim off the [*.] and the [.XX].
+                String s = cn.substring(2, cnLen - 3);
+                // And test against the sorted array of bad 2lds:
+                int x = Arrays.binarySearch(BAD_COUNTRY_2LDS, s);
+                return x < 0;
             }
         }
+        return true;
+    }
 
+    private static final Pattern IPV4_PATTERN =
+        Pattern.compile(
+                "^(25[0-5]|2[0-4]\\d|[0-1]?\\d?\\d)(\\.(25[0-5]|2[0-4]\\d|[0-1]?\\d?\\d)){3}$");
+
+    private static boolean isIPv4Address(final String input) {
+        return IPV4_PATTERN.matcher(input).matches();
+    }
+
+    /**
+     * Counts the number of dots "." in a string.
+     * @param s string to count dots from
+     * @return number of dots
+     */
+    public static int countDots(final String s) {
+        int count = 0;
+        for(int i = 0; i < s.length(); i++) {
+            if(s.charAt(i) == '.')
+                count++;
+        }
+        return count;
     }
 
     /**
@@ -279,28 +320,21 @@ class ServerTrustManager implements X509TrustManager {
     }
 
     /**
-     * Returns the identity of the remote server as defined in the specified certificate. The
-     * identity is defined in the subjectDN of the certificate and it can also be defined in
-     * the subjectAltName extension of type "xmpp". When the extension is being used then the
-     * identity defined in the extension in going to be returned. Otherwise, the value stored in
-     * the subjectDN is returned.
-     *
      * @param x509Certificate the certificate the holds the identity of the remote server.
      * @return the identity of the remote server as defined in the specified certificate.
      */
     public static List<String> getPeerIdentity(X509Certificate x509Certificate) {
         // Look the identity in the subjectAltName extension if available
-        List<String> names = getSubjectAlternativeNames(x509Certificate);
-        if (names.isEmpty()) {
-            String name = x509Certificate.getSubjectDN().getName();
-            Matcher matcher = cnPattern.matcher(name);
-            if (matcher.find()) {
-                name = matcher.group(2);
-            }
-            // Create an array with the unique identity
-            names = new ArrayList<String>();
-            names.add(name);
+        List<String> names = new Vector<String>();
+        String name = x509Certificate.getSubjectDN().getName();
+        Matcher matcher = cnPattern.matcher(name);
+        if (matcher.find()) {
+            name = matcher.group(2);
         }
+        names.add(name);
+
+        names.addAll(getSubjectAlternativeNames(x509Certificate));
+
         return names;
     }
 
@@ -313,45 +347,27 @@ class ServerTrustManager implements X509TrustManager {
      *         in the certificate. If none was found then return <tt>null</tt>.
      */
     private static List<String> getSubjectAlternativeNames(X509Certificate certificate) {
-        List<String> identities = new ArrayList<String>();
+        Collection<List<?>> altNames;
         try {
-            Collection<List<?>> altNames = certificate.getSubjectAlternativeNames();
-            // Check that the certificate includes the SubjectAltName extension
-            if (altNames == null) {
-                return Collections.emptyList();
-            }
-            // Use the type OtherName to search for the certified server name
-            /*for (List item : altNames) {
-                Integer type = (Integer) item.get(0);
-                if (type == 0) {
-                    // Type OtherName found so return the associated value
-                    try {
-                        // Value is encoded using ASN.1 so decode it to get the server's identity
-                        ASN1InputStream decoder = new ASN1InputStream((byte[]) item.toArray()[1]);
-                        DEREncodable encoded = decoder.readObject();
-                        encoded = ((DERSequence) encoded).getObjectAt(1);
-                        encoded = ((DERTaggedObject) encoded).getObject();
-                        encoded = ((DERTaggedObject) encoded).getObject();
-                        String identity = ((DERUTF8String) encoded).getString();
-                        // Add the decoded server name to the list of identities
-                        identities.add(identity);
-                    }
-                    catch (UnsupportedEncodingException e) {
-                        // Ignore
-                    }
-                    catch (IOException e) {
-                        // Ignore
-                    }
-                    catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-                // Other types are not good for XMPP so ignore them
-                System.out.println("SubjectAltName of invalid type found: " + certificate);
-            }*/
+            altNames = certificate.getSubjectAlternativeNames();
         }
         catch (CertificateParsingException e) {
             e.printStackTrace();
+            return Collections.emptyList();
+        }
+
+        // Check that the certificate includes the SubjectAltName extension
+        if (altNames == null)
+            return Collections.emptyList();
+
+        List<String> identities = new ArrayList<String>();
+        // Use the type OtherName to search for the certified server name
+        for (List item: altNames) {
+            Integer type = (Integer) item.get(0);
+            if (type == 2) {
+                String s = (String) item.get(1);
+                identities.add(s);
+            }
         }
         return identities;
     }
