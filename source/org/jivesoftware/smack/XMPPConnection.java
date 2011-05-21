@@ -216,33 +216,33 @@ public class XMPPConnection extends Connection {
         return user;
     }
 
-    @Override
-    public synchronized void login(String username, String password, String resource) throws XMPPException {
+    /**
+     * Log in with the specified username.  SASL will be used if available,
+     * falling back on non-SASL.  If username is null, login anonymously.
+     */
+    private synchronized void performLogin(String username, String password, String resource) throws XMPPException {
         if (!isConnected()) {
             throw new IllegalStateException("Not connected to server.");
         }
         if (authenticated) {
             throw new IllegalStateException("Already logged in to server.");
         }
-        // Do partial version of nameprep on the username.
-        username = username.toLowerCase().trim();
 
         SASLAuthentication sasl = new SASLAuthentication(this, mostRecentFeatures);
 
         String JID = null;
         XMPPException error = null;
         try {
-            if (config.isSASLAuthenticationEnabled() &&
-                    sasl.hasNonAnonymousAuthentication()) {
+            if (config.isSASLAuthenticationEnabled()) {
                 try {
                     // Authenticate using SASL
-                    if (password != null)
-                        JID = sasl.authenticate(username, password, resource);
-                    else
+                    if(password == null && config.getCallbackHandler() != null)
                         JID = sasl.authenticate(username, resource, config.getCallbackHandler());
+                    else
+                        JID = sasl.authenticate(username, password, resource);
                 } catch(XMPPException e) {
                     // On not_authorized, fail.
-                    if(e.getXMPPError() != null || e.getXMPPError().getCondition() == "not_authorized")
+                    if(e.getXMPPError() != null && e.getXMPPError().getCondition() == "not_authorized")
                         throw e;
                     
                     // If we fail for another reason, continue to try non-SASL.
@@ -253,7 +253,7 @@ public class XMPPConnection extends Connection {
             if(JID == null) {
                 // Attempt non-SASL authentication.
                 NonSASLAuthentication legacyAuth = new NonSASLAuthentication(this);
-                if(password != null)
+                if(password == null && config.getCallbackHandler() != null)
                     JID = legacyAuth.authenticate(username, password, resource);
                 else
                     JID = legacyAuth.authenticate(username, password, config.getCallbackHandler());
@@ -282,23 +282,12 @@ public class XMPPConnection extends Connection {
 
         // Indicate that we're now authenticated.
         authenticated = true;
-        anonymous = false;
-
-        // Create the roster if it is not a reconnection or roster already created by getRoster()
-        if (this.roster == null) {
-            this.roster = new Roster(this);
-        }
-        if (config.isRosterLoadedAtLogin()) {
-            this.roster.reload();
-        }
+        anonymous = (username == null);
 
         // Set presence to online.
         if (config.isSendPresence()) {
             packetWriter.sendPacket(new Presence(Presence.Type.available));
         }
-
-        // Stores the authentication for future reconnection
-        config.setLoginInfo(username, password, resource);
 
         // If debugging is enabled, change the the debug window title to include the
         // name we are now logged-in as.
@@ -308,60 +297,27 @@ public class XMPPConnection extends Connection {
     }
 
     @Override
+    public synchronized void login(String username, String password, String resource) throws XMPPException {
+        // Do partial version of nameprep on the username.
+        username = username.toLowerCase().trim();
+
+        performLogin(username, password, resource);
+
+        // Create the roster if it is not a reconnection or roster already created by getRoster()
+        if (this.roster == null) {
+            this.roster = new Roster(this);
+        }
+        if (config.isRosterLoadedAtLogin()) {
+            this.roster.reload();
+        }
+
+        // Stores the authentication for future reconnection
+        config.setLoginInfo(username, password, resource);
+    }
+
+    @Override
     public synchronized void loginAnonymously() throws XMPPException {
-        if (!isConnected()) {
-            throw new IllegalStateException("Not connected to server.");
-        }
-        if (authenticated) {
-            throw new IllegalStateException("Already logged in to server.");
-        }
-
-        SASLAuthentication sasl = new SASLAuthentication(this, mostRecentFeatures);
-
-        String JID = null;
-        XMPPException error = null;
-        try {
-            if (config.isSASLAuthenticationEnabled() &&
-                    sasl.hasAnonymousAuthentication()) {
-                try {
-                    JID = sasl.authenticateAnonymously();
-                } catch(XMPPException e) {
-                    // If SASL fails, continue to try non-SASL.  Store the error, so we can
-                    // throw this one if the below also fails.
-                    error = e;
-                }
-            }
-
-            if(JID == null) {
-                // Authenticate using Non-SASL
-                JID = new NonSASLAuthentication(this).authenticateAnonymously();
-            }
-        } catch(XMPPException e) {
-            // If we attempted SASL first and it failed, throw the first error and ignore
-            // the second non-SASL error.
-            if(error == null)
-                error = e;
-
-            throw error;
-        }
-
-        // Set the user value.
-        this.user = JID;
-        // Update the serviceName with the one returned by the server
-        config.setServiceName(StringUtils.parseServer(JID));
-
-        // Set presence to online.
-        packetWriter.sendPacket(new Presence(Presence.Type.available));
-
-        // Indicate that we're now authenticated.
-        authenticated = true;
-        anonymous = true;
-
-        // If debugging is enabled, change the the debug window title to include the
-        // name we are now logged-in as.
-        if (debugger != null) {
-            debugger.userHasLogged(user);
-        }
+        performLogin(null, null, null);
     }
 
     public Roster getRoster() {

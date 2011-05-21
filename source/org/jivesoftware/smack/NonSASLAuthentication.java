@@ -45,6 +45,9 @@ class NonSASLAuthentication implements UserAuthentication {
     }
 
     public String authenticate(String username, String resource, CallbackHandler cbh) throws XMPPException {
+        if(username == null)
+            return authenticateAnonymously();
+
         //Use the callback handler to determine the password, and continue on.
         PasswordCallback pcb = new PasswordCallback("Password: ",false);
         try {
@@ -57,6 +60,9 @@ class NonSASLAuthentication implements UserAuthentication {
 
     public String authenticate(String username, String password, String resource) throws
             XMPPException {
+        if(username == null)
+            return authenticateAnonymously();
+
         // If we send an authentication packet in "get" mode with just the username,
         // the server will return the list of authentication protocols it supports.
         Authentication discoveryAuth = new Authentication();
@@ -114,7 +120,7 @@ class NonSASLAuthentication implements UserAuthentication {
         return response.getTo();
     }
 
-    public String authenticateAnonymously() throws XMPPException {
+    private String authenticateAnonymously() throws XMPPException {
         // Create the authentication packet we'll send to the server.
         Authentication auth = new Authentication();
 

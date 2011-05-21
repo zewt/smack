@@ -195,24 +195,6 @@ public class SASLAuthentication implements UserAuthentication {
     }
 
     /**
-     * Returns true if the server offered ANONYMOUS SASL as a way to authenticate users.
-     *
-     * @return true if the server offered ANONYMOUS SASL as a way to authenticate users.
-     */
-    public boolean hasAnonymousAuthentication() {
-        return serverMechanisms.contains("ANONYMOUS");
-    }
-
-    /**
-     * Returns true if the server offered SASL authentication besides ANONYMOUS SASL.
-     *
-     * @return true if the server offered SASL authentication besides ANONYMOUS SASL.
-     */
-    public boolean hasNonAnonymousAuthentication() {
-        return !serverMechanisms.isEmpty() && (serverMechanisms.size() != 1 || !hasAnonymousAuthentication());
-    }
-
-    /**
      * Performs SASL authentication of the specified user. If SASL authentication was successful
      * then resource binding and session establishment will be performed. This method will return
      * the full JID provided by the server while binding a resource to the connection.<p>
@@ -388,16 +370,26 @@ public class SASLAuthentication implements UserAuthentication {
         return JID;
     }
 
+    /**
+     * Perform SASL authentication for the given username.  If username is null,
+     * login anonymously.
+     */
     private String authenticate(String username, CallbackHandler cbh, String password, String resource)
             throws XMPPException
     {
         if(cbh != null && password != null)
             throw new IllegalArgumentException();
 
+        List<String> mechanismsToUse = mechanismsPreferences;
+        if (username == null) {
+            mechanismsToUse = new Vector<String>();
+            mechanismsToUse.add("ANONYMOUS");
+        }
+        
         // Try each available SASL mechanism in order of preference until we try one
         // that works, or the server closes the connection.
         XMPPException error = null;
-        for (String mechanism: mechanismsPreferences) {
+        for (String mechanism: mechanismsToUse) {
             if (!implementedMechanisms.containsKey(mechanism) || !serverMechanisms.contains(mechanism))
                 continue;
 
@@ -430,26 +422,6 @@ public class SASLAuthentication implements UserAuthentication {
             throw error;
 
         throw new XMPPException("No supported SASL methods found");
-    }
-
-    /**
-     * Performs ANONYMOUS SASL authentication. If SASL authentication was successful
-     * then resource binding and session establishment will be performed. This method will return
-     * the full JID provided by the server while binding a resource to the connection.<p>
-     *
-     * The server will assign a full JID with a randomly generated resource and possibly with
-     * no username.
-     *
-     * @return the full JID provided by the server while binding a resource to the connection.
-     * @throws XMPPException if an error occures while authenticating.
-     */
-    public String authenticateAnonymously() throws XMPPException {
-        try {
-            return authenticateUsingMechanism("", null, "", "", "ANONYMOUS");
-        } catch (MechanismNotSupported e) {
-            // Anonymous authentication never throws MechanismNotSupported.
-            throw new RuntimeException(e);
-        }
     }
 
     SASLMechanism createMechanism(Class<? extends SASLMechanism> mechanismClass) {

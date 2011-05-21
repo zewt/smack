@@ -40,7 +40,8 @@ interface UserAuthentication {
      * Note that using callbacks is the prefered method of authenticating users since it allows
      * more flexability in the mechanisms used.
      *
-     * @param username the requested username (authorization ID) for authenticating to the server
+     * @param username the requested username (authorization ID) for authenticating to the server,
+     * or null to log in anonymously
      * @param resource the requested resource.
      * @param cbh the CallbackHandler used to obtain authentication ID, password, or other
      * information
@@ -58,7 +59,7 @@ interface UserAuthentication {
      * It is recommended that @{link #authenticate(String, String, CallbackHandler)} be used instead
      * since it provides greater flexability in authenticaiton and authorization.
      *
-     * @param username the username that is authenticating with the server.
+     * @param username the username that is authenticating with the server, or null to log in anonymously
      * @param password the password to send to the server.
      * @param resource the desired resource.
      * @return the full JID provided by the server while binding a resource for the connection.
@@ -66,14 +67,4 @@ interface UserAuthentication {
      */
     String authenticate(String username, String password, String resource) throws
             XMPPException;
-
-    /**
-     * Performs an anonymous authentication with the server. The server will created a new full JID
-     * for this connection. An exception will be thrown if the server does not support anonymous
-     * authentication.
-     *
-     * @return the full JID provided by the server while binding a resource for the connection.
-     * @throws XMPPException if an error occures while authenticating.
-     */
-    String authenticateAnonymously() throws XMPPException;
 }
