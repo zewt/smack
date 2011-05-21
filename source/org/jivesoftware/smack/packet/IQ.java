@@ -20,6 +20,7 @@
 
 package org.jivesoftware.smack.packet;
 
+import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.util.StringUtils;
 
 /**
@@ -175,6 +176,15 @@ public abstract class IQ extends Packet {
         result.setTo(request.getFrom());
         result.setError(error);
         return result;
+    }
+
+    /**
+     * If this packet is of type ERROR, throw an XMPPException containing
+     * the error value.  Otherwise, do nothing.
+     */
+    public void throwIfError() throws XMPPException {
+        if (getType() == IQ.Type.ERROR)
+            throw new XMPPException(getError());
     }
 
     /**
