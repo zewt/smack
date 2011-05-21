@@ -32,9 +32,7 @@ import java.security.cert.CertPathValidator;
 import java.security.cert.CertPathValidatorException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
-import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateFactory;
-import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.CertificateParsingException;
 import java.security.cert.PKIXParameters;
 import java.security.cert.X509Certificate;
@@ -42,7 +40,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Vector;
@@ -63,8 +60,6 @@ class ServerTrustManager implements X509TrustManager {
 
     private static Pattern cnPattern = Pattern.compile("(?i)(cn=)([^,]*)");
 
-    private ConnectionConfiguration configuration;
-
     /**
      * Holds the domain of the remote server we are trying to connect
      */
@@ -80,7 +75,6 @@ class ServerTrustManager implements X509TrustManager {
     public ServerTrustManager(String server, ConnectionConfiguration configuration, boolean secureConnectionRequired)
     throws XMPPException
     {
-        this.configuration = configuration;
         this.server = server;
         this.secureConnectionRequired = secureConnectionRequired;
 
