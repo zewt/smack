@@ -85,7 +85,7 @@ public class SASLAuthentication implements UserAuthentication {
     /**
      * Boolean indicating if SASL negotiation has finished and was successful.
      */
-    private boolean saslNegotiated;
+    private boolean saslNegotiated = false;
 
     static {
 
@@ -192,7 +192,6 @@ public class SASLAuthentication implements UserAuthentication {
                 serverMechanisms = PacketParserUtils.parseMechanisms(node);
             }
         }
-        this.init();
     }
 
     /**
@@ -258,7 +257,7 @@ public class SASLAuthentication implements UserAuthentication {
         if (saslNegotiated)
             throw new XMPPException("Already authenticated");
 
-        init();
+        saslNegotiated = false;
 
         // A SASL mechanism was found. Authenticate using the selected mechanism and then
         // proceed to bind a resource
@@ -512,14 +511,5 @@ public class SASLAuthentication implements UserAuthentication {
      */
     public boolean isAuthenticated() {
         return saslNegotiated;
-    }
-    
-    /**
-     * Initializes the internal state in order to be able to be reused. The authentication
-     * is used by the connection at the first login and then reused after the connection
-     * is disconnected and then reconnected.
-     */
-    protected void init() {
-        saslNegotiated = false;
     }
 }
