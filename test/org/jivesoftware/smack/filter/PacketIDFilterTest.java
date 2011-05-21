@@ -62,7 +62,7 @@ public class PacketIDFilterTest extends TestCase {
 
     public void testNullArgs() {
         try {
-            new PacketIDFilter(null);
+            new PacketIDFilter((String) null);
             fail("Parameter can not be null");
         }
         catch (IllegalArgumentException e) {

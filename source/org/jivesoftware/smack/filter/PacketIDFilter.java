@@ -43,6 +43,15 @@ public class PacketIDFilter implements PacketFilter {
         this.packetID = packetID;
     }
 
+    /**
+     * Creates a new packet ID filter matching the ID of the given packet.
+     *
+     * @param packetID the packet ID to filter for.
+     */
+    public PacketIDFilter(Packet packet) {
+        this(packet.getPacketID());
+    }
+
     public boolean accept(Packet packet) {
         return packetID.equals(packet.getPacketID());
     }
