@@ -706,6 +706,10 @@ public class RosterSmackTest extends SmackTestCase {
     /**
      * Tests the creation of a roster and then simulates abrupt termination. Cached presences
      * must go offline. At reconnection, presences must go back to online.
+     *
+     * This test will fail when using BOSH, because abrupt disconnection doesn't
+     * cause the XMPP session to terminate.
+     *
      * <ol>
      *     <li> Create some entries
      *     <li> Breack the connection
