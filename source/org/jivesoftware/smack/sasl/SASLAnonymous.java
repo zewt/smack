@@ -36,15 +36,10 @@ public class SASLAnonymous extends SASLMechanism {
     public SASLAnonymous() { super("ANONYMOUS"); }
 
     public String authenticate(String username, String host, CallbackHandler cbh) throws IOException {
-        return authenticate();
+        return null;
     }
 
     public String authenticate(String username, String host, String password) throws IOException {
-        return authenticate();
-    }
-
-    protected String authenticate() throws IOException {
-        // Send the authentication to the server
         return null;
     }
 
