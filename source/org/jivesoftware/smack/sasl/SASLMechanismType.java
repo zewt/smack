@@ -64,6 +64,12 @@ public abstract class SASLMechanismType {
      */
     public abstract byte[] challengeReceived(byte[] challenge) throws XMPPException;
 
+    /**
+     * SASL success has been received.  If SASL "additional data with success" was
+     * received, it will be provided in data; otherwise data is null.
+     */
+    public void successReceived(byte[] successData) throws XMPPException { }
+
     static abstract public class Factory {
         String name;
         public Factory(String name) { this.name = name; }

@@ -268,6 +268,17 @@ public class SASLAuthentication implements UserAuthentication {
                 Element element = receivedPacket.getElement();
 
                 if(element.getLocalName().equals("success")) {
+                    byte[] successData = null;
+                    String content = element.getTextContent();
+                    if(content != null && content.length() > 0) {
+                        if(content.equals("="))
+                            successData = new byte[0];
+                        else
+                            successData = Base64.decode(content);
+                    }
+
+                    currentMechanism.successReceived(successData);
+
                     saslNegotiated = true;
                     break;
                 }
