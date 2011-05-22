@@ -17,8 +17,6 @@
 
 package org.jivesoftware.smack.sasl;
 
-import java.io.IOException;
-
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
 import org.jivesoftware.smack.XMPPException;
 
@@ -47,12 +45,12 @@ public abstract class SASLMechanismType {
     public final String getName() { return mechanismName; }
 
     public abstract byte[] authenticate(String username, String host, String password)
-        throws IOException, XMPPException, MechanismNotSupported;
+        throws XMPPException, MechanismNotSupported;
 
     public abstract byte[] authenticate(String username, String host, CallbackHandler cbh)
-        throws IOException, XMPPException, MechanismNotSupported;
+        throws XMPPException, MechanismNotSupported;
 
-    public abstract byte[] challengeReceived(byte[] challenge) throws IOException;
+    public abstract byte[] challengeReceived(byte[] challenge) throws XMPPException;
 
     static abstract public class Factory {
         String name;

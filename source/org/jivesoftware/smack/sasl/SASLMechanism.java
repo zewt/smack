@@ -73,12 +73,11 @@ public class SASLMechanism extends SASLMechanismType {
      * @param username the username of the user being authenticated.
      * @param host     the hostname where the user account resides.
      * @param password the password for this account.
-     * @throws IOException If a network error occurs while authenticating.
      * @throws XMPPException If a protocol error occurs or the user is not authenticated.
      * @throws MechanismNotSupported If this mechanism is not supported by the client.
      */
     public byte[] authenticate(String username, String host, String password)
-    throws IOException, XMPPException, MechanismNotSupported
+    throws XMPPException, MechanismNotSupported
     {
         //Since we were not provided with a CallbackHandler, we will use our own with the given
         //information
@@ -89,7 +88,12 @@ public class SASLMechanism extends SASLMechanismType {
 
         String[] mechanisms = { getName() };
         Map<String,String> props = new HashMap<String,String>();
-        sc = Sasl.createSaslClient(mechanisms, username, "xmpp", host, props, callbackHandler);
+        try {
+            sc = Sasl.createSaslClient(mechanisms, username, "xmpp", host, props, callbackHandler);
+        } catch(IOException e) {
+            throw new XMPPException(e);
+        }
+
         if(sc == null)
             throw new MechanismNotSupported();
         return authenticate();
@@ -108,23 +112,26 @@ public class SASLMechanism extends SASLMechanismType {
      * @param username the username of the user being authenticated.
      * @param host     the hostname where the user account resides.
      * @param cbh      the CallbackHandler to obtain user information.
-     * @throws IOException If a network error occures while authenticating.
      * @throws XMPPException If a protocol error occurs or the user is not authenticated.
      * @throws MechanismNotSupported If this mechanism is not supported by the client.
      */
     public byte[] authenticate(String username, String host, CallbackHandler cbh)
-    throws IOException, XMPPException, MechanismNotSupported
+    throws XMPPException, MechanismNotSupported
     {
         String[] mechanisms = { getName() };
         Map<String,String> props = new HashMap<String,String>();
         applyProperties(props);
-        sc = Sasl.createSaslClient(mechanisms, username, "xmpp", host, props, cbh);
+        try {
+            sc = Sasl.createSaslClient(mechanisms, username, "xmpp", host, props, cbh);
+        } catch(IOException e) {
+            throw new XMPPException(e);
+        }
         if(sc == null)
             throw new MechanismNotSupported();
         return authenticate();
     }
 
-    protected byte[] authenticate() throws IOException, XMPPException {
+    protected byte[] authenticate() throws XMPPException {
         if(!sc.hasInitialResponse())
             return null;
 
@@ -143,8 +150,12 @@ public class SASLMechanism extends SASLMechanismType {
      * @param challenge the decoded challenge.
      * @throws IOException if an exception sending the response occurs.
      */
-    public byte[] challengeReceived(byte[] challenge) throws IOException {
-        return sc.evaluateChallenge(challenge);
+    public byte[] challengeReceived(byte[] challenge) throws XMPPException {
+        try {
+            return sc.evaluateChallenge(challenge);
+        } catch(SaslException e) {
+            throw new XMPPException(e);
+        }
     }
 
     /**

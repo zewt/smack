@@ -251,19 +251,14 @@ public class SASLAuthentication implements UserAuthentication {
         PacketCollector coll = connection.createPacketCollector(filter);
         try {
             /* Start authentication. */
-            try {
-                byte[] authText;
-                if(cbh != null)
-                    authText = currentMechanism.authenticate(username, connection.getServiceName(), cbh);
-                else
-                    authText = currentMechanism.authenticate(username, connection.getServiceName(), password);
+            byte[] authText;
+            if(cbh != null)
+                authText = currentMechanism.authenticate(username, connection.getServiceName(), cbh);
+            else
+                authText = currentMechanism.authenticate(username, connection.getServiceName(), password);
 
-                // Send the initial packet.
-                connection.sendPacket(new AuthMechanism(currentMechanism.getName(), authText));
-            } catch(IOException e) {
-                e.printStackTrace();
-                throw new XMPPException(e);
-            }
+            // Send the initial packet.
+            connection.sendPacket(new AuthMechanism(currentMechanism.getName(), authText));
 
             while(true) {
                 Packet packet = coll.nextResult(SmackConfiguration.getPacketReplyTimeout());
@@ -299,29 +294,25 @@ public class SASLAuthentication implements UserAuthentication {
                      * the server. The length of the challenge-response sequence varies according to the
                      * SASLMechanism in use.
                      */
-                    try {
-                        // Decode the challenge.
-                        byte[] challengeData;
-                        if(element.getTextContent() != null) // XXX
-                            challengeData = Base64.decode(element.getTextContent());
-                        else
-                            challengeData = new byte[0];
+                    // Decode the challenge.
+                    byte[] challengeData;
+                    if(element.getTextContent() != null) // XXX
+                        challengeData = Base64.decode(element.getTextContent());
+                    else
+                        challengeData = new byte[0];
 
-                        // Ask the mechanism for the response.
-                        byte[] response = currentMechanism.challengeReceived(challengeData);
+                    // Ask the mechanism for the response.
+                    byte[] response = currentMechanism.challengeReceived(challengeData);
 
-                        // Encode the response.
-                        Packet responseStanza;
-                        if (response == null)
-                            responseStanza = new Response();
-                        else
-                            responseStanza = new Response(Base64.encodeBytes(response,Base64.DONT_BREAK_LINES));
+                    // Encode the response.
+                    Packet responseStanza;
+                    if (response == null)
+                        responseStanza = new Response();
+                    else
+                        responseStanza = new Response(Base64.encodeBytes(response,Base64.DONT_BREAK_LINES));
 
-                        // Send the response to the server.
-                        connection.sendPacket(responseStanza);
-                    } catch(IOException e) {
-                        throw new XMPPException(e);
-                    }
+                    // Send the response to the server.
+                    connection.sendPacket(responseStanza);
                 }
             }
         } finally {

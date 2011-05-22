@@ -19,7 +19,6 @@
 
 package org.jivesoftware.smack.sasl;
 
-import java.io.IOException;
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
 
 /**
@@ -35,15 +34,15 @@ public class SASLAnonymous extends SASLMechanismType {
 
     public SASLAnonymous() { super("ANONYMOUS"); }
 
-    public byte[] authenticate(String username, String host, CallbackHandler cbh) throws IOException {
+    public byte[] authenticate(String username, String host, CallbackHandler cbh) {
         return null;
     }
 
-    public byte[] authenticate(String username, String host, String password) throws IOException {
+    public byte[] authenticate(String username, String host, String password) {
         return null;
     }
 
-    public byte[] challengeReceived(byte[] challenge) throws IOException {
+    public byte[] challengeReceived(byte[] challenge) {
         return null;
     }
 
