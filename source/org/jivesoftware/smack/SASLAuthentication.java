@@ -32,7 +32,6 @@ import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.sasl.*;
 import org.jivesoftware.smack.sasl.SASLMechanism.AuthMechanism;
 import org.jivesoftware.smack.sasl.SASLMechanism.Response;
-import org.jivesoftware.smack.sasl.SASLMechanism.MechanismNotSupported;
 import org.jivesoftware.smack.util.Base64;
 import org.jivesoftware.smack.util.PacketParserUtils;
 import org.w3c.dom.Element;
@@ -182,6 +181,10 @@ public class SASLAuthentication implements UserAuthentication {
     SASLAuthentication(Connection connection, ReceivedPacket features) {
         super();
         this.connection = connection;
+        if(connection == null)
+            throw new IllegalArgumentException("connection must not be null");
+        if(features == null)
+            throw new IllegalArgumentException("features must not be null");
 
         // Record the mechanisms provided in the previous features packet.
         for(Node node: PacketParserUtils.getChildNodes(features.getElement())) {
