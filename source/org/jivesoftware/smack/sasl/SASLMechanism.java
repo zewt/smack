@@ -104,6 +104,12 @@ public class SASLMechanism implements CallbackHandler {
     }
 
     /**
+     * If a derived mechanism needs to set additional properties to pass to
+     * {@link Sasl#createSaslClient}, override this method.
+     */
+    protected void applyProperties(Map<String,String> props) { }
+
+    /**
      * Builds and sends the <tt>auth</tt> stanza to the server. The callback handler will handle
      * any additional information, such as the authentication ID or realm, if it is needed.
      *
@@ -119,6 +125,7 @@ public class SASLMechanism implements CallbackHandler {
     {
         String[] mechanisms = { getName() };
         Map<String,String> props = new HashMap<String,String>();
+        applyProperties(props);
         sc = Sasl.createSaslClient(mechanisms, username, "xmpp", host, props, cbh);
         if(sc == null)
             throw new MechanismNotSupported();

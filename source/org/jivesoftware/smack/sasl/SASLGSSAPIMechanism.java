@@ -19,14 +19,8 @@
 
 package org.jivesoftware.smack.sasl;
 
-import org.jivesoftware.smack.XMPPException;
-import org.jivesoftware.smack.sasl.SASLMechanism.MechanismNotSupported;
-
-import java.io.IOException;
 import java.util.Map;
-import java.util.HashMap;
 import org.apache.harmony.javax.security.sasl.Sasl;
-import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
 
 /**
  * Implementation of the SASL GSSAPI mechanism
@@ -44,54 +38,9 @@ public class SASLGSSAPIMechanism extends SASLMechanism {
 
         System.setProperty("javax.security.auth.useSubjectCredsOnly","false");
         System.setProperty("java.security.auth.login.config","gss.conf");
-
     }
 
-    /**
-     * Builds and sends the <tt>auth</tt> stanza to the server.
-     * This overrides from the abstract class because the initial token
-     * needed for GSSAPI is binary, and not safe to put in a string, thus
-     * getAuthenticationText() cannot be used.
-     *
-     * @param username the username of the user being authenticated.
-     * @param host     the hostname where the user account resides.
-     * @param cbh      the CallbackHandler (not used with GSSAPI)
-     * @throws IOException If a network error occures while authenticating.
-     */
-    public String authenticate(String username, String host, CallbackHandler cbh)
-    throws IOException, XMPPException, MechanismNotSupported
-    {
-        String[] mechanisms = { getName() };
-        Map<String,String> props = new HashMap<String,String>();
+    protected void applyProperties(Map<String,String> props) {
         props.put(Sasl.SERVER_AUTH,"TRUE");
-        sc = Sasl.createSaslClient(mechanisms, username, "xmpp", host, props, cbh);
-        if(sc == null)
-            throw new MechanismNotSupported();
-        return authenticate();
     }
-
-    /**
-     * Builds and sends the <tt>auth</tt> stanza to the server.
-     * This overrides from the abstract class because the initial token
-     * needed for GSSAPI is binary, and not safe to put in a string, thus
-     * getAuthenticationText() cannot be used.
-     *
-     * @param username the username of the user being authenticated.
-     * @param host     the hostname where the user account resides.
-     * @param password the password of the user (ignored for GSSAPI)
-     * @throws IOException If a network error occures while authenticating.
-     */
-    public String authenticate(String username, String host, String password)
-    throws IOException, XMPPException, MechanismNotSupported
-    {
-        String[] mechanisms = { getName() };
-        Map<String,String> props = new HashMap<String,String>();
-        props.put(Sasl.SERVER_AUTH,"TRUE");
-        sc = Sasl.createSaslClient(mechanisms, username, "xmpp", host, props, this);
-        if(sc == null)
-            throw new MechanismNotSupported();
-        return authenticate();
-    }
-
-
 }
