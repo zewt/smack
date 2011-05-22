@@ -33,17 +33,17 @@ import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
  * @author Jay Kline
  */
 public class SASLGSSAPIMechanism extends SASLMechanism {
+    static public class Factory extends SASLMechanism.Factory {
+        public Factory() { super("GSSAPI"); }
+        public SASLMechanism create() { return new SASLGSSAPIMechanism(); }
+    }
 
     public SASLGSSAPIMechanism() {
-        super();
+        super("GSSAPI");
 
         System.setProperty("javax.security.auth.useSubjectCredsOnly","false");
         System.setProperty("java.security.auth.login.config","gss.conf");
 
-    }
-
-    public String getName() {
-        return "GSSAPI";
     }
 
     /**

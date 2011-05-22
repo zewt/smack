@@ -28,10 +28,12 @@ import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
  * @author Jay Kline
  */
 public class SASLAnonymous extends SASLMechanism {
-
-    public String getName() {
-        return "ANONYMOUS";
+    static public class Factory extends SASLMechanism.Factory {
+        public Factory() { super("ANONYMOUS"); }
+        public SASLMechanism create() { return new SASLAnonymous(); }
     }
+
+    public SASLAnonymous() { super("ANONYMOUS"); }
 
     public String authenticate(String username, String host, CallbackHandler cbh) throws IOException {
         return authenticate();

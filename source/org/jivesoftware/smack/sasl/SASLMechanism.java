@@ -54,11 +54,22 @@ import org.apache.harmony.javax.security.sasl.SaslException;
  *
  * @author Jay Kline
  */
-public abstract class SASLMechanism implements CallbackHandler {
+public class SASLMechanism implements CallbackHandler {
+    static public class Factory {
+        String name;
+        public Factory(String name) { this.name = name; }
+        public String getName() { return name; }
+        public SASLMechanism create() { return new SASLMechanism(name); }
+    }
+
     protected SaslClient sc;
     protected String authenticationId;
     protected String password;
+    private final String mechanismName;
 
+    public SASLMechanism(String mechanismName) {
+        this.mechanismName = mechanismName;
+    }
 
     static public class MechanismNotSupported extends Exception {};
 
@@ -146,7 +157,7 @@ public abstract class SASLMechanism implements CallbackHandler {
      *
      * @return the common name of the SASL mechanism.
      */
-    public abstract String getName();
+    public String getName() { return mechanismName; }
 
     /**
      * 

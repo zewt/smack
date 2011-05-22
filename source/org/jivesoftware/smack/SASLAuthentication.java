@@ -75,8 +75,8 @@ import java.util.*;
  */
 public class SASLAuthentication implements UserAuthentication {
 
-    private static Map<String, Class<? extends SASLMechanism>> implementedMechanisms =
-        new HashMap<String, Class<? extends SASLMechanism>>();
+    private static Map<String, SASLMechanism.Factory> implementedMechanisms =
+        new HashMap<String, SASLMechanism.Factory>();
     private static List<String> mechanismsPreferences = new ArrayList<String>();
 
     private Connection connection;
@@ -89,12 +89,12 @@ public class SASLAuthentication implements UserAuthentication {
     static {
 
         // Register SASL mechanisms supported by Smack
-        registerSASLMechanism("EXTERNAL", SASLExternalMechanism.class);
-        registerSASLMechanism("GSSAPI", SASLGSSAPIMechanism.class);
-        registerSASLMechanism("DIGEST-MD5", SASLDigestMD5Mechanism.class);
-        registerSASLMechanism("CRAM-MD5", SASLCramMD5Mechanism.class);
-        registerSASLMechanism("PLAIN", SASLPlainMechanism.class);
-        registerSASLMechanism("ANONYMOUS", SASLAnonymous.class);
+        registerSASLMechanism(new SASLMechanism.Factory("EXTERNAL"));
+        registerSASLMechanism(new SASLGSSAPIMechanism.Factory());
+        registerSASLMechanism(new SASLMechanism.Factory("DIGEST-MD5"));
+        registerSASLMechanism(new SASLMechanism.Factory("CRAM-MD5"));
+        registerSASLMechanism(new SASLMechanism.Factory("PLAIN"));
+        registerSASLMechanism(new SASLAnonymous.Factory());
 
         supportSASLMechanism("ANONYMOUS", 0);
         supportSASLMechanism("PLAIN", 0);
@@ -110,8 +110,8 @@ public class SASLAuthentication implements UserAuthentication {
      * @param name   common name of the SASL mechanism. E.g.: PLAIN, DIGEST-MD5 or KERBEROS_V4.
      * @param mClass a SASLMechanism subclass.
      */
-    public static void registerSASLMechanism(String name, Class<? extends SASLMechanism> mClass) {
-        implementedMechanisms.put(name, mClass);
+    public static void registerSASLMechanism(SASLMechanism.Factory factory) {
+        implementedMechanisms.put(factory.getName(), factory);
     }
 
     /**
@@ -170,8 +170,8 @@ public class SASLAuthentication implements UserAuthentication {
      *
      * @return the registerd SASLMechanism classes sorted by the level of preference.
      */
-    public static List<Class<? extends SASLMechanism>> getRegisterSASLMechanisms() {
-        List<Class<? extends SASLMechanism>> answer = new ArrayList<Class<? extends SASLMechanism>>();
+    public static List<SASLMechanism.Factory> getRegisterSASLMechanisms() {
+        List<SASLMechanism.Factory> answer = new ArrayList<SASLMechanism.Factory>();
         for (String mechanismsPreference : mechanismsPreferences) {
             answer.add(implementedMechanisms.get(mechanismsPreference));
         }
@@ -236,7 +236,7 @@ public class SASLAuthentication implements UserAuthentication {
     }
 
     private String authenticateUsingMechanism(String username, CallbackHandler cbh, String password, String resource,
-            String mechanism)
+            SASLMechanism.Factory mechanismFactory)
             throws XMPPException, SASLMechanism.MechanismNotSupported
     {
         if (saslNegotiated)
@@ -246,7 +246,7 @@ public class SASLAuthentication implements UserAuthentication {
 
         // A SASL mechanism was found. Authenticate using the selected mechanism and then
         // proceed to bind a resource
-        SASLMechanism currentMechanism = createMechanism(implementedMechanisms.get(mechanism));
+        SASLMechanism currentMechanism = mechanismFactory.create();
 
         // Trigger SASL authentication with the selected mechanism. We use
         // connection.getHost() since GSAPI requires the FQDN of the server, which
@@ -288,11 +288,11 @@ public class SASLAuthentication implements UserAuthentication {
                         errorCondition = firstChild.getLocalName();
 
                     if (errorCondition != null) {
-                        throw new XMPPException("SASL authentication " + mechanism + " failed: " + errorCondition,
+                        throw new XMPPException("SASL authentication " + currentMechanism.getName() + " failed: " + errorCondition,
                                 XMPPError.fromErrorCondition(errorCondition));
                     }
                     else {
-                        throw new XMPPException("SASL authentication " + mechanism + " failed");
+                        throw new XMPPException("SASL authentication " + currentMechanism.getName() + " failed");
                     }
                 }
 
@@ -396,8 +396,9 @@ public class SASLAuthentication implements UserAuthentication {
             if (!implementedMechanisms.containsKey(mechanism) || !serverMechanisms.contains(mechanism))
                 continue;
 
+            SASLMechanism.Factory factory = implementedMechanisms.get(mechanism);
             try {
-                return authenticateUsingMechanism(username, cbh, password, resource, mechanism);
+                return authenticateUsingMechanism(username, cbh, password, resource, factory);
             }
             catch (SASLMechanism.MechanismNotSupported e) {
                 // The mechanism isn't supported by the local system.  Keep looking.
@@ -425,20 +426,6 @@ public class SASLAuthentication implements UserAuthentication {
             throw error;
 
         throw new XMPPException("No supported SASL methods found");
-    }
-
-    SASLMechanism createMechanism(Class<? extends SASLMechanism> mechanismClass) {
-        try {
-            Constructor<? extends SASLMechanism> constructor = mechanismClass.getConstructor();
-            return constructor.newInstance();
-        } catch (InvocationTargetException e) {
-            // If the constructor throws an exception, it's an unexpected failure; don't
-            // mask it.
-            Throwable e2 = e.getCause();
-            throw new RuntimeException("Error instantiating mechanism", e2);
-        } catch (Exception e) {
-            return null;
-        }
     }
 
     private String bindResource(String resource) throws XMPPException {
