@@ -20,6 +20,7 @@
 package org.jivesoftware.smack.sasl;
 
 import org.jivesoftware.smack.XMPPException;
+import org.jivesoftware.smack.sasl.SASLMechanism.MechanismNotSupported;
 
 import java.io.IOException;
 import java.util.Map;
@@ -57,11 +58,15 @@ public class SASLGSSAPIMechanism extends SASLMechanism {
      * @param cbh      the CallbackHandler (not used with GSSAPI)
      * @throws IOException If a network error occures while authenticating.
      */
-    public String authenticate(String username, String host, CallbackHandler cbh) throws IOException, XMPPException {
+    public String authenticate(String username, String host, CallbackHandler cbh)
+    throws IOException, XMPPException, MechanismNotSupported
+    {
         String[] mechanisms = { getName() };
         Map<String,String> props = new HashMap<String,String>();
         props.put(Sasl.SERVER_AUTH,"TRUE");
         sc = Sasl.createSaslClient(mechanisms, username, "xmpp", host, props, cbh);
+        if(sc == null)
+            throw new MechanismNotSupported();
         return authenticate();
     }
 
@@ -76,11 +81,15 @@ public class SASLGSSAPIMechanism extends SASLMechanism {
      * @param password the password of the user (ignored for GSSAPI)
      * @throws IOException If a network error occures while authenticating.
      */
-    public String authenticate(String username, String host, String password) throws IOException, XMPPException {
+    public String authenticate(String username, String host, String password)
+    throws IOException, XMPPException, MechanismNotSupported
+    {
         String[] mechanisms = { getName() };
         Map<String,String> props = new HashMap<String,String>();
         props.put(Sasl.SERVER_AUTH,"TRUE");
         sc = Sasl.createSaslClient(mechanisms, username, "xmpp", host, props, this);
+        if(sc == null)
+            throw new MechanismNotSupported();
         return authenticate();
     }
 
