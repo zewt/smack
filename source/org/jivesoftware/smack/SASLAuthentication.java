@@ -252,7 +252,7 @@ public class SASLAuthentication implements UserAuthentication {
         try {
             /* Start authentication. */
             try {
-                String authText;
+                byte[] authText;
                 if(cbh != null)
                     authText = currentMechanism.authenticate(username, connection.getServiceName(), cbh);
                 else
@@ -466,12 +466,16 @@ public class SASLAuthentication implements UserAuthentication {
         final private String name;
         final private String authenticationText;
 
-        public AuthMechanism(String name, String authenticationText) {
+        public AuthMechanism(String name, byte[] initialResponse) {
             if (name == null) {
                 throw new NullPointerException("SASL mechanism name shouldn't be null.");
             }
             this.name = name;
-            this.authenticationText = authenticationText;
+
+            if(initialResponse != null)
+                this.authenticationText = Base64.encodeBytes(initialResponse, Base64.DONT_BREAK_LINES);
+            else
+                this.authenticationText = null;
         }
 
         public String toXML() {

@@ -35,11 +35,11 @@ public class SASLAnonymous extends SASLMechanismType {
 
     public SASLAnonymous() { super("ANONYMOUS"); }
 
-    public String authenticate(String username, String host, CallbackHandler cbh) throws IOException {
+    public byte[] authenticate(String username, String host, CallbackHandler cbh) throws IOException {
         return null;
     }
 
-    public String authenticate(String username, String host, String password) throws IOException {
+    public byte[] authenticate(String username, String host, String password) throws IOException {
         return null;
     }
 

@@ -21,7 +21,6 @@
 package org.jivesoftware.smack.sasl;
 
 import org.jivesoftware.smack.XMPPException;
-import org.jivesoftware.smack.util.Base64;
 
 import java.io.IOException;
 import java.util.Map;
@@ -78,7 +77,7 @@ public class SASLMechanism extends SASLMechanismType {
      * @throws XMPPException If a protocol error occurs or the user is not authenticated.
      * @throws MechanismNotSupported If this mechanism is not supported by the client.
      */
-    public String authenticate(String username, String host, String password)
+    public byte[] authenticate(String username, String host, String password)
     throws IOException, XMPPException, MechanismNotSupported
     {
         //Since we were not provided with a CallbackHandler, we will use our own with the given
@@ -113,7 +112,7 @@ public class SASLMechanism extends SASLMechanismType {
      * @throws XMPPException If a protocol error occurs or the user is not authenticated.
      * @throws MechanismNotSupported If this mechanism is not supported by the client.
      */
-    public String authenticate(String username, String host, CallbackHandler cbh)
+    public byte[] authenticate(String username, String host, CallbackHandler cbh)
     throws IOException, XMPPException, MechanismNotSupported
     {
         String[] mechanisms = { getName() };
@@ -125,19 +124,15 @@ public class SASLMechanism extends SASLMechanismType {
         return authenticate();
     }
 
-    protected String authenticate() throws IOException, XMPPException {
-        String authenticationText = null;
+    protected byte[] authenticate() throws IOException, XMPPException {
+        if(!sc.hasInitialResponse())
+            return null;
+
         try {
-            if(sc.hasInitialResponse()) {
-                byte[] response = sc.evaluateChallenge(new byte[0]);
-                authenticationText = Base64.encodeBytes(response,Base64.DONT_BREAK_LINES);
-            }
+            return sc.evaluateChallenge(new byte[0]);
         } catch (SaslException e) {
             throw new XMPPException("SASL authentication failed", e);
         }
-
-        // Send the authentication to the server
-        return authenticationText;
     }
 
 

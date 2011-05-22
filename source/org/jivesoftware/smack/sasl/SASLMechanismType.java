@@ -46,10 +46,10 @@ public abstract class SASLMechanismType {
      */
     public final String getName() { return mechanismName; }
 
-    public abstract String authenticate(String username, String host, String password)
+    public abstract byte[] authenticate(String username, String host, String password)
         throws IOException, XMPPException, MechanismNotSupported;
 
-    public abstract String authenticate(String username, String host, CallbackHandler cbh)
+    public abstract byte[] authenticate(String username, String host, CallbackHandler cbh)
         throws IOException, XMPPException, MechanismNotSupported;
 
     public abstract byte[] challengeReceived(byte[] challenge) throws IOException;
