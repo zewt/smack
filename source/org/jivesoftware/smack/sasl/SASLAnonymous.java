@@ -27,10 +27,10 @@ import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
  *
  * @author Jay Kline
  */
-public class SASLAnonymous extends SASLMechanism {
-    static public class Factory extends SASLMechanism.Factory {
+public class SASLAnonymous extends SASLMechanismType {
+    static public class Factory extends SASLMechanismType.Factory {
         public Factory() { super("ANONYMOUS"); }
-        public SASLMechanism create() { return new SASLAnonymous(); }
+        public SASLMechanismType create() { return new SASLAnonymous(); }
     }
 
     public SASLAnonymous() { super("ANONYMOUS"); }

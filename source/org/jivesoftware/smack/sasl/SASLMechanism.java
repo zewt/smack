@@ -54,24 +54,19 @@ import org.apache.harmony.javax.security.sasl.SaslException;
  *
  * @author Jay Kline
  */
-public class SASLMechanism {
-    static public class Factory {
-        String name;
-        public Factory(String name) { this.name = name; }
-        public String getName() { return name; }
-        public SASLMechanism create() { return new SASLMechanism(name); }
+public class SASLMechanism extends SASLMechanismType {
+    static public class Factory extends SASLMechanismType.Factory {
+        public Factory(String name) { super(name); }
+        public SASLMechanismType create() { return new SASLMechanism(name); }
     }
 
     protected SaslClient sc;
     protected String authenticationId;
     protected String password;
-    private final String mechanismName;
 
     public SASLMechanism(String mechanismName) {
-        this.mechanismName = mechanismName;
+        super(mechanismName);
     }
-
-    static public class MechanismNotSupported extends Exception {};
 
     /**
      * Builds and sends the <tt>auth</tt> stanza to the server. Note that this method of
@@ -158,13 +153,6 @@ public class SASLMechanism {
     public byte[] challengeReceived(byte[] challenge) throws IOException {
         return sc.evaluateChallenge(challenge);
     }
-
-    /**
-     * Returns the common name of the SASL mechanism. E.g.: PLAIN, DIGEST-MD5 or GSSAPI.
-     *
-     * @return the common name of the SASL mechanism.
-     */
-    public String getName() { return mechanismName; }
 
     /**
      * 

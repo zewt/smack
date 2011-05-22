@@ -40,8 +40,6 @@ import org.w3c.dom.Node;
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
 
 import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
 /**
@@ -75,8 +73,8 @@ import java.util.*;
  */
 public class SASLAuthentication implements UserAuthentication {
 
-    private static Map<String, SASLMechanism.Factory> implementedMechanisms =
-        new HashMap<String, SASLMechanism.Factory>();
+    private static Map<String, SASLMechanismType.Factory> implementedMechanisms =
+        new HashMap<String, SASLMechanismType.Factory>();
     private static List<String> mechanismsPreferences = new ArrayList<String>();
 
     private Connection connection;
@@ -110,7 +108,7 @@ public class SASLAuthentication implements UserAuthentication {
      * @param name   common name of the SASL mechanism. E.g.: PLAIN, DIGEST-MD5 or KERBEROS_V4.
      * @param mClass a SASLMechanism subclass.
      */
-    public static void registerSASLMechanism(SASLMechanism.Factory factory) {
+    public static void registerSASLMechanism(SASLMechanismType.Factory factory) {
         implementedMechanisms.put(factory.getName(), factory);
     }
 
@@ -170,8 +168,8 @@ public class SASLAuthentication implements UserAuthentication {
      *
      * @return the registerd SASLMechanism classes sorted by the level of preference.
      */
-    public static List<SASLMechanism.Factory> getRegisterSASLMechanisms() {
-        List<SASLMechanism.Factory> answer = new ArrayList<SASLMechanism.Factory>();
+    public static List<SASLMechanismType.Factory> getRegisterSASLMechanisms() {
+        List<SASLMechanismType.Factory> answer = new ArrayList<SASLMechanismType.Factory>();
         for (String mechanismsPreference : mechanismsPreferences) {
             answer.add(implementedMechanisms.get(mechanismsPreference));
         }
@@ -236,8 +234,8 @@ public class SASLAuthentication implements UserAuthentication {
     }
 
     private String authenticateUsingMechanism(String username, CallbackHandler cbh, String password, String resource,
-            SASLMechanism.Factory mechanismFactory)
-            throws XMPPException, SASLMechanism.MechanismNotSupported
+            SASLMechanismType.Factory mechanismFactory)
+            throws XMPPException, SASLMechanismType.MechanismNotSupported
     {
         if (saslNegotiated)
             throw new XMPPException("Already authenticated");
@@ -246,7 +244,7 @@ public class SASLAuthentication implements UserAuthentication {
 
         // A SASL mechanism was found. Authenticate using the selected mechanism and then
         // proceed to bind a resource
-        SASLMechanism currentMechanism = mechanismFactory.create();
+        SASLMechanismType currentMechanism = mechanismFactory.create();
 
         // Trigger SASL authentication with the selected mechanism. We use
         // connection.getHost() since GSAPI requires the FQDN of the server, which
@@ -396,11 +394,11 @@ public class SASLAuthentication implements UserAuthentication {
             if (!implementedMechanisms.containsKey(mechanism) || !serverMechanisms.contains(mechanism))
                 continue;
 
-            SASLMechanism.Factory factory = implementedMechanisms.get(mechanism);
+            SASLMechanismType.Factory factory = implementedMechanisms.get(mechanism);
             try {
                 return authenticateUsingMechanism(username, cbh, password, resource, factory);
             }
-            catch (SASLMechanism.MechanismNotSupported e) {
+            catch (SASLMechanismType.MechanismNotSupported e) {
                 // The mechanism isn't supported by the local system.  Keep looking.
             }
             catch (XMPPException e) {
