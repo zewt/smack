@@ -54,7 +54,7 @@ import org.apache.harmony.javax.security.sasl.SaslException;
  *
  * @author Jay Kline
  */
-public class SASLMechanism implements CallbackHandler {
+public class SASLMechanism {
     static public class Factory {
         String name;
         public Factory(String name) { this.name = name; }
@@ -97,7 +97,7 @@ public class SASLMechanism implements CallbackHandler {
 
         String[] mechanisms = { getName() };
         Map<String,String> props = new HashMap<String,String>();
-        sc = Sasl.createSaslClient(mechanisms, username, "xmpp", host, props, this);
+        sc = Sasl.createSaslClient(mechanisms, username, "xmpp", host, props, callbackHandler);
         if(sc == null)
             throw new MechanismNotSupported();
         return authenticate();
@@ -169,26 +169,28 @@ public class SASLMechanism implements CallbackHandler {
     /**
      * 
      */
-    public void handle(Callback[] callbacks) throws IOException, UnsupportedCallbackException {
-        for (int i = 0; i < callbacks.length; i++) {
-            if (callbacks[i] instanceof NameCallback) {
-                NameCallback ncb = (NameCallback)callbacks[i];
-                ncb.setName(authenticationId);
-            } else if(callbacks[i] instanceof PasswordCallback) {
-                PasswordCallback pcb = (PasswordCallback)callbacks[i];
-                pcb.setPassword(password.toCharArray());
-            } else if(callbacks[i] instanceof RealmCallback) {
-                // Use the default realm provided by the server.
-                RealmCallback rcb = (RealmCallback)callbacks[i];
-                rcb.setText(rcb.getDefaultText());
-            } else if(callbacks[i] instanceof RealmChoiceCallback){
-                //unused
-                //RealmChoiceCallback rccb = (RealmChoiceCallback)callbacks[i];
-            } else {
-               throw new UnsupportedCallbackException(callbacks[i]);
+    CallbackHandler callbackHandler = new CallbackHandler() {
+        public void handle(Callback[] callbacks) throws IOException, UnsupportedCallbackException {
+            for (int i = 0; i < callbacks.length; i++) {
+                if (callbacks[i] instanceof NameCallback) {
+                    NameCallback ncb = (NameCallback)callbacks[i];
+                    ncb.setName(authenticationId);
+                } else if(callbacks[i] instanceof PasswordCallback) {
+                    PasswordCallback pcb = (PasswordCallback)callbacks[i];
+                    pcb.setPassword(password.toCharArray());
+                } else if(callbacks[i] instanceof RealmCallback) {
+                    // Use the default realm provided by the server.
+                    RealmCallback rcb = (RealmCallback)callbacks[i];
+                    rcb.setText(rcb.getDefaultText());
+                } else if(callbacks[i] instanceof RealmChoiceCallback){
+                    //unused
+                    //RealmChoiceCallback rccb = (RealmChoiceCallback)callbacks[i];
+                } else {
+                   throw new UnsupportedCallbackException(callbacks[i]);
+                }
             }
-         }
-    }
+        }
+    };
 
     /**
      * Initiating SASL authentication by select a mechanism.
