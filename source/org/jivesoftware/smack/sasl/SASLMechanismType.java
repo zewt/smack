@@ -31,6 +31,7 @@ import org.jivesoftware.smack.XMPPException;
  * than javax.security.auth.
  */
 public abstract class SASLMechanismType {
+    /** This exception is thrown by {@see #authenticate} if this mechanism is not available. */
     static public class MechanismNotSupported extends Exception {};
 
     private final String mechanismName;
@@ -44,12 +45,23 @@ public abstract class SASLMechanismType {
      */
     public final String getName() { return mechanismName; }
 
+    /**
+     * Attempt to begin authentication with this mechanism.
+     *
+     * @return the initial response, or {@code null} if none
+     * @throws XMPPException if this mechanism is supported but failed
+     * @throws MechanismNotSupported if this mechanism is unsupported by the local system.
+     */
     public abstract byte[] authenticate(String username, String host, String password)
         throws XMPPException, MechanismNotSupported;
 
+    /** See {@link #authenticate(String, String, String)}. */
     public abstract byte[] authenticate(String username, String host, CallbackHandler cbh)
         throws XMPPException, MechanismNotSupported;
 
+    /**
+     * A SASL challenge has been received.  Return the response.
+     */
     public abstract byte[] challengeReceived(byte[] challenge) throws XMPPException;
 
     static abstract public class Factory {
