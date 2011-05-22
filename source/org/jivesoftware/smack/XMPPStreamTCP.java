@@ -860,7 +860,7 @@ public class XMPPStreamTCP extends XMPPStream
     private void proceedTLSReceived() throws Exception
     {
         // Secure the plain connection
-        SSLSocket sslSocket = (SSLSocket) sslSocketFactory.getSocketFactory().createSocket(socket, originalServiceName, socket.getPort(), true);
+        SSLSocket sslSocket = sslSocketFactory.attachSSLConnection(socket, originalServiceName, socket.getPort());
         sslSocket.setSoTimeout(0);
         
         // We have our own keepalive.  Don't enabling TCP keepalive, too.

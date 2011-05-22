@@ -2,20 +2,20 @@ package org.jivesoftware.smack;
 
 import java.io.IOException;
 import java.io.StringReader;
+import java.net.Socket;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.cert.CertificateException;
 import java.util.Vector;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import javax.net.ssl.SSLSocket;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.jivesoftware.smack.ConnectionConfiguration.SecurityMode;
 import org.jivesoftware.smack.packet.XMPPError;
-import org.jivesoftware.smack.proxy.ProxyInfo;
-import org.jivesoftware.smack.proxy.ProxyInfo.ProxyType;
 import org.jivesoftware.smack.util.DNSUtil;
 import org.jivesoftware.smack.util.ObservableReader;
 import org.jivesoftware.smack.util.ObservableWriter;
@@ -134,33 +134,21 @@ public class XMPPStreamBOSH extends XMPPStream
                         XMPPError.Condition.forbidden);
         }
 
-        // android.util.Log.w("SMACK", "XMPPStreamBOSH: initializeConnection");
         BOSHClientConfig.Builder cfgBuilder = BOSHClientConfig.Builder.create(uri, config.getServiceName());
+        cfgBuilder.setSocketFactory(config.getProxyInfo().getSocketFactory());
 
-        // If the BOSH server is HTTPS, set up XMPPSSLSocketFactory to handle connections.
-        // Only do this if it's needed, so we don't waste time loading certificates if we're
-        // not going to use them.
-        XMPPSSLSocketFactory xmppSocketFactory = null;
-        // XXX HTTP factory
-        if(uri.getScheme().equals("https")) {
-            // If config.getSecurityMode() == required, XMPPSSLSocketFactory will take care
-            // of throwing an error if the connection isn't secure.
-            xmppSocketFactory = new XMPPSSLSocketFactory(config, config.getServiceName());
-            cfgBuilder.setSocketFactoryHTTPS(xmppSocketFactory.getSocketFactory());
-        } else if(uri.getScheme().equals("http")) {
+        final XMPPSSLSocketFactory xmppSocketFactory = new XMPPSSLSocketFactory(config, config.getServiceName());
+        cfgBuilder.setSSLConnector(new com.kenai.jbosh.SSLConnector() {
+            public SSLSocket attachSSLConnection(Socket socket, String host, int port) throws IOException {
+                return xmppSocketFactory.attachSSLConnection(socket, host, port);
+            }
+        });
+
+        if(uri.getScheme().equals("http")) {
             if(config.getSecurityMode() == SecurityMode.required)
                 throw new XMPPException("BOSH server is not HTTPS, but security required by connection configuration.",
                         XMPPError.Condition.forbidden);
             usingSecureConnection = false;
-        }
-
-        // XXX
-        ProxyInfo proxy = config.getProxyInfo();
-        if (proxy.getProxyType() != ProxyType.NONE) {
-            if(proxy.getProxyType() != ProxyType.HTTP)
-                throw new XMPPException("BOSH is configured for use with a proxy, but a non-HTTP proxy is set", XMPPError.Condition.forbidden);
-
-            cfgBuilder.setProxy(proxy.getProxyAddress(), proxy.getProxyPort());
         }
 
         bosh_client = BOSHClient.create(cfgBuilder.build());

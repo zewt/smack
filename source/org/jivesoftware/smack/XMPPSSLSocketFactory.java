@@ -26,9 +26,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.net.InetAddress;
 import java.net.Socket;
-import java.net.UnknownHostException;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
@@ -54,26 +52,32 @@ import org.apache.harmony.javax.security.auth.callback.Callback;
 import org.apache.harmony.javax.security.auth.callback.PasswordCallback;
 
 /**
- * An SSLSocketFactory with associated ServerTrustManager.  This allows verifying
- * certificates and retrieving details about certificate failures.  We also enable
- * support for TLS compression here, if support is available. 
+ * This class allows creating SSLSockets from existing Sockets, with an associated
+ * {@link ServerTrustManager}.  This allows verifying certificates and retrieving
+ * details about certificate failures.  We also enable support for TLS compression
+ * here, if available.
+ * <p>
+ * If configured as optional, TLS will be configured on the first call to
+ * {@link #getSocketFactory} or {@link #isAvailable}.
  */
 public class XMPPSSLSocketFactory {
-    private WrappedSocketFactory socketFactory;
     private ServerTrustManager trustManager;
     private boolean secureConnectionRequired;
+    private SSLContext sslContext;
 
-    public SSLSocketFactory getSocketFactory() { return socketFactory; }
+    private final ConnectionConfiguration config;
+    private final String originalServiceName;
+    private boolean isInitialized = false;
 
     /** If at least one insecure connection has been created with this factory,
      * return a CertificateExceptionDetail.  If all connections have been secure,
      * return null. */
-    public CertificateException getSeenInsecureConnection() { return seenInsecureConnection; } 
-    public CertificateException seenInsecureConnection = null;
+    public CertificateException getSeenInsecureConnection() { return seenInsecureConnection; }
+    private CertificateException seenInsecureConnection = null;
 
     /** Store information about each socket connection.  There's no good way to wrap
      *  an SSLSocket that another class gives to us, so we store these in a WeakHashMap. */
-    private class SSLSocketInfo { 
+    private class SSLSocketInfo {
         // If the connection is insecure, this contains the exception explaining the
         // reason.
         CertificateException insecureConnection;
@@ -84,170 +88,169 @@ public class XMPPSSLSocketFactory {
     };
     public WeakHashMap<SSLSocket, SSLSocketInfo> map = new WeakHashMap<SSLSocket, SSLSocketInfo>();
 
-    /* A SocketFactory that initializes its returned sockets with our TrustManager. */
-    private class WrappedSocketFactory extends SSLSocketFactory {
-        SSLSocketFactory wrapped;
+    /**
+     * Return an SSLSocket connected to the given socket.  This is equivalent
+     * to {@link SSLSocketFactory#createSocket}(socket, host, port, true).
+     */
+    public SSLSocket attachSSLConnection(Socket s, String host, int port) throws IOException {
+        initIfNeeded();
+        if(sslContext == null)
+            throw new IOException("TLS not available");
 
-        WrappedSocketFactory(SSLSocketFactory factory) {
-            this.wrapped = factory;
-        }
+        SSLSocketFactory factory = sslContext.getSocketFactory();
+        Socket socket = factory.createSocket(s, host, port, true);
 
-        public Socket createSocket() throws IOException {
-            return initSocket(wrapped.createSocket());
-        }
+        SSLSocket sslSocket = (SSLSocket) socket;
 
-        public Socket createSocket(String host, int port)
-        throws IOException, UnknownHostException {
-            return initSocket(wrapped.createSocket(host, port));
-        }
+        SSLSocketInfo info = new SSLSocketInfo();
+        map.put(sslSocket, info);
 
-        public Socket createSocket(String host, int port, InetAddress localHost, int localPort)
-        throws IOException, UnknownHostException {
-            return initSocket(wrapped.createSocket(host, port, localHost, localPort));
-        }
+        sslSocket.addHandshakeCompletedListener(new HandshakeCompletedListener() {
+            public void handshakeCompleted(HandshakeCompletedEvent event) {
+                SSLSocket socket = (SSLSocket) event.getSocket();
+                SSLSocketInfo info = map.get(socket);
 
-        public Socket createSocket(Socket s, String host, int port, boolean autoClose) throws IOException {
-            return initSocket(wrapped.createSocket(s, host, port, autoClose));
-        }
-
-        // These two calls aren't told the remote host's name, so it's not possible to check
-        // certificates.
-        public Socket createSocket(InetAddress host, int port) throws IOException {
-            return initSocket(wrapped.createSocket(host, port));
-        }
-
-        public Socket createSocket(InetAddress address, int port,
-                InetAddress localAddress, int localPort) throws IOException {
-            return initSocket(wrapped.createSocket(address, port, localAddress, localPort));
-        }
-
-        public String[] getDefaultCipherSuites() { return wrapped.getDefaultCipherSuites(); }
-        public String[] getSupportedCipherSuites() { return wrapped.getSupportedCipherSuites(); }
-
-        // If host is null, we're connecting directly to an IP address.  We won't be able
-        // to verify the host certificate.
-        private SSLSocket initSocket(Socket socket) {
-            SSLSocket sslSocket = (SSLSocket) socket;
-
-            SSLSocketInfo info = new SSLSocketInfo();
-            map.put(sslSocket, info);
-
-            sslSocket.addHandshakeCompletedListener(new HandshakeCompletedListener() {
-                public void handshakeCompleted(HandshakeCompletedEvent event) {
-                    SSLSocket socket = (SSLSocket) event.getSocket();
-                    SSLSocketInfo info = map.get(socket);
-
-                    if(secureConnectionRequired) {
-                        // If secureConnectionRequired is true then we've performed the certificate
-                        // check in ServerTrustManager.checkServerTrusted; if it fails then the
-                        // handshake will be aborted, so we'll never get here.
+                if(secureConnectionRequired) {
+                    // If secureConnectionRequired is true then we've performed the certificate
+                    // check in ServerTrustManager.checkServerTrusted; if it fails then the
+                    // handshake will be aborted, so we'll never get here.
+                    info.insecureConnection = null;
+                } else {
+                    try {
+                        checkSecureConnection(socket);
                         info.insecureConnection = null;
-                    } else {
-                        try {
-                            checkSecureConnection(socket);
-                            info.insecureConnection = null;
-                        } catch(CertificateException e) {
-                            // The connection isn't secure.  Store the reason.
-                            info.insecureConnection = e;
-                            seenInsecureConnection = e;
-                        }
+                    } catch(CertificateException e) {
+                        // The connection isn't secure.  Store the reason.
+                        info.insecureConnection = e;
+                        seenInsecureConnection = e;
                     }
-
-                    info.compressionMethod = getCompressionMethod(socket);
                 }
-            });
 
-            initCompression(sslSocket);
-
-            return sslSocket;
-        }
-
-        /** Attempt to request compression on the given socket, if supported by the implementation.
-         *  This is supported by org.apache.harmony.xnet.provider.jsse. */
-        private void initCompression(SSLSocket socket)
-        {
-            try {
-                Method getSupportedCompressionMethods = socket.getClass().getMethod("getSupportedCompressionMethods");
-                Method setEnabledCompressionMethods = socket.getClass().getMethod("setEnabledCompressionMethods", String[].class);
-
-                String[] compressionMethods = (String[]) getSupportedCompressionMethods.invoke(socket);
-                setEnabledCompressionMethods.invoke(socket, (Object) compressionMethods);
-            } catch (Exception e) {
+                info.compressionMethod = getCompressionMethod(socket);
             }
-        }
+        });
 
-        /** Return the name of the compression method in use on a socket, or null if none is active. */
-        private String getCompressionMethod(SSLSocket socket) {
-            try {
-                SSLSession session = socket.getSession();
-                Method getCompressionMethod = session.getClass().getMethod("getCompressionMethod");
-                String compressionMethod = (String) getCompressionMethod.invoke(session);
-                if(compressionMethod != null && compressionMethod.equals("NULL"))
-                    return null;
-                else
-                    return compressionMethod;
-            } catch (Exception e) {
-                return null;
-            }
-        }
+        initCompression(sslSocket);
 
-        /**
-         * Verify the certificate for the given socket.  If the certificate isn't
-         * trusted, throw {@link ServerTrustManager.CertificateExceptionDetail }.
-         */
-        private void checkSecureConnection(SSLSocket socket)
-        throws CertificateException
-        {
+        return sslSocket;
+    }
+
+    /** Attempt to request compression on the given socket, if supported by the implementation.
+     *  This is supported by org.apache.harmony.xnet.provider.jsse. */
+    private static void initCompression(SSLSocket socket)
+    {
+        try {
+            Method getSupportedCompressionMethods = socket.getClass().getMethod("getSupportedCompressionMethods");
+            Method setEnabledCompressionMethods = socket.getClass().getMethod("setEnabledCompressionMethods", String[].class);
+
+            String[] compressionMethods = (String[]) getSupportedCompressionMethods.invoke(socket);
+            setEnabledCompressionMethods.invoke(socket, (Object) compressionMethods);
+        } catch (Exception e) {
+        }
+    }
+
+    /** Return the name of the compression method in use on a socket, or null if none is active. */
+    private static String getCompressionMethod(SSLSocket socket) {
+        try {
             SSLSession session = socket.getSession();
-
-            Certificate[] certs;
-            try {
-                certs = session.getPeerCertificates();
-            } catch(SSLPeerUnverifiedException e) {
-                // If checkSecureConnection is called then getSecurityMode() != required, and
-                // we've disabled certificate checks within ServiceTrustManager, so all certificates
-                // are trusted at that level and this exception should never happen.
-                throw new RuntimeException(e);
-            }
-
-            trustManager.checkCertificates(certs);
+            Method getCompressionMethod = session.getClass().getMethod("getCompressionMethod");
+            String compressionMethod = (String) getCompressionMethod.invoke(session);
+            if(compressionMethod != null && compressionMethod.equals("NULL"))
+                return null;
+            else
+                return compressionMethod;
+        } catch (Exception e) {
+            return null;
         }
-    };
+    }
+
+    /**
+     * Verify the certificate for the given socket.  If the certificate isn't
+     * trusted, throw {@link ServerTrustManager.CertificateExceptionDetail }.
+     */
+    private void checkSecureConnection(SSLSocket socket)
+    throws CertificateException
+    {
+        SSLSession session = socket.getSession();
+
+        Certificate[] certs;
+        try {
+            certs = session.getPeerCertificates();
+        } catch(SSLPeerUnverifiedException e) {
+            // If checkSecureConnection is called then getSecurityMode() != required, and
+            // we've disabled certificate checks within ServiceTrustManager, so all certificates
+            // are trusted at that level and this exception should never happen.
+            throw new RuntimeException(e);
+        }
+
+        trustManager.checkCertificates(certs);
+    }
 
     XMPPSSLSocketFactory(ConnectionConfiguration config, String originalServiceName)
     throws XMPPException
     {
-        SSLContext context;
+        this.config = config;
+        this.originalServiceName = originalServiceName;
+        this.secureConnectionRequired = config.getSecurityMode() == ConnectionConfiguration.SecurityMode.required;
+
+        // Initialize now if a secure connection is required, so if it's not
+        // successful we'll fail immediately.
+        if(secureConnectionRequired)
+            init();
+    }
+
+    private void initIfNeeded() {
         try {
-            context = SSLContext.getInstance("TLS");
-        } catch (NoSuchAlgorithmException e) {
+            init();
+        } catch(XMPPException e) {
+            // If secureConnectionRequired, then we should have initialized in the constructor
+            // where we can throw the exception.
+            if(secureConnectionRequired)
+                throw new RuntimeException("Unexpected TLS error", e);
+        }
+    }
+
+    /**
+     * If we havn't yet attempted to initialize TLS, do so.
+     *
+     * @throws XMPPException if TLS initialization fails.
+     */
+    private void init() throws XMPPException {
+        if(isInitialized)
+            return;
+        isInitialized = true;
+
+        try {
+            try {
+                sslContext = SSLContext.getInstance("TLS");
+            } catch (NoSuchAlgorithmException e) {
+                throw new XMPPException("TLS not supported", e);
+            }
+        } catch(XMPPException e) {
             // The environment doesn't support TLS.  Clear socketFactory, and
             // isAvailable will return false.
-            socketFactory = null;
+            sslContext = null;
             e.printStackTrace();
-            return;
+            throw e;
         }
 
-        this.secureConnectionRequired = config.getSecurityMode() == ConnectionConfiguration.SecurityMode.required;
-        trustManager = getServerTrustManager(context, config, secureConnectionRequired, originalServiceName);
-
-        SSLSocketFactory factory = context.getSocketFactory();
-        socketFactory = new WrappedSocketFactory(factory);
+        trustManager = getServerTrustManager(sslContext, config, secureConnectionRequired, originalServiceName);
     }
 
     /** @return true if TLS is available. */
     public boolean isAvailable() {
-        return socketFactory != null;
+        initIfNeeded();
+        return sslContext != null;
     }
 
     /** Return true if the specified socket is over a secure connection. */
-    public CertificateException isInsecureConnection(SSLSocket socket) {
+    public CertificateException isInsecureConnection(Socket socket) {
         return map.get(socket).insecureConnection;
     }
 
     /** Return the name of the compression in use on the specified socket, or null if no
      * compression is active. */
-    public String getCompressionMethod(SSLSocket socket) {
+    public String getCompressionMethod(Socket socket) {
         return map.get(socket).compressionMethod;
     }
 
