@@ -59,7 +59,7 @@ public class SASLGSSAPIMechanism extends SASLMechanism {
      */
     public String authenticate(String username, String host, CallbackHandler cbh) throws IOException, XMPPException {
         String[] mechanisms = { getName() };
-        Map props = new HashMap();
+        Map<String,String> props = new HashMap<String,String>();
         props.put(Sasl.SERVER_AUTH,"TRUE");
         sc = Sasl.createSaslClient(mechanisms, username, "xmpp", host, props, cbh);
         return authenticate();
@@ -78,7 +78,7 @@ public class SASLGSSAPIMechanism extends SASLMechanism {
      */
     public String authenticate(String username, String host, String password) throws IOException, XMPPException {
         String[] mechanisms = { getName() };
-        Map props = new HashMap();
+        Map<String,String> props = new HashMap<String,String>();
         props.put(Sasl.SERVER_AUTH,"TRUE");
         sc = Sasl.createSaslClient(mechanisms, username, "xmpp", host, props, this);
         return authenticate();
