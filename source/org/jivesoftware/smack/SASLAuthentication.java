@@ -463,8 +463,12 @@ public class SASLAuthentication implements UserAuthentication {
             }
             this.name = name;
 
-            if(initialResponse != null)
-                this.authenticationText = Base64.encodeBytes(initialResponse, Base64.DONT_BREAK_LINES);
+            if(initialResponse != null) {
+                if(initialResponse.length == 0)
+                    this.authenticationText = "=";
+                else
+                    this.authenticationText = Base64.encodeBytes(initialResponse, Base64.DONT_BREAK_LINES);
+            }
             else
                 this.authenticationText = null;
         }
