@@ -21,6 +21,11 @@ class DirectSocketFactory
     {
     }
 
+    public Socket createSocket()
+    {
+        return new Socket(Proxy.NO_PROXY);
+    }
+
     public Socket createSocket(String host, int port) 
         throws IOException, UnknownHostException
     {
