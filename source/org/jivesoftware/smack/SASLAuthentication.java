@@ -296,7 +296,7 @@ public class SASLAuthentication implements UserAuthentication {
                      */
                     // Decode the challenge.
                     byte[] challengeData;
-                    if(element.getTextContent() != null) // XXX
+                    if(element.getTextContent() != null)
                         challengeData = Base64.decode(element.getTextContent());
                     else
                         challengeData = new byte[0];
