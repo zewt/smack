@@ -21,7 +21,6 @@
 package org.jivesoftware.smack.sasl;
 
 import org.jivesoftware.smack.XMPPException;
-import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.util.Base64;
 
 import java.io.IOException;
@@ -36,7 +35,6 @@ import org.apache.harmony.javax.security.sasl.RealmCallback;
 import org.apache.harmony.javax.security.sasl.RealmChoiceCallback;
 import org.apache.harmony.javax.security.sasl.Sasl;
 import org.apache.harmony.javax.security.sasl.SaslClient;
-import org.apache.harmony.javax.security.sasl.SaslClientFactory;
 import org.apache.harmony.javax.security.sasl.SaslException;
 
 /**
@@ -179,62 +177,4 @@ public class SASLMechanism extends SASLMechanismType {
             }
         }
     };
-
-    /**
-     * Initiating SASL authentication by select a mechanism.
-     */
-    public static class AuthMechanism extends Packet {
-        final private String name;
-        final private String authenticationText;
-
-        public AuthMechanism(String name, String authenticationText) {
-            if (name == null) {
-                throw new NullPointerException("SASL mechanism name shouldn't be null.");
-            }
-            this.name = name;
-            this.authenticationText = authenticationText;
-        }
-
-        public String toXML() {
-            StringBuilder stanza = new StringBuilder();
-            stanza.append("<auth mechanism=\"").append(name);
-            stanza.append("\" xmlns=\"urn:ietf:params:xml:ns:xmpp-sasl\">");
-            if (authenticationText != null &&
-                    authenticationText.trim().length() > 0) {
-                stanza.append(authenticationText);
-            }
-            stanza.append("</auth>");
-            return stanza.toString();
-        }
-    }
-
-    /**
-     * A SASL response stanza.
-     */
-    public static class Response extends Packet {
-        final private String authenticationText;
-
-        public Response() {
-            authenticationText = null;
-        }
-
-        public Response(String authenticationText) {
-            if (authenticationText == null || authenticationText.trim().length() == 0) {
-                this.authenticationText = null;
-            }
-            else {
-                this.authenticationText = authenticationText;
-            }
-        }
-
-        public String toXML() {
-            StringBuilder stanza = new StringBuilder();
-            stanza.append("<response xmlns=\"urn:ietf:params:xml:ns:xmpp-sasl\">");
-            if (authenticationText != null) {
-                stanza.append(authenticationText);
-            }
-            stanza.append("</response>");
-            return stanza.toString();
-        }
-    }
 }
