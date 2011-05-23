@@ -284,7 +284,7 @@ public class SASLAuthentication implements UserAuthentication {
 
                 if(element.getLocalName().equals("success")) {
                     byte[] successData = null;
-                    String content = element.getTextContent();
+                    String content = PacketParserUtils.getTextContent(element);
                     if(content != null && content.length() > 0) {
                         if(content.equals("="))
                             successData = new byte[0];
@@ -322,8 +322,8 @@ public class SASLAuthentication implements UserAuthentication {
                      */
                     // Decode the challenge.
                     byte[] challengeData;
-                    if(element.getTextContent() != null)
-                        challengeData = Base64.decode(element.getTextContent());
+                    if(PacketParserUtils.getTextContent(element) != null)
+                        challengeData = Base64.decode(PacketParserUtils.getTextContent(element));
                     else
                         challengeData = new byte[0];
 
