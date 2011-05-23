@@ -52,10 +52,6 @@ public abstract class SASLMechanismType {
      * @throws XMPPException if this mechanism is supported but failed
      * @throws MechanismNotSupported if this mechanism is unsupported by the local system.
      */
-    public abstract byte[] authenticate(String username, String host, String password)
-        throws XMPPException, MechanismNotSupported;
-
-    /** See {@link #authenticate(String, String, String)}. */
     public abstract byte[] authenticate(String username, String host, CallbackHandler cbh)
         throws XMPPException, MechanismNotSupported;
 

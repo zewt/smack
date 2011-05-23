@@ -66,40 +66,6 @@ public class SASLMechanism extends SASLMechanismType {
     }
 
     /**
-     * Builds and sends the <tt>auth</tt> stanza to the server. Note that this method of
-     * authentication is not recommended, since it is very inflexable.  Use
-     * {@link #authenticate(String, String, CallbackHandler)} whenever possible.
-     *
-     * @param username the username of the user being authenticated.
-     * @param host     the hostname where the user account resides.
-     * @param password the password for this account.
-     * @throws XMPPException If a protocol error occurs or the user is not authenticated.
-     * @throws MechanismNotSupported If this mechanism is not supported by the client.
-     */
-    public byte[] authenticate(String username, String host, String password)
-    throws XMPPException, MechanismNotSupported
-    {
-        //Since we were not provided with a CallbackHandler, we will use our own with the given
-        //information
-
-        //Set the authenticationID as the username, since they must be the same in this case.
-        this.authenticationId = username;
-        this.password = password;
-
-        String[] mechanisms = { getName() };
-        Map<String,String> props = new HashMap<String,String>();
-        try {
-            sc = Sasl.createSaslClient(mechanisms, username, "xmpp", host, props, callbackHandler);
-        } catch(IOException e) {
-            throw new XMPPException(e);
-        }
-
-        if(sc == null)
-            throw new MechanismNotSupported();
-        return authenticate();
-    }
-
-    /**
      * If a derived mechanism needs to set additional properties to pass to
      * {@link Sasl#createSaslClient}, override this method.
      */

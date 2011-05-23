@@ -35,7 +35,13 @@ import org.jivesoftware.smack.util.PacketParserUtils;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
+import org.apache.harmony.javax.security.auth.callback.Callback;
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
+import org.apache.harmony.javax.security.auth.callback.NameCallback;
+import org.apache.harmony.javax.security.auth.callback.PasswordCallback;
+import org.apache.harmony.javax.security.auth.callback.UnsupportedCallbackException;
+import org.apache.harmony.javax.security.sasl.RealmCallback;
+import org.apache.harmony.javax.security.sasl.RealmChoiceCallback;
 
 import java.io.IOException;
 import java.util.*;
@@ -202,25 +208,6 @@ public class SASLAuthentication implements UserAuthentication {
      * by this method.
      *
      * @param username the username that is authenticating with the server.
-     * @param resource the desired resource.
-     * @param cbh the CallbackHandler used to get information from the user
-     * @return the full JID provided by the server while binding a resource to the connection.
-     * @throws XMPPException if an error occures while authenticating.
-     */
-    public String authenticate(String username, String resource, CallbackHandler cbh) 
-            throws XMPPException {
-        return authenticate(username, cbh, null, resource);
-    }
-
-    /**
-     * Performs SASL authentication of the specified user. If SASL authentication was successful
-     * then resource binding and session establishment will be performed. This method will return
-     * the full JID provided by the server while binding a resource to the connection.<p>
-     *
-     * The server may assign a full JID with a username or resource different than the requested
-     * by this method.
-     *
-     * @param username the username that is authenticating with the server.
      * @param password the password to send to the server.
      * @param resource the desired resource.
      * @return the full JID provided by the server while binding a resource to the connection.
@@ -228,10 +215,42 @@ public class SASLAuthentication implements UserAuthentication {
      */
     public String authenticate(String username, String password, String resource)
             throws XMPPException {
-        return authenticate(username, null, password, resource);
+        CallbackHandler cbh = new DefaultCallbackHandler(username, password);
+        return authenticate(username, resource, cbh);
     }
 
-    private String authenticateUsingMechanism(String username, CallbackHandler cbh, String password, String resource,
+    static class DefaultCallbackHandler implements CallbackHandler {
+        final String username;
+        final String password;
+
+        DefaultCallbackHandler(String username, String password) {
+            this.username = username;
+            this.password = password;
+        }
+
+        public void handle(Callback[] callbacks) throws IOException, UnsupportedCallbackException {
+            for (int i = 0; i < callbacks.length; i++) {
+                if (callbacks[i] instanceof NameCallback) {
+                    NameCallback ncb = (NameCallback)callbacks[i];
+                    ncb.setName(username);
+                } else if(callbacks[i] instanceof PasswordCallback) {
+                    PasswordCallback pcb = (PasswordCallback)callbacks[i];
+                    pcb.setPassword(password.toCharArray());
+                } else if(callbacks[i] instanceof RealmCallback) {
+                    // Use the default realm provided by the server.
+                    RealmCallback rcb = (RealmCallback)callbacks[i];
+                    rcb.setText(rcb.getDefaultText());
+                } else if(callbacks[i] instanceof RealmChoiceCallback){
+                    //unused
+                    //RealmChoiceCallback rccb = (RealmChoiceCallback)callbacks[i];
+                } else {
+                   throw new UnsupportedCallbackException(callbacks[i]);
+                }
+            }
+        }
+    };
+
+    private String authenticateUsingMechanism(String username, CallbackHandler cbh, String resource,
             SASLMechanismType.Factory mechanismFactory)
             throws XMPPException, SASLMechanismType.MechanismNotSupported
     {
@@ -251,11 +270,7 @@ public class SASLAuthentication implements UserAuthentication {
         PacketCollector coll = connection.createPacketCollector(filter);
         try {
             /* Start authentication. */
-            byte[] authText;
-            if(cbh != null)
-                authText = currentMechanism.authenticate(username, connection.getServiceName(), cbh);
-            else
-                authText = currentMechanism.authenticate(username, connection.getServiceName(), password);
+            byte[] authText = currentMechanism.authenticate(username, connection.getServiceName(), cbh);
 
             // Send the initial packet.
             connection.sendPacket(new AuthMechanism(currentMechanism.getName(), authText));
@@ -372,15 +387,22 @@ public class SASLAuthentication implements UserAuthentication {
     }
 
     /**
-     * Perform SASL authentication for the given username.  If username is null,
-     * login anonymously.
+     * Performs SASL authentication of the specified user. If SASL authentication was successful
+     * then resource binding and session establishment will be performed. This method will return
+     * the full JID provided by the server while binding a resource to the connection.<p>
+     *
+     * The server may assign a full JID with a username or resource different than the requested
+     * by this method.
+     *
+     * @param username the username to authenticate, or null to login anonymously
+     * @param resource the desired resource.
+     * @param cbh the CallbackHandler used to get information from the user
+     * @return the full JID provided by the server while binding a resource to the connection.
+     * @throws XMPPException if an error occures while authenticating.
      */
-    private String authenticate(String username, CallbackHandler cbh, String password, String resource)
+    public String authenticate(String username, String resource, CallbackHandler cbh) 
             throws XMPPException
     {
-        if(cbh != null && password != null)
-            throw new IllegalArgumentException();
-
         List<String> mechanismsToUse = mechanismsPreferences;
         if (username == null) {
             mechanismsToUse = new Vector<String>();
@@ -396,7 +418,7 @@ public class SASLAuthentication implements UserAuthentication {
 
             SASLMechanismType.Factory factory = implementedMechanisms.get(mechanism);
             try {
-                return authenticateUsingMechanism(username, cbh, password, resource, factory);
+                return authenticateUsingMechanism(username, cbh, resource, factory);
             }
             catch (SASLMechanismType.MechanismNotSupported e) {
                 // The mechanism isn't supported by the local system.  Keep looking.

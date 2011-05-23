@@ -38,13 +38,7 @@ public class SASLAnonymous extends SASLMechanismType {
         return null;
     }
 
-    public byte[] authenticate(String username, String host, String password) {
-        return null;
-    }
-
     public byte[] challengeReceived(byte[] challenge) {
         return null;
     }
-
-
 }
