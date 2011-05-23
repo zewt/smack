@@ -34,7 +34,7 @@ public class ReceivedPacketFilter implements PacketFilter {
      * null, receive all packets in the given namespace.
      */
     public ReceivedPacketFilter(String localName, String namespaceURI) {
-        if(namespaceURI.isEmpty())
+        if(namespaceURI.length() == 0)
             throw new IllegalArgumentException("namespaceURI must not be null");
 
         this.localName = localName;
