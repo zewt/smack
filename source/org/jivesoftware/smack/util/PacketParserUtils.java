@@ -508,7 +508,7 @@ public class PacketParserUtils {
         for(Node child: PacketParserUtils.getChildNodes(node)) {
             String elementName = child.getLocalName();
             if (elementName.equals("mechanism")) {
-                mechanisms.add(child.getTextContent());
+                mechanisms.add(getTextContent(child));
             }
         }
         return mechanisms;
