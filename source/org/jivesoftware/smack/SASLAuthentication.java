@@ -90,11 +90,11 @@ public class SASLAuthentication implements UserAuthentication {
     private boolean saslNegotiated = false;
 
     static {
-
         // Register SASL mechanisms supported by Smack
         registerSASLMechanism(new SASLMechanism.Factory("EXTERNAL"));
         registerSASLMechanism(new SASLGSSAPIMechanism.Factory());
         registerSASLMechanism(new SASLMechanism.Factory("DIGEST-MD5"));
+        registerSASLMechanism(new SASLScramSHA1Mechanism.Factory());
         registerSASLMechanism(new SASLMechanism.Factory("CRAM-MD5"));
         registerSASLMechanism(new SASLMechanism.Factory("PLAIN"));
         registerSASLMechanism(new SASLAnonymous.Factory());
@@ -103,8 +103,8 @@ public class SASLAuthentication implements UserAuthentication {
         supportSASLMechanism("PLAIN", 0);
         supportSASLMechanism("CRAM-MD5", 0);
         supportSASLMechanism("DIGEST-MD5", 0);
+        supportSASLMechanism("SCRAM-SHA-1", 0);
         supportSASLMechanism("GSSAPI", 0);
-
     }
 
     /**
