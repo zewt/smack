@@ -177,6 +177,9 @@ public class PacketCollector<T extends Packet> {
      * compatible with the type of this PacketCollector
      */
     public synchronized T getResult(long timeout) throws XMPPException {
+        if(cancelled)
+            throw new IllegalStateException("getResult called on a cancelled PacketCollector");
+
         if(timeout == 0)
             timeout = SmackConfiguration.getPacketReplyTimeout();
 
