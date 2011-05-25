@@ -57,7 +57,7 @@ public class PacketCollector<T extends Packet> {
      * Creates a new packet collector. If the packet filter is <tt>null</tt>, then
      * all packets will match this collector.
      * <p>
-     * If cls is null, calls to getPacket will not be typesafe.  When created using
+     * If cls is null, calls to getResult will not be typesafe.  When created using
      * connection.createPacketCollector(filter, cls), cls will be specified.
      * <p>
      * See also {@link #PacketCollector(Connection, PacketFilter)}.
@@ -207,6 +207,19 @@ public class PacketCollector<T extends Packet> {
         catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
             throw new XMPPException("Thread interrupted", ie);
+        }
+    }
+
+    /**
+     * Return the result of a single call to {@link #getResult}, and {@link #cancel} the
+     * collector.  The collector will be cancelled whether a packet is returned or an
+     * exception is thrown.
+     */
+    public T getOnlyResult(long timeout) throws XMPPException {
+        try {
+            return getResult(timeout);
+        } finally {
+            cancel();
         }
     }
 
