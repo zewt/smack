@@ -22,9 +22,11 @@ package org.jivesoftware.smack.provider;
 
 import org.jivesoftware.smack.packet.IQ;
 import org.jivesoftware.smack.packet.PacketExtension;
+import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
 import org.xmlpull.v1.XmlPullParser;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.*;
@@ -205,6 +207,43 @@ public class ProviderManager {
         }
     }
 
+    private void loadProvidersFromStream(InputStream providerStream) throws XmlPullParserException, IOException {
+        XmlPullParser parser = XmlPullParserFactory.newInstance().newPullParser();
+        parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
+        parser.setInput(providerStream, "UTF-8");
+        int eventType = parser.getEventType();
+        do {
+            if (eventType == XmlPullParser.START_TAG) {
+                if (parser.getName().equals("iqProvider")) {
+                    parser.next();
+                    parser.next();
+                    String elementName = parser.nextText();
+                    parser.next();
+                    parser.next();
+                    String namespace = parser.nextText();
+                    parser.next();
+                    parser.next();
+                    String className = parser.nextText();
+                    registerIQProvider(elementName, namespace, className);
+                }
+                else if (parser.getName().equals("extensionProvider")) {
+                    parser.next();
+                    parser.next();
+                    String elementName = parser.nextText();
+                    parser.next();
+                    parser.next();
+                    String namespace = parser.nextText();
+                    parser.next();
+                    parser.next();
+                    String className = parser.nextText();
+                    registerExtension(elementName, namespace, className);
+                }
+            }
+            eventType = parser.next();
+        }
+        while (eventType != XmlPullParser.END_DOCUMENT);
+    }
+
     protected void initialize() {
         // Load IQ processing providers.
         try {
@@ -218,40 +257,7 @@ public class ProviderManager {
                     InputStream providerStream = null;
                     try {
                         providerStream = url.openStream();
-                        XmlPullParser parser = XmlPullParserFactory.newInstance().newPullParser();
-                        parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
-                        parser.setInput(providerStream, "UTF-8");
-                        int eventType = parser.getEventType();
-                        do {
-                            if (eventType == XmlPullParser.START_TAG) {
-                                if (parser.getName().equals("iqProvider")) {
-                                    parser.next();
-                                    parser.next();
-                                    String elementName = parser.nextText();
-                                    parser.next();
-                                    parser.next();
-                                    String namespace = parser.nextText();
-                                    parser.next();
-                                    parser.next();
-                                    String className = parser.nextText();
-                                    registerIQProvider(elementName, namespace, className);
-                                }
-                                else if (parser.getName().equals("extensionProvider")) {
-                                    parser.next();
-                                    parser.next();
-                                    String elementName = parser.nextText();
-                                    parser.next();
-                                    parser.next();
-                                    String namespace = parser.nextText();
-                                    parser.next();
-                                    parser.next();
-                                    String className = parser.nextText();
-                                    registerExtension(elementName, namespace, className);
-                                }
-                            }
-                            eventType = parser.next();
-                        }
-                        while (eventType != XmlPullParser.END_DOCUMENT);
+                        loadProvidersFromStream(providerStream);
                     }
                     finally {
                         try {
