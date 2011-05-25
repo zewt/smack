@@ -56,8 +56,7 @@ public class PacketCollectorTest extends SmackTestCase {
     }
 
     /**
-     * Verify that an exception is thrown by a PacketCollect if the connection is lost
-     * before the collector was created. 
+     * Verify that an exception is thrown if the connection is lost before the collector was created.
      */
     public void testEarlyDisconnection() throws Exception {
         getConnection(0).disconnect();
@@ -76,8 +75,7 @@ public class PacketCollectorTest extends SmackTestCase {
     }
 
     /**
-     * Verify that an exception is thrown by a PacketCollect if the connection is lost
-     * after the collector was created. 
+     * Verify that an exception is thrown if the connection is lost after the collector was created.
      */
     public void testLateDisconnection() throws Exception {
         Message msg = new Message(getConnection(0).getUser(), Message.Type.normal);
@@ -117,8 +115,7 @@ public class PacketCollectorTest extends SmackTestCase {
     }
     
     /**
-     * Verify that an exception is thrown by a PacketCollect if the connection is lost
-     * while waiting. 
+     * Verify that an exception is thrown the connection is lost while waiting.
      */
     public void testAsyncDisconnection() throws Exception {
         Message msg = new Message(getConnection(0).getUser(), Message.Type.normal);
