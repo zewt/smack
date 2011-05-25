@@ -343,7 +343,8 @@ public class ServiceDiscoveryManager {
      */
     public void addFeature(String feature) {
         synchronized (features) {
-            features.add(feature);
+            if (!features.contains(feature))
+                features.add(feature);
         }
     }
 
