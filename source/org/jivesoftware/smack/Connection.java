@@ -380,7 +380,7 @@ public abstract class Connection {
      * 
      * @return an account manager for this connection.
      */
-    public AccountManager getAccountManager() {
+    public synchronized AccountManager getAccountManager() {
         if (accountManager == null) {
             accountManager = new AccountManager(this);
         }
