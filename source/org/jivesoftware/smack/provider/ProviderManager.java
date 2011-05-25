@@ -151,6 +151,60 @@ public class ProviderManager {
         instance = providerManager;
     }
 
+    protected void registerIQProvider(String elementName, String namespaceURI, String className) {
+        // Only add the provider for the namespace if one isn't
+        // already registered.
+        String key = getProviderKey(elementName, namespaceURI);
+        if (iqProviders.containsKey(key))
+            return;
+
+        // Attempt to load the provider class and then create a new instance if it's
+        // an IQProvider. Otherwise, if it's an IQ class, add the class object
+        // itself, then we'll use reflection later to create instances of the class.
+        try {
+            // Add the provider to the map.
+            Class provider = Class.forName(className);
+            if (IQProvider.class.isAssignableFrom(provider))
+                iqProviders.put(key, provider.newInstance());
+            else if (IQ.class.isAssignableFrom(provider))
+                iqProviders.put(key, provider);
+        }
+        catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (InstantiationException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }
+    }
+
+    protected void registerExtension(String elementName, String namespaceURI, String className) {
+        // Only add the provider for the namespace if one isn't
+        // already registered.
+        String key = getProviderKey(elementName, namespaceURI);
+        if (extensionProviders.containsKey(key))
+            return;
+
+        // Attempt to load the provider class and then create a new instance if it's
+        // a Provider. Otherwise, if it's a PacketExtension, add the class object
+        // itself and then we'll use reflection later to create instances of the class.
+        try {
+            // Add the provider to the map.
+            Class provider = Class.forName(className);
+            if (PacketExtensionProvider.class.isAssignableFrom(provider))
+                extensionProviders.put(key, provider.newInstance());
+            else if (PacketExtension.class.isAssignableFrom(provider))
+                extensionProviders.put(key, provider);
+        }
+        catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (InstantiationException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }
+    }
+
     protected void initialize() {
         // Load IQ processing providers.
         try {
@@ -180,28 +234,7 @@ public class ProviderManager {
                                     parser.next();
                                     parser.next();
                                     String className = parser.nextText();
-                                    // Only add the provider for the namespace if one isn't
-                                    // already registered.
-                                    String key = getProviderKey(elementName, namespace);
-                                    if (!iqProviders.containsKey(key)) {
-                                        // Attempt to load the provider class and then create
-                                        // a new instance if it's an IQProvider. Otherwise, if it's
-                                        // an IQ class, add the class object itself, then we'll use
-                                        // reflection later to create instances of the class.
-                                        try {
-                                            // Add the provider to the map.
-                                            Class provider = Class.forName(className);
-                                            if (IQProvider.class.isAssignableFrom(provider)) {
-                                                iqProviders.put(key, provider.newInstance());
-                                            }
-                                            else if (IQ.class.isAssignableFrom(provider)) {
-                                                iqProviders.put(key, provider);
-                                            }
-                                        }
-                                        catch (ClassNotFoundException cnfe) {
-                                            cnfe.printStackTrace();
-                                        }
-                                    }
+                                    registerIQProvider(elementName, namespace, className);
                                 }
                                 else if (parser.getName().equals("extensionProvider")) {
                                     parser.next();
@@ -213,31 +246,7 @@ public class ProviderManager {
                                     parser.next();
                                     parser.next();
                                     String className = parser.nextText();
-                                    // Only add the provider for the namespace if one isn't
-                                    // already registered.
-                                    String key = getProviderKey(elementName, namespace);
-                                    if (!extensionProviders.containsKey(key)) {
-                                        // Attempt to load the provider class and then create
-                                        // a new instance if it's a Provider. Otherwise, if it's
-                                        // a PacketExtension, add the class object itself and
-                                        // then we'll use reflection later to create instances
-                                        // of the class.
-                                        try {
-                                            // Add the provider to the map.
-                                            Class provider = Class.forName(className);
-                                            if (PacketExtensionProvider.class.isAssignableFrom(
-                                                    provider)) {
-                                                extensionProviders.put(key, provider.newInstance());
-                                            }
-                                            else if (PacketExtension.class.isAssignableFrom(
-                                                    provider)) {
-                                                extensionProviders.put(key, provider);
-                                            }
-                                        }
-                                        catch (ClassNotFoundException cnfe) {
-                                            cnfe.printStackTrace();
-                                        }
-                                    }
+                                    registerExtension(elementName, namespace, className);
                                 }
                             }
                             eventType = parser.next();
