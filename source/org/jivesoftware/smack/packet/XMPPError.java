@@ -145,6 +145,8 @@ public class XMPPError {
                     this.code = spec.code;
                 if (this.type == null)
                     this.type = spec.type;
+            } else {
+                this.code = 0;
             }
         }
     }
