@@ -31,10 +31,8 @@ public class PacketCollectorTest extends SmackTestCase {
 
         getConnection(1).sendPacket(msg);
 
-        Message receivedMsg = coll.getResult(0);
+        Message receivedMsg = coll.getOnlyResult(0);
         assertEquals(receivedMsg.getPacketID(), msg.getPacketID());
-
-        coll.cancel();
     }
 
     /**
@@ -47,13 +45,11 @@ public class PacketCollectorTest extends SmackTestCase {
 
         try {
             getConnection(1).sendPacket(msg);
-            coll.getResult(0);
+            coll.getOnlyResult(0);
         } catch(XMPPException e) {
             if(!e.getMessage().contains("Unexpected packet type received"))
                 fail("Unexpected exception: " + e);
             return;
-        } finally {
-            coll.cancel();
         }
         fail("Expected XMPPException");
     }
@@ -69,13 +65,11 @@ public class PacketCollectorTest extends SmackTestCase {
 
         try {
             getConnection(1).sendPacket(msg);
-            coll.getResult(0);
+            coll.getOnlyResult(0);
         } catch(XMPPException e) {
             if(!e.getMessage().contains("Connection lost"))
                 fail("Unexpected exception: " + e);
             return;
-        } finally {
-            coll.cancel();
         }
         fail("Expected XMPPException");
     }
@@ -92,13 +86,11 @@ public class PacketCollectorTest extends SmackTestCase {
             getConnection(1).sendPacket(msg);
             getConnection(0).disconnect();
 
-            coll.getResult(0);
+            coll.getOnlyResult(0);
         } catch(XMPPException e) {
             if(!e.getMessage().contains("Connection lost"))
                 fail("Unexpected exception: " + e);
             return;
-        } finally {
-            coll.cancel();
         }
         fail("Expected XMPPException");
     }
@@ -111,16 +103,14 @@ public class PacketCollectorTest extends SmackTestCase {
         PacketCollector<IQ> coll = getConnection(0).createPacketCollector(new PacketIDFilter(msg), IQ.class);
 
         try {
-            // Don't send any packet, so getResult() times out.
+            // Don't send any packet, so getOnlyResult() times out.
             // getConnection(1).sendPacket(msg);
             
-            coll.getResult(100);
+            coll.getOnlyResult(100);
         } catch(XMPPException e) {
             if(!e.getMessage().contains("Response timed out"))
                 fail("Unexpected exception: " + e);
             return;
-        } finally {
-            coll.cancel();
         }
         fail("Expected XMPPException");
     }
@@ -147,16 +137,15 @@ public class PacketCollectorTest extends SmackTestCase {
         thread.start();
         
         try {
-            // Don't send any packet, so getResult() blocks.
+            // Don't send any packet, so getOnlyResult() blocks.
             // getConnection(1).sendPacket(msg);
             
-            coll.getResult(1500);
+            coll.getOnlyResult(1500);
         } catch(XMPPException e) {
             if(!e.getMessage().contains("Connection lost"))
                 fail("Unexpected exception: " + e);
             return;
         } finally {
-            coll.cancel();
             thread.join();
         }
         fail("Expected XMPPException");
