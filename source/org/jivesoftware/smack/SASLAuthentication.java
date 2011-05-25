@@ -32,6 +32,7 @@ import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.sasl.*;
 import org.jivesoftware.smack.util.Base64;
 import org.jivesoftware.smack.util.PacketParserUtils;
+import org.jivesoftware.smack.sasl.SASLHelpers;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
@@ -289,7 +290,7 @@ public class SASLAuthentication implements UserAuthentication {
                         if(content.equals("="))
                             successData = new byte[0];
                         else
-                            successData = Base64.decode(content);
+                            successData = SASLHelpers.decodeBase64(content);
                     }
 
                     currentMechanism.successReceived(successData);
@@ -323,7 +324,7 @@ public class SASLAuthentication implements UserAuthentication {
                     // Decode the challenge.
                     byte[] challengeData;
                     if(PacketParserUtils.getTextContent(element) != null)
-                        challengeData = Base64.decode(PacketParserUtils.getTextContent(element));
+                        challengeData = SASLHelpers.decodeBase64(PacketParserUtils.getTextContent(element));
                     else
                         challengeData = new byte[0];
 
