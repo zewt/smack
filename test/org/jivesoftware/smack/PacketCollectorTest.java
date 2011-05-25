@@ -20,6 +20,7 @@ import org.jivesoftware.smack.filter.PacketIDFilter;
 import org.jivesoftware.smack.packet.IQ;
 import org.jivesoftware.smack.packet.Message;
 import org.jivesoftware.smack.test.SmackTestCase;
+import org.junit.Test;
 
 public class PacketCollectorTest extends SmackTestCase {
     /**
@@ -151,6 +152,64 @@ public class PacketCollectorTest extends SmackTestCase {
         fail("Expected XMPPException");
     }
     
+    /**
+     * Reading a result from a cancelled collector throws IllegalStateException.
+     */
+    public void testCancelledCollector() throws Exception {
+        PacketCollector<Message> coll = getConnection(0).createPacketCollector(null, Message.class);
+        coll.cancel();
+
+        try {
+            coll.getResult(0);
+        } catch(IllegalStateException e) {
+            return;
+        }
+        fail("Expected IllegalStateException");
+    }
+
+    /**
+     * getOnlyResult cancels the connector, so calling it twice throws IllegalStateException.
+     */
+    public void testGetOnlyResultCancels() throws Exception {
+        Message msg = new Message(getConnection(0).getUser(), Message.Type.normal);
+        PacketCollector<Message> coll = getConnection(0).createPacketCollector(new PacketIDFilter(msg), Message.class);
+
+        getConnection(1).sendPacket(msg);
+        coll.getOnlyResult(0);
+
+        try {
+            coll.getOnlyResult(0);
+        } catch(IllegalStateException e) {
+            return;
+        }
+        fail("Expected IllegalStateException");
+    }
+
+    /**
+     * getOnlyResult cancels the connector, so calling it twice throws IllegalStateException.
+     */
+    public void testGetOnlyResultCancelsOnFailure() throws Exception {
+        PacketCollector<Message> coll = getConnection(0).createPacketCollector(new PacketIDFilter("never match"), Message.class);
+
+        // Read a packet.  This will time out, since no packet will match it.
+        boolean thrown = false;
+        try {
+            coll.getOnlyResult(1);
+        } catch(XMPPException e) {
+            thrown = true;
+        }
+        if(!thrown)
+            fail("Expected getOnlyResult to throw XMPPException");
+
+        // The collector is now cancelled.
+        try {
+            coll.getOnlyResult(0);
+        } catch(IllegalStateException e) {
+            return;
+        }
+        fail("Expected IllegalStateException");
+    }
+
     protected int getMaxConnections() {
         return 2;
     }
