@@ -190,7 +190,7 @@ public class SASLAuthentication implements UserAuthentication {
             throw new IllegalArgumentException("features must not be null");
 
         // Record the mechanisms provided in the previous features packet.
-        for(Node node: PacketParserUtils.getChildNodes(features.getElement())) {
+        for(Element node: PacketParserUtils.getChildElements(features.getElement())) {
             if(node.getLocalName().equals("mechanisms")) {
                 // The server is reporting available SASL mechanisms. Store this information
                 // which will be used later while logging (i.e. authenticating) into
@@ -361,7 +361,7 @@ public class SASLAuthentication implements UserAuthentication {
                 throw new XMPPException("Timed out waiting for post-SASL features");
 
             // Ensure that we've received the "bind" feature.
-            for(Node node: PacketParserUtils.getChildNodes(features.getElement())) {
+            for(Element node: PacketParserUtils.getChildElements(features.getElement())) {
                 if(node.getLocalName().equals("bind") &&
                         node.getNamespaceURI().equals("urn:ietf:params:xml:ns:xmpp-bind"))
                     foundBind = true;

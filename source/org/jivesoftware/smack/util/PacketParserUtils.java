@@ -505,7 +505,7 @@ public class PacketParserUtils {
      */
     public static Collection<String> parseMechanisms(Node node) {
         List<String> mechanisms = new ArrayList<String>();
-        for(Node child: PacketParserUtils.getChildNodes(node)) {
+        for(Element child: PacketParserUtils.getChildElements(node)) {
             String elementName = child.getLocalName();
             if (elementName.equals("mechanism")) {
                 mechanisms.add(getTextContent(child));
@@ -821,16 +821,20 @@ public class PacketParserUtils {
     }
 
     /**
-     * Return an iterable Collection<Node> of the children of the specified
+     * Return an iterable Collection<Node> of the child Elements of the specified
      * node.
      * @param parent The parent node.
      * @return A collection of child nodes.
      */
-    public static Collection<Node> getChildNodes(Node node) {
+    public static Collection<Element> getChildElements(Node node) {
         NodeList children = node.getChildNodes();
-        ArrayList<Node> result = new ArrayList<Node>(children.getLength());
-        for(int i = 0; i < children.getLength(); ++i)
-            result.add(children.item(i));
+        ArrayList<Element> result = new ArrayList<Element>(children.getLength());
+        for(int i = 0; i < children.getLength(); ++i) {
+            Node child = children.item(i);
+            if(!(child instanceof Element))
+                continue;
+            result.add((Element) child);
+        }
         return result;
     }
 

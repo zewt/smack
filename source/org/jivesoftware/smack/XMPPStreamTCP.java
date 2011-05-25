@@ -331,11 +331,11 @@ public class XMPPStreamTCP extends XMPPStream
             featureStartTLSReceived = false;
             featureCompressionMethods = new ArrayList<String>();
 
-            for (Node child: PacketParserUtils.getChildNodes(node)) {
+            for (Element child: PacketParserUtils.getChildElements(node)) {
                 if (!usingTLS && child.getNodeName().equals("starttls")) {
                     featureStartTLSReceived = true;
 
-                    for (Node startTlsChild: PacketParserUtils.getChildNodes(child)) {
+                    for (Element startTlsChild: PacketParserUtils.getChildElements(child)) {
                         if (startTlsChild.getNodeName().equals("required")) {
                             if (config.getSecurityMode() == ConnectionConfiguration.SecurityMode.disabled) {
                                 throw new XMPPException(
@@ -345,7 +345,7 @@ public class XMPPStreamTCP extends XMPPStream
                     }
                 }
                 else if (child.getNodeName().equals("compression")) {
-                    for (Node compressionChild: PacketParserUtils.getChildNodes(child)) {
+                    for (Element compressionChild: PacketParserUtils.getChildElements(child)) {
                         if (!compressionChild.getNodeName().equals("method"))
                             continue;
                         featureCompressionMethods.add(PacketParserUtils.getTextContent(compressionChild));
