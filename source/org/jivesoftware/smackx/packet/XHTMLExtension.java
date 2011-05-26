@@ -32,11 +32,7 @@ import java.util.List;
  * extension is only a subset of XHTML 1.0.<p>
  * 
  * The following link summarizes the requirements of XHTML IM:
- * <a href="http://www.jabber.org/jeps/jep-0071.html#sect-id2598018">Valid tags</a>.<p>
- * 
- * Warning: this is an non-standard protocol documented by
- * <a href="http://www.jabber.org/jeps/jep-0071.html">JEP-71</a>. Because this is a
- * non-standard protocol, it is subject to change.
+ * <a href="http://xmpp.org/extensions/xep-0071.html#reqs">Requirements</a>.<p>
  *
  * @author Gaston Dombiak
  */
