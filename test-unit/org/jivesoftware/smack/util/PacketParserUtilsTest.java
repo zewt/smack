@@ -653,13 +653,13 @@ public class PacketParserUtilsTest {
                 .a("xmlns", "http://www.w3.org/1999/xhtml")
                 .e("span")
                     .a("style", "font-weight: bold;")
-                    .t("Bad Message Body")
+                    .t("Message Body")
             .asString(outputProperties);
         
         try {
             Message message = (Message) PacketParserUtils.parseMessage(getParser(control));
             String body = "<span style=\"font-weight: bold;\">"
-                            + "Bad Message Body</span>";
+                            + "Message Body</span>";
             assertEquals(body, message.getBody());
             
             assertXMLNotEqual(control, message.toXML());
