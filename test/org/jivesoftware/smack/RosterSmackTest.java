@@ -750,13 +750,6 @@ public class RosterSmackTest extends SmackTestCase {
     protected void setUp() throws Exception {
         //XMPPConnection.DEBUG_ENABLED = false;
 
-        try  {
-            Thread.sleep(500);
-        }
-        catch (InterruptedException e) {
-            fail(e.getMessage());
-        }
-
         super.setUp();
     }
 }
