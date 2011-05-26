@@ -21,6 +21,7 @@
 package org.jivesoftware.smack;
 
 import org.jivesoftware.smack.Connection.ListenerWrapper;
+import org.jivesoftware.smack.SynchronousPacketListener;
 import org.jivesoftware.smack.packet.*;
 import org.jivesoftware.smack.util.PacketParserUtils;
 import org.jivesoftware.smack.util.ThreadUtil;
@@ -216,6 +217,15 @@ class PacketReader {
                         receivedPacket = new ReceivedPacket(packet);
                     }
 
+                    for (ListenerWrapper listenerWrapper : connection.recvListeners.values()) {
+                        if(listenerWrapper.isSynchronous())
+                            listenerWrapper.notifyListener(receivedPacket);
+                    }
+
+                    // Loop through all collectors and notify the appropriate ones.
+                    for (PacketCollector collector: connection.getPacketCollectors())
+                        collector.processPacket(receivedPacket);
+
                     // Deliver the received packet to listeners.
                     listenerExecutor.submit(new ListenerNotification(receivedPacket));
                 }
@@ -283,14 +293,9 @@ class PacketReader {
             // collectors, so a collector can be used to wait until all listeners
             // on a packet have been run.
             for (ListenerWrapper listenerWrapper : connection.recvListeners.values()) {
-                listenerWrapper.notifyListener(packet);
+                if(!listenerWrapper.isSynchronous())
+                    listenerWrapper.notifyListener(packet);
             }
-
-            // Loop through all collectors and notify the appropriate ones.
-            for (PacketCollector collector: connection.getPacketCollectors()) {
-                collector.processPacket(packet);
-            }
-
         }
     }
 }

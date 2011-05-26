@@ -703,6 +703,10 @@ public abstract class Connection {
         private PacketListener packetListener;
         private PacketFilter packetFilter;
 
+        public boolean isSynchronous() {
+            return packetListener instanceof SynchronousPacketListener;
+        }
+
         /**
          * Create a class which associates a packet filter with a listener.
          * 

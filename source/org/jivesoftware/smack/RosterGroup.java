@@ -167,7 +167,7 @@ public class RosterGroup {
     public void addEntry(final RosterEntry entry) throws XMPPException {
         PacketCollector collector = null;
         PacketIDFilter filter = null;
-        PacketListener addEntryListener = new PacketListener() {
+        PacketListener addEntryListener = new SynchronousPacketListener() {
             public void processPacket(Packet packet) { addEntryLocal(entry); }
         };
 
@@ -211,7 +211,7 @@ public class RosterGroup {
     public void removeEntry(final RosterEntry entry) throws XMPPException {
         PacketCollector collector = null;
         PacketIDFilter filter = null;
-        PacketListener removeEntryListener = new PacketListener() {
+        PacketListener removeEntryListener = new SynchronousPacketListener() {
             public void processPacket(Packet packet) { removeEntryLocal(entry); }
         };
 

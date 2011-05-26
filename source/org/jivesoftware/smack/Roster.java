@@ -273,7 +273,7 @@ public class Roster {
         }
         rosterPacket.addRosterItem(item);
 
-        PacketListener addEntryListener = new PacketListener() {
+        PacketListener addEntryListener = new SynchronousPacketListener() {
             public void processPacket(Packet packet) {
                 addEntryLocal(item);
 
@@ -338,7 +338,7 @@ public class Roster {
         item.setItemType(RosterPacket.ItemType.remove);
         packet.addRosterItem(item);
 
-        PacketListener removeEntryListener = new PacketListener() {
+        PacketListener removeEntryListener = new SynchronousPacketListener() {
             public void processPacket(Packet packet) { removeEntryLocal(item); }
         };
 
