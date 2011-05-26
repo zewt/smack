@@ -505,10 +505,10 @@ public class PacketParserUtils {
      */
     public static Collection<String> parseMechanisms(Node node) {
         List<String> mechanisms = new ArrayList<String>();
-        for(Element child: PacketParserUtils.getChildElements(node)) {
+        for(Element child: XmlUtil.getChildElements(node)) {
             String elementName = child.getLocalName();
             if (elementName.equals("mechanism")) {
-                mechanisms.add(getTextContent(child));
+                mechanisms.add(XmlUtil.getTextContent(child));
             }
         }
         return mechanisms;
@@ -804,25 +804,6 @@ public class PacketParserUtils {
             }
         }
         return object;
-    }
-
-    /**
-     * Implement Node.getTextContent(), which isn't available in DOM Level 2.
-     * @deprecated use {@link XmlUtil#getTextContent(Node)}
-     */
-    public static String getTextContent(Node node) {
-        return XmlUtil.getTextContent(node);
-    }
-
-    /**
-     * Return an iterable Collection<Node> of the child Elements of the specified
-     * node.
-     * @deprecated use {@link XmlUtil#getChildElements(Node)}
-     * @param parent The parent node.
-     * @return A collection of child nodes.
-     */
-    public static Collection<Element> getChildElements(Node node) {
-        return XmlUtil.getChildElements(node);
     }
 
     /**

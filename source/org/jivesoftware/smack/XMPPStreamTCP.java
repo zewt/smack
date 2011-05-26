@@ -48,9 +48,9 @@ import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.util.DNSUtil;
 import org.jivesoftware.smack.util.ObservableReader;
 import org.jivesoftware.smack.util.ObservableWriter;
-import org.jivesoftware.smack.util.PacketParserUtils;
 import org.jivesoftware.smack.util.ThreadUtil;
 import org.jivesoftware.smack.util.WriterListener;
+import org.jivesoftware.smack.util.XmlUtil;
 import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -331,11 +331,11 @@ public class XMPPStreamTCP extends XMPPStream
             featureStartTLSReceived = false;
             featureCompressionMethods = new ArrayList<String>();
 
-            for (Element child: PacketParserUtils.getChildElements(node)) {
+            for (Element child: XmlUtil.getChildElements(node)) {
                 if (!usingTLS && child.getNodeName().equals("starttls")) {
                     featureStartTLSReceived = true;
 
-                    for (Element startTlsChild: PacketParserUtils.getChildElements(child)) {
+                    for (Element startTlsChild: XmlUtil.getChildElements(child)) {
                         if (startTlsChild.getNodeName().equals("required")) {
                             if (config.getSecurityMode() == ConnectionConfiguration.SecurityMode.disabled) {
                                 throw new XMPPException(
@@ -345,10 +345,10 @@ public class XMPPStreamTCP extends XMPPStream
                     }
                 }
                 else if (child.getNodeName().equals("compression")) {
-                    for (Element compressionChild: PacketParserUtils.getChildElements(child)) {
+                    for (Element compressionChild: XmlUtil.getChildElements(child)) {
                         if (!compressionChild.getNodeName().equals("method"))
                             continue;
-                        featureCompressionMethods.add(PacketParserUtils.getTextContent(compressionChild));
+                        featureCompressionMethods.add(XmlUtil.getTextContent(compressionChild));
                     }
                 }
             }

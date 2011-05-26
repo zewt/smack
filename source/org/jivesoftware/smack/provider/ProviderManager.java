@@ -22,7 +22,6 @@ package org.jivesoftware.smack.provider;
 
 import org.jivesoftware.smack.packet.IQ;
 import org.jivesoftware.smack.packet.PacketExtension;
-import org.jivesoftware.smack.util.PacketParserUtils;
 import org.jivesoftware.smack.util.XmlUtil;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
@@ -217,16 +216,16 @@ public class ProviderManager {
     }
 
     private void loadProvidersFromStream(Element doc) throws SAXException, IOException {
-        for(Element e: PacketParserUtils.getChildElements(doc)) {
+        for(Element e: XmlUtil.getChildElements(doc)) {
             if (e.getLocalName().equals("iqProvider") || e.getLocalName().equals("extensionProvider")) {
                 String elementName = null, namespace = null, className = null;
-                for(Element data: PacketParserUtils.getChildElements(e)) {
+                for(Element data: XmlUtil.getChildElements(e)) {
                     if(data.getLocalName().equals("elementName"))
-                        elementName = PacketParserUtils.getTextContent(data);
+                        elementName = XmlUtil.getTextContent(data);
                     else if(data.getLocalName().equals("namespace"))
-                        namespace = PacketParserUtils.getTextContent(data);
+                        namespace = XmlUtil.getTextContent(data);
                     else if(data.getLocalName().equals("className"))
-                        className = PacketParserUtils.getTextContent(data);
+                        className = XmlUtil.getTextContent(data);
                 }
 
                 if(elementName == null || namespace == null || className == null)

@@ -33,6 +33,7 @@ import org.jivesoftware.smack.sasl.*;
 import org.jivesoftware.smack.util.Base64;
 import org.jivesoftware.smack.util.PacketParserUtils;
 import org.jivesoftware.smack.sasl.SASLHelpers;
+import org.jivesoftware.smack.util.XmlUtil;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 
@@ -190,7 +191,7 @@ public class SASLAuthentication implements UserAuthentication {
             throw new IllegalArgumentException("features must not be null");
 
         // Record the mechanisms provided in the previous features packet.
-        for(Element node: PacketParserUtils.getChildElements(features.getElement())) {
+        for(Element node: XmlUtil.getChildElements(features.getElement())) {
             if(node.getLocalName().equals("mechanisms")) {
                 // The server is reporting available SASL mechanisms. Store this information
                 // which will be used later while logging (i.e. authenticating) into
@@ -285,7 +286,7 @@ public class SASLAuthentication implements UserAuthentication {
 
                 if(element.getLocalName().equals("success")) {
                     byte[] successData = null;
-                    String content = PacketParserUtils.getTextContent(element);
+                    String content = XmlUtil.getTextContent(element);
                     if(content != null && content.length() > 0) {
                         if(content.equals("="))
                             successData = new byte[0];
@@ -323,8 +324,8 @@ public class SASLAuthentication implements UserAuthentication {
                      */
                     // Decode the challenge.
                     byte[] challengeData;
-                    if(PacketParserUtils.getTextContent(element) != null)
-                        challengeData = SASLHelpers.decodeBase64(PacketParserUtils.getTextContent(element));
+                    if(XmlUtil.getTextContent(element) != null)
+                        challengeData = SASLHelpers.decodeBase64(XmlUtil.getTextContent(element));
                     else
                         challengeData = new byte[0];
 
@@ -361,7 +362,7 @@ public class SASLAuthentication implements UserAuthentication {
                 throw new XMPPException("Timed out waiting for post-SASL features");
 
             // Ensure that we've received the "bind" feature.
-            for(Element node: PacketParserUtils.getChildElements(features.getElement())) {
+            for(Element node: XmlUtil.getChildElements(features.getElement())) {
                 if(node.getLocalName().equals("bind") &&
                         node.getNamespaceURI().equals("urn:ietf:params:xml:ns:xmpp-bind"))
                     foundBind = true;

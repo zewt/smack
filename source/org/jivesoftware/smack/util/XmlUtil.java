@@ -60,7 +60,7 @@ public class XmlUtil {
      */
     public static Element getXMLRootNode(InputSource stream) throws SAXException, IOException {
         Document doc = parseXML(stream);
-        for(Element data: PacketParserUtils.getChildElements(doc))
+        for(Element data: XmlUtil.getChildElements(doc))
             return data;
 
         throw new RuntimeException("Document had no root node");

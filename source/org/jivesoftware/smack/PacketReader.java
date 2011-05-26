@@ -25,6 +25,7 @@ import org.jivesoftware.smack.packet.*;
 import org.jivesoftware.smack.util.PacketParserUtils;
 import org.jivesoftware.smack.util.ThreadUtil;
 import org.jivesoftware.smack.util.XmlPullParserDom;
+import org.jivesoftware.smack.util.XmlUtil;
 import org.w3c.dom.Element;
 import org.xmlpull.v1.XmlPullParser;
 
@@ -251,7 +252,7 @@ class PacketReader {
     }
 
     private Packet parseFeatures(Element packet) throws Exception {
-        for(Element node: PacketParserUtils.getChildElements(packet)) {
+        for(Element node: XmlUtil.getChildElements(packet)) {
             if(node.getLocalName().equals("register")) {
                 connection.getAccountManager().setSupportsAccountCreation(true);
             }
