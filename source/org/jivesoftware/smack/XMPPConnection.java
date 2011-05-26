@@ -426,12 +426,6 @@ public class XMPPConnection extends Connection {
             roster = null;
         }
 
-        // Clear packet listeners only on final disconnection.
-        recvListeners.clear();
-        sendListeners.clear();
-        collectors.clear();
-        interceptors.clear();
-
         wasAuthenticated = false;
         suppressConnectionErrors = false;
 
@@ -439,6 +433,15 @@ public class XMPPConnection extends Connection {
         // disconnection.
         if(wasConnected)
             notifyConnectionClosed();
+
+        // Clear packet listeners only on final disconnection.  Do this after calling
+        // notifyConnectionClosed.  Some listeners unregister themselves (unnecessarily)
+        // on disconnection; if we clear listeners before notifyConnectionClosed that'll
+        // cause an unnecessary error.
+        recvListeners.clear();
+        sendListeners.clear();
+        collectors.clear();
+        interceptors.clear();
     }
 
     public void sendPacket(Packet packet) {
