@@ -56,6 +56,7 @@ import java.util.Iterator;
 
 import org.jivesoftware.smack.*;
 import org.jivesoftware.smack.test.SmackTestCase;
+import org.jivesoftware.smack.util.StringUtils;
 
 /**
  *
@@ -188,6 +189,11 @@ public class RosterExchangeManagerTest extends SmackTestCase {
                     try {
                         RemoteRosterEntry remoteRosterEntry =
                             (RemoteRosterEntry) remoteRosterEntries.next();
+
+                        // Don't try to add us to our own roster.
+                        if(remoteRosterEntry.getUser().equals(StringUtils.parseBareAddress(getConnection(1).getUser())))
+                                continue;
+
                         getConnection(1).getRoster().createEntry(
                             remoteRosterEntry.getUser(),
                             remoteRosterEntry.getName(),
