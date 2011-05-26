@@ -183,13 +183,8 @@ public class XmlPullParserDom implements XmlPullParser {
         return currentEvent.getName();
     }
 
-    /**
-     * Not supported.
-     *
-     * @throws UnsupportedOperationException always
-     */
     public String getPrefix() {
-        throw new UnsupportedOperationException();
+        return currentEvent.getPrefix();
     }
 
     public boolean isEmptyElementTag() throws XmlPullParserException {
@@ -208,13 +203,8 @@ public class XmlPullParserDom implements XmlPullParser {
         return currentEvent.getAttributeName(index);
     }
 
-    /**
-     * Not supported.
-     *
-     * @throws UnsupportedOperationException always
-     */
     public String getAttributePrefix(int index) {
-        throw new UnsupportedOperationException();
+        return currentEvent.getAttributePrefix(index);
     }
 
     public String getAttributeType(int index) {
@@ -329,6 +319,10 @@ public class XmlPullParserDom implements XmlPullParser {
             return null;
         }
 
+        String getPrefix() {
+            return null;
+        }
+
         int getAttributeCount() {
             return -1;
         }
@@ -338,6 +332,10 @@ public class XmlPullParserDom implements XmlPullParser {
         }
 
         String getAttributeName(int index) {
+            throw new IndexOutOfBoundsException(NOT_A_START_TAG);
+        }
+
+        String getAttributePrefix(int index) {
             throw new IndexOutOfBoundsException(NOT_A_START_TAG);
         }
 
@@ -372,17 +370,20 @@ public class XmlPullParserDom implements XmlPullParser {
 
         final String name;
         final String namespace;
+        final String prefix;
         final NamedNodeMap attributes;
         final boolean processNamespaces;
 
         StartTagEvent(String namespace,
                 String name,
+                String prefix,
                 NamedNodeMap attributes,
                 int depth,
                 boolean processNamespaces) {
             super(depth);
             this.namespace = namespace;
             this.name = name;
+            this.prefix = prefix;
             this.attributes = attributes;
             this.processNamespaces = processNamespaces;
         }
@@ -395,6 +396,11 @@ public class XmlPullParserDom implements XmlPullParser {
         @Override
         String getName() {
             return name;
+        }
+
+        @Override
+        String getPrefix() {
+            return prefix;
         }
 
         @Override
@@ -427,6 +433,18 @@ public class XmlPullParserDom implements XmlPullParser {
             
             return processNamespaces ? attr.getLocalName()
                     : attr.getName();
+        }
+
+        @Override
+        String getAttributePrefix(int index) {
+            if(getType() != START_TAG)
+                throw new IndexOutOfBoundsException();
+
+            Attr attr = (Attr) attributes.item(index);
+            if(attr == null)
+                throw new IndexOutOfBoundsException();
+
+            return attr.getPrefix();
         }
 
         @Override
@@ -564,8 +582,8 @@ public class XmlPullParserDom implements XmlPullParser {
             currentEvent = last;
         }
 
-        add(new StartTagEvent(currentNode.getNamespaceURI(), currentNode.getLocalName(), currentNode.getAttributes(), depth,
-                processNamespaces));
+        add(new StartTagEvent(currentNode.getNamespaceURI(), currentNode.getLocalName(),
+                currentNode.getPrefix(), currentNode.getAttributes(), depth, processNamespaces));
 
         TextEvent textEvent = null;
         for (Node child = currentNode.getFirstChild(); child != null; child = child.getNextSibling())
