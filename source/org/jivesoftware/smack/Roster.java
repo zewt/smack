@@ -275,6 +275,9 @@ public class Roster {
 
         PacketListener addEntryListener = new SynchronousPacketListener() {
             public void processPacket(Packet packet) {
+                IQ iq = (IQ) packet;
+                if (iq.getType() == IQ.Type.ERROR)
+                    return;
                 addEntryLocal(item);
 
                 final HashSet<String> groupSet = new HashSet<String>();
@@ -339,7 +342,12 @@ public class Roster {
         packet.addRosterItem(item);
 
         PacketListener removeEntryListener = new SynchronousPacketListener() {
-            public void processPacket(Packet packet) { removeEntryLocal(item); }
+            public void processPacket(Packet packet) {
+                IQ iq = (IQ) packet;
+                if (iq.getType() == IQ.Type.ERROR)
+                    return;
+                removeEntryLocal(item);
+            }
         };
 
         PacketIDFilter filter = new PacketIDFilter(packet.getPacketID());

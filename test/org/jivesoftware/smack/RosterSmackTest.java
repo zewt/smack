@@ -698,6 +698,27 @@ public class RosterSmackTest extends SmackTestCase {
     }
 
     /**
+     * If createEntry throws an exception, the new roster entry is not created.
+     */
+    public void testRosterErrors() throws Exception {
+        Roster roster = getConnection(0).getRoster();
+        int initialCount = roster.getEntryCount();
+
+        try {
+            // Add an invalid roster entry.
+            roster.createEntry("invalid/", "gato11", new String[] { "Friends" });
+            fail("Expected XMPPException from createEntry");
+        }
+        catch (XMPPException e) {
+            // The invalid roster entry was not added to the roster.
+            assertEquals(initialCount, roster.getEntryCount());
+        }
+        finally {
+            cleanUpRoster();
+        }
+    }
+
+    /**
      * Tests the creation of a roster and then simulates abrupt termination. Cached presences
      * must go offline. At reconnection, presences must go back to online.
      *

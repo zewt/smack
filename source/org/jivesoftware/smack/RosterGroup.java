@@ -168,7 +168,12 @@ public class RosterGroup {
         PacketCollector collector = null;
         PacketIDFilter filter = null;
         PacketListener addEntryListener = new SynchronousPacketListener() {
-            public void processPacket(Packet packet) { addEntryLocal(entry); }
+            public void processPacket(Packet packet) {
+                IQ iq = (IQ) packet;
+                if (iq.getType() == IQ.Type.ERROR)
+                    return;
+                addEntryLocal(entry);
+            }
         };
 
         // Only add the entry if it isn't already in the list.
@@ -212,7 +217,12 @@ public class RosterGroup {
         PacketCollector collector = null;
         PacketIDFilter filter = null;
         PacketListener removeEntryListener = new SynchronousPacketListener() {
-            public void processPacket(Packet packet) { removeEntryLocal(entry); }
+            public void processPacket(Packet packet) {
+                IQ iq = (IQ) packet;
+                if (iq.getType() == IQ.Type.ERROR)
+                    return;
+                removeEntryLocal(entry);
+            }
         };
 
         synchronized (entries) {
