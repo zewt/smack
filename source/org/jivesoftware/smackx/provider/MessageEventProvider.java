@@ -56,13 +56,13 @@ public class MessageEventProvider implements PacketExtensionProvider {
             if (eventType == XmlPullParser.START_TAG) {
                 if (parser.getName().equals("id"))
                     messageEvent.setPacketID(parser.nextText());
-                if (parser.getName().equals(MessageEvent.COMPOSING))
+                else if (parser.getName().equals(MessageEvent.COMPOSING))
                     messageEvent.setComposing(true);
-                if (parser.getName().equals(MessageEvent.DELIVERED))
+                else if (parser.getName().equals(MessageEvent.DELIVERED))
                     messageEvent.setDelivered(true);
-                if (parser.getName().equals(MessageEvent.DISPLAYED))
+                else if (parser.getName().equals(MessageEvent.DISPLAYED))
                     messageEvent.setDisplayed(true);
-                if (parser.getName().equals(MessageEvent.OFFLINE))
+                else if (parser.getName().equals(MessageEvent.OFFLINE))
                     messageEvent.setOffline(true);
             } else if (eventType == XmlPullParser.END_TAG) {
                 if (parser.getName().equals("x")) {
