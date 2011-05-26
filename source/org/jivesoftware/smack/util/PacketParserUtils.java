@@ -808,34 +808,21 @@ public class PacketParserUtils {
 
     /**
      * Implement Node.getTextContent(), which isn't available in DOM Level 2.
+     * @deprecated use {@link XmlUtil#getTextContent(Node)}
      */
     public static String getTextContent(Node node) {
-        String result = "";
-        if(node instanceof Text)
-            result = ((Text) node).getData();
-
-        for (Node child = node.getFirstChild(); child != null; child = child.getNextSibling())
-            result += getTextContent(child);
-
-        return result;
+        return XmlUtil.getTextContent(node);
     }
 
     /**
      * Return an iterable Collection<Node> of the child Elements of the specified
      * node.
+     * @deprecated use {@link XmlUtil#getChildElements(Node)}
      * @param parent The parent node.
      * @return A collection of child nodes.
      */
     public static Collection<Element> getChildElements(Node node) {
-        NodeList children = node.getChildNodes();
-        ArrayList<Element> result = new ArrayList<Element>(children.getLength());
-        for(int i = 0; i < children.getLength(); ++i) {
-            Node child = children.item(i);
-            if(!(child instanceof Element))
-                continue;
-            result.add((Element) child);
-        }
-        return result;
+        return XmlUtil.getChildElements(node);
     }
 
     /**

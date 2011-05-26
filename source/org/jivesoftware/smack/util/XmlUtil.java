@@ -17,6 +17,8 @@
 package org.jivesoftware.smack.util;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -24,6 +26,9 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.w3c.dom.Text;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
@@ -59,5 +64,38 @@ public class XmlUtil {
             return data;
 
         throw new RuntimeException("Document had no root node");
+    }
+
+    /**
+     * Return an iterable Collection<Node> of the child Elements of the specified
+     * node.
+     *
+     * @param parent The parent node.
+     * @return A collection of child nodes.
+     */
+    public static Collection<Element> getChildElements(Node node) {
+        NodeList children = node.getChildNodes();
+        ArrayList<Element> result = new ArrayList<Element>(children.getLength());
+        for(int i = 0; i < children.getLength(); ++i) {
+            Node child = children.item(i);
+            if(!(child instanceof Element))
+                continue;
+            result.add((Element) child);
+        }
+        return result;
+    }
+
+    /**
+     * Implement Node.getTextContent(), which isn't available in DOM Level 2.
+     */
+    public static String getTextContent(Node node) {
+        String result = "";
+        if(node instanceof Text)
+            result = ((Text) node).getData();
+
+        for (Node child = node.getFirstChild(); child != null; child = child.getNextSibling())
+            result += getTextContent(child);
+
+        return result;
     }
 };
