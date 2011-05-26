@@ -22,7 +22,7 @@ package org.jivesoftware.smackx.provider;
 
 import org.jivesoftware.smack.packet.PacketExtension;
 import org.jivesoftware.smack.provider.PacketExtensionProvider;
-import org.jivesoftware.smack.util.StringUtils;
+import org.jivesoftware.smack.util.XmlUtil;
 import org.jivesoftware.smackx.packet.XHTMLExtension;
 import org.xmlpull.v1.XmlPullParser;
 
@@ -50,40 +50,29 @@ public class XHTMLExtensionProvider implements PacketExtensionProvider {
     public PacketExtension parseExtension(XmlPullParser parser)
         throws Exception {
         XHTMLExtension xhtmlExtension = new XHTMLExtension();
-        boolean done = false;
-        StringBuilder buffer = new StringBuilder();
         int startDepth = parser.getDepth();
-        int depth = parser.getDepth();
-        String lastTag = "";
-        while (!done) {
+        while (true) {
             int eventType = parser.next();
             if (eventType == XmlPullParser.START_TAG) {
-                if (parser.getName().equals("body")) {
-                    buffer = new StringBuilder();
-                    depth = parser.getDepth();
+                if (parser.getName().equals("body") &&
+                    parser.getNamespace().equals("http://www.w3.org/1999/xhtml")) {
+                    String content = XmlUtil.parserNodeToString(parser);
+                    xhtmlExtension.addBody(content);
+                    continue;
                 }
-                lastTag = parser.getText();
-                buffer.append(parser.getText());
-            } else if (eventType == XmlPullParser.TEXT) {
-                if (buffer != null) {
-                    // We need to return valid XML so any inner text needs to be re-escaped
-                    buffer.append(StringUtils.escapeForXML(parser.getText()));
-                }
+
+                // Ignore any unrecognized tags.  Read until we receive the END_TAG at our
+                // current level.
+                int currentLevel = parser.getDepth();
+                do {
+                    eventType = parser.next();
+                    if(eventType == XmlPullParser.END_DOCUMENT)
+                        break;
+                } while(eventType != XmlPullParser.END_TAG || parser.getDepth() > currentLevel);
             } else if (eventType == XmlPullParser.END_TAG) {
-                if (parser.getName().equals("body") && parser.getDepth() <= depth) {
-                    buffer.append(parser.getText());
-                    xhtmlExtension.addBody(buffer.toString());
-                }
-                else if (parser.getName().equals(xhtmlExtension.getElementName())
+                if (parser.getName().equals(xhtmlExtension.getElementName())
                         && parser.getDepth() <= startDepth) {
-                    done = true;
-                }
-                else {
-                    // This is a check for tags that are both a start and end tag like <br/>
-                    // So that they aren't doubled
-                    if(lastTag == null || !lastTag.equals(parser.getText())) {
-                        buffer.append(parser.getText());
-                    }
+                    break;
                 }
             }
         }

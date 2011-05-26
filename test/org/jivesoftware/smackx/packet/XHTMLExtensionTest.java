@@ -128,7 +128,7 @@ public class XHTMLExtensionTest extends SmackTestCase {
 	// Create a XHTMLExtension Package and add it to the message
 	XHTMLExtension xhtmlExtension = new XHTMLExtension();
 	xhtmlExtension.addBody(
-	"<body><p style='font-size:large'>Hey John, this is my new <span style='color:green'>green</span><em>!!!!</em></p></body>");
+	"<ignored>blah</ignored><body xmlns='http://www.w3.org/1999/xhtml'><p style='font-size:large'>Hey John, this is my new <span style='color:green'>green</span><em>!!!!</em></p></body>");
 	msg.addExtension(xhtmlExtension);
 
 	// User1 sends the message that contains the XHTML to user2
@@ -151,8 +151,11 @@ public class XHTMLExtensionTest extends SmackTestCase {
 		    xhtmlExtension);
 	    assertTrue("Message without XHTML bodies", xhtmlExtension.getBodiesCount() > 0);
 	    for (Iterator it = xhtmlExtension.getBodies(); it.hasNext();) {
+	        String expected =
+	            "<body xmlns='http://www.w3.org/1999/xhtml'><p style='font-size:large'>" +
+	            "Hey John, this is my new <span style='color:green'>green</span><em>!!!!</em></p></body>";
 		String body = (String) it.next();
-		System.out.println(body);
+		assertEquals(expected, body);
 	    }
 	}
 	catch (ClassCastException e) {
@@ -195,9 +198,9 @@ public class XHTMLExtensionTest extends SmackTestCase {
         // Create an XHTMLExtension and add it to the message
         XHTMLExtension xhtmlExtension = new XHTMLExtension();
         xhtmlExtension.addBody(
-                "<body xml:lang=\"es-ES\"><h1>impresionante!</h1><p>Como Emerson dijo una vez:</p><blockquote><p>Una consistencia ridicula es el espantajo de mentes pequenas.</p></blockquote></body>");
+                "<body xmlns='http://www.w3.org/1999/xhtml' xml:lang=\"es-ES\"><h1>impresionante!</h1><p>Como Emerson dijo una vez:</p><blockquote><p>Una consistencia ridicula es el espantajo de mentes pequenas.</p></blockquote></body>");
         xhtmlExtension.addBody(
-                "<body xml:lang=\"en-US\"><h1>awesome!</h1><p>As Emerson once said:</p><blockquote><p>A foolish consistency is the hobgoblin of little minds.</p></blockquote></body>");
+                "<body xmlns='http://www.w3.org/1999/xhtml' xml:lang=\"en-US\"><h1>awesome!</h1><p>As Emerson once said:</p><blockquote><p>A foolish consistency is the hobgoblin of little minds.</p></blockquote></body>");
         msg.addExtension(xhtmlExtension);
 
 	// User1 sends the message that contains the XHTML to user2
@@ -222,21 +225,24 @@ public class XHTMLExtensionTest extends SmackTestCase {
 		    "Message without extension \"http://jabber.org/protocol/xhtml-im\"",
 		    xhtmlExtension);
 	    assertTrue("Message without XHTML bodies", xhtmlExtension.getBodiesCount() > 0);
-	    for (Iterator it = xhtmlExtension.getBodies(); it.hasNext();) {
-		received++;
-		System.out.println((String) it.next());
-	    }
-	    bodiesReceived = received;
+            Iterator<String> it = xhtmlExtension.getBodies();
+
+	    // Verify the result.  Note that this verification depends on our particular
+	    // implementation of XmlUtil.parserNodeToString.
+	    String expect_ES =
+                "<body lang='es-ES' xmlns='http://www.w3.org/1999/xhtml'><h1>impresionante!</h1><p>Como Emerson dijo una vez:</p><blockquote><p>Una consistencia ridicula es el espantajo de mentes pequenas.</p></blockquote></body>";
+            String result = it.next();
+	    assertEquals(expect_ES, result);
+
+	    String expect_EN =
+                "<body lang='en-US' xmlns='http://www.w3.org/1999/xhtml'><h1>awesome!</h1><p>As Emerson once said:</p><blockquote><p>A foolish consistency is the hobgoblin of little minds.</p></blockquote></body>";
+            result = it.next();
+            assertEquals(expect_EN, result);
 	}
 	catch (ClassCastException e) {
 	    fail("ClassCastException - Most probable cause is that smack providers is " +
 	    "misconfigured");
 	}
-	// Wait half second so that the complete test can run
-	assertEquals(
-		"Number of sent and received XHTMP bodies does not match",
-		bodiesSent,
-		bodiesReceived);
     }
 
     @Override
