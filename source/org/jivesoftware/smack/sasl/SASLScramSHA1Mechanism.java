@@ -59,7 +59,6 @@ public class SASLScramSHA1Mechanism extends SASLMechanismType {
         /* Do U2 ... Ui. */
         byte[] previous = null;
         for(int i = 1; i < iterCount; ++i) {
-            hmac.reset();
             hmac.update(previous != null? previous: result);
             previous = hmac.doFinal();
             result = xorBytes(result, previous);
