@@ -31,6 +31,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.jivesoftware.smack.filter.PacketFilter;
+import org.jivesoftware.smack.filter.PacketIDFilter;
 import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.packet.Presence;
 
@@ -369,6 +370,31 @@ public abstract class Connection {
      * @param packet the packet to send.
      */
     public abstract void sendPacket(Packet packet);
+
+    /**
+     * Cast from U to T.  This allows unchecked casts without putting @SuppressWarnings("unchecked")
+     * on the function doing the cast, which confuses Javadocs in Eclipse.
+     */
+    @SuppressWarnings("unchecked")
+    private static <T, U> T uncheckedCast(U cls) {
+        return (T) cls;
+    }
+
+    /**
+     * Send the specified packet, and wait for a response to its packet ID with the
+     * same packet type using the default timeout.  Return the response packet.
+     * <p>
+     * See {@link PacketCollector#getResult} for exception conditions.
+     * <p>
+     * @param packet An instance of {@link Packet}.
+     */
+    public <T extends Packet> T sendPacketReadResult(T packet) throws XMPPException {
+        Class<T> packetClass = uncheckedCast(packet.getClass());
+        PacketCollector<T> collector = createPacketCollector(new PacketIDFilter(packet), packetClass);
+
+        sendPacket(packet);
+        return collector.getOnlyResult(0);
+    }
 
     /**
      * A stream reset is required.
