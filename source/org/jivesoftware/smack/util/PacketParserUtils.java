@@ -166,7 +166,9 @@ public class PacketParserUtils {
         int parserDepth = parser.getDepth();
         while (!(parser.next() == XmlPullParser.END_TAG && parser
                         .getDepth() == parserDepth)) {
-            content += parser.getText();
+            String text = parser.getText();
+            if(text != null)
+                content += text;
         }
         return content;
     }

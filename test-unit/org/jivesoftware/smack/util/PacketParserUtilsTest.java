@@ -658,8 +658,7 @@ public class PacketParserUtilsTest {
         
         try {
             Message message = (Message) PacketParserUtils.parseMessage(getParser(control));
-            String body = "<span style=\"font-weight: bold;\">"
-                            + "Message Body</span>";
+            String body = "Message Body";
             assertEquals(body, message.getBody());
             
             assertXMLNotEqual(control, message.toXML());
