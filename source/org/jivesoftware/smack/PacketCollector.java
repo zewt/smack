@@ -22,6 +22,7 @@ package org.jivesoftware.smack;
 
 import org.jivesoftware.smack.filter.PacketFilter;
 import org.jivesoftware.smack.packet.Packet;
+import org.jivesoftware.smack.packet.XMPPError;
 
 import java.util.LinkedList;
 
@@ -202,7 +203,7 @@ public class PacketCollector<T extends Packet> {
 
                 long waitTime = waitUntil - System.currentTimeMillis();
                 if (waitTime <= 0)
-                    throw new XMPPException("Response timed out");
+                    throw new XMPPException("Response timed out", XMPPError.Condition.request_timeout);
 
                 wait(waitTime);
             }
