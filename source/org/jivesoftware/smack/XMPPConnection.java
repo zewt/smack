@@ -30,6 +30,7 @@ import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.util.StringUtils;
 import org.jivesoftware.smack.util.ObservableReader;
 import org.jivesoftware.smack.util.ObservableWriter;
+import org.jivesoftware.smack.util.XmlUtil;
 
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
 
@@ -610,6 +611,13 @@ public class XMPPConnection extends Connection {
             throw ex;        // Everything stopped. Now throw the exception.
         } finally {
             coll.cancel();
+        }
+
+        for(Element node: XmlUtil.getChildElements(initialFeatures.getElement())) {
+            if(node.getLocalName().equals("register") &&
+               node.getNamespaceURI().equals("http://jabber.org/features/iq-register")) {
+                getAccountManager().setSupportsAccountCreation(true);
+            }
         }
 
         if (isFirstInitialization) {

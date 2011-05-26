@@ -211,7 +211,7 @@ class PacketReader {
                             waitingForEstablishedConnection = false;
                         }
 
-                        receivedPacket = parseFeatures(packet);
+                        receivedPacket = new ReceivedPacket(packet);
                     } else {
                         // Treat any unknown packet types generically.
                         receivedPacket = new ReceivedPacket(packet);
@@ -259,16 +259,6 @@ class PacketReader {
                 throw new AssertionError("Should be disconnected");
             notifyCollectorsOfDisconnection();
         }
-    }
-
-    private Packet parseFeatures(Element packet) throws Exception {
-        for(Element node: XmlUtil.getChildElements(packet)) {
-            if(node.getLocalName().equals("register")) {
-                connection.getAccountManager().setSupportsAccountCreation(true);
-            }
-        }
-
-        return new ReceivedPacket(packet);
     }
 
     private void notifyCollectorsOfDisconnection() {
