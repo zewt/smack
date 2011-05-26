@@ -38,7 +38,7 @@ import java.util.List;
  */
 public class XHTMLExtension implements PacketExtension {
 
-    private List bodies = new ArrayList();
+    private List<String> bodies = new ArrayList<String>();
 
     /**
     * Returns the XML element name of the extension sub-packet root element.
