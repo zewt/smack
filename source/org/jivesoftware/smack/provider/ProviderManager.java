@@ -22,15 +22,24 @@ package org.jivesoftware.smack.provider;
 
 import org.jivesoftware.smack.packet.IQ;
 import org.jivesoftware.smack.packet.PacketExtension;
-import org.xmlpull.v1.XmlPullParserException;
-import org.xmlpull.v1.XmlPullParserFactory;
-import org.xmlpull.v1.XmlPullParser;
+import org.jivesoftware.smack.util.PacketParserUtils;
+import org.jivesoftware.smack.util.XmlUtil;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringReader;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 
 /**
  * Manages providers for parsing custom XML sub-documents of XMPP packets. Two types of
@@ -207,41 +216,28 @@ public class ProviderManager {
         }
     }
 
-    private void loadProvidersFromStream(InputStream providerStream) throws XmlPullParserException, IOException {
-        XmlPullParser parser = XmlPullParserFactory.newInstance().newPullParser();
-        parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
-        parser.setInput(providerStream, "UTF-8");
-        int eventType = parser.getEventType();
-        do {
-            if (eventType == XmlPullParser.START_TAG) {
-                if (parser.getName().equals("iqProvider")) {
-                    parser.next();
-                    parser.next();
-                    String elementName = parser.nextText();
-                    parser.next();
-                    parser.next();
-                    String namespace = parser.nextText();
-                    parser.next();
-                    parser.next();
-                    String className = parser.nextText();
+    private void loadProvidersFromStream(Element doc) throws SAXException, IOException {
+        for(Element e: PacketParserUtils.getChildElements(doc)) {
+            if (e.getLocalName().equals("iqProvider") || e.getLocalName().equals("extensionProvider")) {
+                String elementName = null, namespace = null, className = null;
+                for(Element data: PacketParserUtils.getChildElements(e)) {
+                    if(data.getLocalName().equals("elementName"))
+                        elementName = PacketParserUtils.getTextContent(data);
+                    else if(data.getLocalName().equals("namespace"))
+                        namespace = PacketParserUtils.getTextContent(data);
+                    else if(data.getLocalName().equals("className"))
+                        className = PacketParserUtils.getTextContent(data);
+                }
+
+                if(elementName == null || namespace == null || className == null)
+                    continue;
+
+                if (e.getLocalName().equals("iqProvider"))
                     registerIQProvider(elementName, namespace, className);
-                }
-                else if (parser.getName().equals("extensionProvider")) {
-                    parser.next();
-                    parser.next();
-                    String elementName = parser.nextText();
-                    parser.next();
-                    parser.next();
-                    String namespace = parser.nextText();
-                    parser.next();
-                    parser.next();
-                    String className = parser.nextText();
+                else if(e.getLocalName().equals("extensionProvider"))
                     registerExtension(elementName, namespace, className);
-                }
             }
-            eventType = parser.next();
         }
-        while (eventType != XmlPullParser.END_DOCUMENT);
     }
 
     protected void initialize() {
@@ -257,7 +253,8 @@ public class ProviderManager {
                     InputStream providerStream = null;
                     try {
                         providerStream = url.openStream();
-                        loadProvidersFromStream(providerStream);
+                        Element doc = XmlUtil.getXMLRootNode(new InputSource(providerStream));
+                        loadProvidersFromStream(doc);
                     }
                     finally {
                         try {
