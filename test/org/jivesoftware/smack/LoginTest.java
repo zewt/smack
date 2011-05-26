@@ -58,6 +58,7 @@ public class LoginTest extends SmackTestCase {
     /**
      * Check that the server handles anonymous users correctly.
      */
+    // XXX: This test should not fall back on non-SASL login.
     public void testSASLAnonymousLogin() throws Exception {
         XMPPConnection conn1 = createConnection();
         XMPPConnection conn2 = createConnection();
