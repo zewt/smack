@@ -93,7 +93,7 @@ public class XHTMLExtension implements PacketExtension {
      *
      * @return an Iterator for the bodies in the packet.
      */
-    public Iterator getBodies() {
+    public Iterator<String> getBodies() {
         synchronized (bodies) {
             return Collections.unmodifiableList(new ArrayList(bodies)).iterator();
         }
