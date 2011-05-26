@@ -222,7 +222,8 @@ public abstract class SmackTestCase extends TestCase {
             return;
         }
         connections = new XMPPConnection[getMaxConnections()];
-        try {
+
+        {
             // Connect to the server
             for (int i = 0; i < getMaxConnections(); i++) {
                 connections[i] = createConnection();
@@ -264,10 +265,6 @@ public abstract class SmackTestCase extends TestCase {
                     }
                 }
             }
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-            fail(e.getMessage());
         }
     }
 
