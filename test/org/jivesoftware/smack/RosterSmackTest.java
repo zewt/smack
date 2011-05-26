@@ -485,9 +485,7 @@ public class RosterSmackTest extends SmackTestCase {
             Presence presence;
 
             // Create another connection for the same user of connection 1
-            ConnectionConfiguration connectionConfiguration =
-                    new ConnectionConfiguration(getHost(), getPort(), getServiceName());
-            XMPPConnection conn4 = new XMPPConnection(connectionConfiguration);
+            XMPPConnection conn4 = new XMPPConnection(getConnectionConfig());
             conn4.connect();
             conn4.login(getUsername(1), getUsername(1), "Home");
 
@@ -561,9 +559,7 @@ public class RosterSmackTest extends SmackTestCase {
      */
     public void testMultipleResources() throws Exception {
         // Create another connection for the same user of connection 1
-        ConnectionConfiguration connectionConfiguration =
-                new ConnectionConfiguration(getHost(), getPort(), getServiceName());
-        XMPPConnection conn4 = new XMPPConnection(connectionConfiguration);
+        XMPPConnection conn4 = new XMPPConnection(getConnectionConfig());
         conn4.connect();
         conn4.login(getUsername(1), getUsername(1), "Home");
 
@@ -626,9 +622,7 @@ public class RosterSmackTest extends SmackTestCase {
         assertEquals("Created entry was never received", 1, roster.getEntryCount());
 
         // Create another connection for the same user of connection 0
-        ConnectionConfiguration connectionConfiguration =
-                new ConnectionConfiguration(getHost(), getPort(), getServiceName());
-        XMPPConnection conn2 = new XMPPConnection(connectionConfiguration);
+        XMPPConnection conn2 = new XMPPConnection(getConnectionConfig());
         conn2.connect();
         conn2.login(getUsername(0), getUsername(0), "Home");
 

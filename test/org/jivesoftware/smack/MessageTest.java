@@ -195,9 +195,7 @@ public class MessageTest extends SmackTestCase {
      */
     public void testHighestPriority() throws Exception {
         // Create another connection for the same user of connection 1
-        ConnectionConfiguration connectionConfiguration =
-                new ConnectionConfiguration(getHost(), getPort(), getServiceName());
-        XMPPConnection conn3 = new XMPPConnection(connectionConfiguration);
+        XMPPConnection conn3 = new XMPPConnection(getConnectionConfig());
         conn3.connect();
         conn3.login(getUsername(0), getUsername(0), "Home");
         // Set this connection as highest priority
@@ -244,9 +242,7 @@ public class MessageTest extends SmackTestCase {
      */
     public void testHighestShow() throws Exception {
         // Create another connection for the same user of connection 1
-        ConnectionConfiguration connectionConfiguration =
-                new ConnectionConfiguration(getHost(), getPort(), getServiceName());
-        XMPPConnection conn3 = new XMPPConnection(connectionConfiguration);
+        XMPPConnection conn3 = new XMPPConnection(getConnectionConfig());
         conn3.connect();
         conn3.login(getUsername(0), getUsername(0), "Home");
         // Set this connection as highest priority
@@ -293,9 +289,7 @@ public class MessageTest extends SmackTestCase {
      */
     public void testMostRecentActive() throws Exception {
         // Create another connection for the same user of connection 1
-        ConnectionConfiguration connectionConfiguration =
-                new ConnectionConfiguration(getHost(), getPort(), getServiceName());
-        XMPPConnection conn3 = new XMPPConnection(connectionConfiguration);
+        XMPPConnection conn3 = new XMPPConnection(getConnectionConfig());
         conn3.connect();
         conn3.login(getUsername(0), getUsername(0), "Home");
         // Set this connection as highest priority
@@ -309,9 +303,7 @@ public class MessageTest extends SmackTestCase {
         presence.setPriority(10);
         getConnection(0).sendPacket(presence);
 
-        connectionConfiguration =
-                new ConnectionConfiguration(getHost(), getPort(), getServiceName());
-        XMPPConnection conn4 = new XMPPConnection(connectionConfiguration);
+        XMPPConnection conn4 = new XMPPConnection(getConnectionConfig());
         conn4.connect();
         conn4.login(getUsername(0), getUsername(0), "Home2");
         presence = new Presence(Presence.Type.available);
