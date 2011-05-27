@@ -200,10 +200,10 @@ public class SASLScramSHA1Mechanism extends SASLMechanismType {
             clientFinalMessageWithoutProof;
 
         // ClientSignature:
-        byte[] clientSignature = SASLHelpers.computeHMACSHA1(storedKey, authMessage.toString().getBytes());
+        byte[] clientSignature = SASLHelpers.computeHMACSHA1(storedKey, authMessage.getBytes());
         byte[] clientProof = xorBytes(clientKey, clientSignature);
         byte[] serverKey = SASLHelpers.computeHMACSHA1(saltedPassword, "Server Key".getBytes());
-        serverSignature = SASLHelpers.computeHMACSHA1(serverKey, authMessage.toString().getBytes());
+        serverSignature = SASLHelpers.computeHMACSHA1(serverKey, authMessage.getBytes());
 
         String finalMessageWithProof = clientFinalMessageWithoutProof + ",p=" + Base64.encodeBytes(clientProof);
         return finalMessageWithProof.getBytes();
