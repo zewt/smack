@@ -67,6 +67,14 @@ public class SASLScramSHA1Mechanism extends SASLMechanismType {
         return result;
     }
 
+    private static byte[] stringToBytesUTF8(String data) {
+        try {
+            return data.getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private static String byteToStringAscii(byte[] data) {
         try {
             return new String(data, "ASCII");
@@ -113,7 +121,7 @@ public class SASLScramSHA1Mechanism extends SASLMechanismType {
         clientFirstMessageBare = "n=" + escapedUsername + ",r=" + clientNonce;
 
         String firstMessage = gs2_header + clientFirstMessageBare;
-        return firstMessage.getBytes();
+        return stringToBytesUTF8(firstMessage);
     }
 
     static private byte[] xorBytes(byte[] lhs, byte[] rhs) {
@@ -182,7 +190,7 @@ public class SASLScramSHA1Mechanism extends SASLMechanismType {
             "c=" + Base64.encodeBytes(gs2_header.getBytes()) + ",r=" + serverNonce;
 
         /* Perform the steps in rfc5802 sec3. */
-        byte[] saltedPassword = calculateSaltedPassword(password.getBytes(), decodedSalt, iterCount);
+        byte[] saltedPassword = calculateSaltedPassword(stringToBytesUTF8(password), decodedSalt, iterCount);
         byte[] clientKey = SASLHelpers.computeHMACSHA1(saltedPassword, "Client Key".getBytes());
         byte[] storedKey = SASLHelpers.computeSHA1(clientKey);
 
