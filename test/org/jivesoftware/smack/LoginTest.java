@@ -134,8 +134,8 @@ public class LoginTest extends SmackTestCase {
 
         // Check that the server assigned a resource.
         assertNotNull("JID assigned by server is missing", conn.getUser());
-        assertNotNull("JID assigned by server does not have a resource",
-                StringUtils.parseResource(conn.getUser()));
+        assertTrue("JID assigned by server does not have a resource",
+                StringUtils.parseResource(conn.getUser()).length() > 0);
         conn.disconnect();
     }
 
