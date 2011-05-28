@@ -258,12 +258,12 @@ public class XMPPStreamBOSH extends XMPPStream
             return;
         }
 
-        // We've sent the terminate packet.  Wait for the stream to close; disconnect()
-        // will set connectionClosed.
+        // We've sent the terminate packet.  Wait for the stream to close; we'll
+        // receive a connectionEvent, which will call disconnect() and set connectionClosed.
         // android.util.Log.w("SMACK", "XMPPStreamBOSH: waiting for disconnect");
         long waitUntil = System.currentTimeMillis() + SmackConfiguration.getPacketReplyTimeout();
         synchronized(this) {
-            while(!read_queue.isEmpty()) {
+            while(!connectionClosed) {
                 long ms = waitUntil - System.currentTimeMillis();
                 if(ms <= 0)
                     break;
