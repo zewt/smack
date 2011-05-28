@@ -218,18 +218,18 @@ public class XMPPStreamTCP extends XMPPStream
             /* Stream initialization is complete.  The packet we just read wasn't consumed
              * by processInitializationPacket, so save it for the first real call to readPcket. */
             bufferedPacket = packet;
-
-            // After a successful connect, fill in config with the host we actually connected
-            // to.  This allows the client to detect what it's actually talking to, and is necessary
-            // for SASL authentication.  Don't do this until we're actually connected, so later
-            // autodiscovery attempts aren't modified.
-            config.setHost(host);
-            config.setPort(port);
-
-            /* Start keepalives after TLS has been set up. */ 
-            startKeepAliveProcess();
-            return;
+            break;
         }
+
+        // After a successful connect, fill in config with the host we actually connected
+        // to.  This allows the client to detect what it's actually talking to, and is necessary
+        // for SASL authentication.  Don't do this until we're actually connected, so later
+        // autodiscovery attempts aren't modified.
+        config.setHost(host);
+        config.setPort(port);
+
+        /* Start keepalives after TLS has been set up. */
+        startKeepAliveProcess();
     }
     
     /**
