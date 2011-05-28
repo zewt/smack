@@ -466,10 +466,10 @@ public class XMPPStreamTCP extends XMPPStream
         }
 
         // Now that we've closed the socket, close() won't block for I/O.
-        close(null);
+        gracefulDisconnect(null);
     }
 
-    public void close(String packet)
+    public void gracefulDisconnect(String packet)
     {
         // Tell readPacket() that we expect the connection to be closing.
         waitingForConnectionClose = true;

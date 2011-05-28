@@ -28,7 +28,7 @@ public abstract class XMPPStream
      * closed, the given packets will be sent in the disconnection message.  This
      * function may block.
      */
-    public abstract void close(String packet);
+    public abstract void gracefulDisconnect(String packet);
 
     /**
      * Forcibly disconnect the connection.  Future calls to readPacket will return

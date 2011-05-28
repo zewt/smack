@@ -418,7 +418,7 @@ public class XMPPConnection extends Connection {
 
         // Cleanly close down the connection.
         if (wasConnected)
-            data_stream.close(unavailablePresence != null? unavailablePresence.toXML():null);
+            data_stream.gracefulDisconnect(unavailablePresence != null? unavailablePresence.toXML():null);
 
         shutdown();
 

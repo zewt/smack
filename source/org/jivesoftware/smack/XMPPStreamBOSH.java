@@ -241,7 +241,7 @@ public class XMPPStreamBOSH extends XMPPStream
         // android.util.Log.w("SMACK", "XMPPStreamBOSH: initializeConnection: done");
     }
 
-    public void close(String packet)
+    public void gracefulDisconnect(String packet)
     {
         // android.util.Log.w("SMACK", "XMPPStreamBOSH: close()");
 
