@@ -469,6 +469,74 @@ public class XMPPStreamTCP extends XMPPStream
         close(null);
     }
 
+    public void close(String packet)
+    {
+        // Tell readPacket() that we expect the connection to be closing.
+        waitingForConnectionClose = true;
+
+        /* Attempt to close the stream. */
+        try {
+            if (packet == null)
+                packet = "";
+
+            // Append the final packet (if any) and </stream> and send them together,
+            // so they're sent together.
+            packet += "</stream:stream>";
+            writePacket(packet);
+        }
+        catch (IOException e) {
+            // Do nothing
+        }
+
+        // If the connection wasn't already closed, give the server a chance to close
+        // gracefully.
+        if(!connectionClosed) {
+            synchronized(this) {
+                long waitUntil = System.currentTimeMillis() + SmackConfiguration.getPacketReplyTimeout();
+                while(!sessionTerminated) {
+                    long ms = waitUntil - System.currentTimeMillis();
+                    if(ms <= 0)
+                        break;
+
+                    try {
+                        wait(ms);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            }
+        }
+
+        try {
+            if(socket != null)
+                socket.close();
+        }
+        catch (IOException ignore) { /* ignore */ }
+
+        // Shut down the keepalive thread, if any.  Do this after closing the socket,
+        // so it'll receive an IOException immediately if it's currently blocking to write,
+        // guaranteeing it'll exit quickly.
+        if(this.keepAlive != null) {
+            this.keepAlive.close();
+            this.keepAlive = null;
+        }
+
+        this.socket = null;
+
+        if (reader != null) {
+            try { reader.close(); } catch (IOException ignore) { /* ignore */ }
+            reader = null;
+        }
+
+        if (writer != null) {
+            try { writer.close(); } catch (IOException ignore) { /* ignore */ }
+            writer = null;
+        }
+
+        connectionClosed = true;
+    }
+
     public Element readPacket() throws XMPPException {
         if(bufferedPacket != null) {
             Element packet = bufferedPacket;
@@ -787,74 +855,6 @@ public class XMPPStreamTCP extends XMPPStream
         }
         
         streamReset();
-    }
-
-    public void close(String packet)
-    {
-        // Tell readPacket() that we expect the connection to be closing.
-        waitingForConnectionClose = true;
-
-        /* Attempt to close the stream. */
-        try {
-            if (packet == null)
-                packet = "";
-
-            // Append the final packet (if any) and </stream> and send them together,
-            // so they're sent together.
-            packet += "</stream:stream>";
-            writePacket(packet);
-        }
-        catch (IOException e) {
-            // Do nothing
-        }
-
-        // If the connection wasn't already closed, give the server a chance to close
-        // gracefully.
-        if(!connectionClosed) {
-            synchronized(this) {
-                long waitUntil = System.currentTimeMillis() + SmackConfiguration.getPacketReplyTimeout();
-                while(!sessionTerminated) {
-                    long ms = waitUntil - System.currentTimeMillis();
-                    if(ms <= 0)
-                        break;
-
-                    try {
-                        wait(ms);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
-                }
-            }
-        }
-
-        try {
-            if(socket != null)
-                socket.close();
-        }
-        catch (IOException ignore) { /* ignore */ }
-
-        // Shut down the keepalive thread, if any.  Do this after closing the socket,
-        // so it'll receive an IOException immediately if it's currently blocking to write,
-        // guaranteeing it'll exit quickly.
-        if(this.keepAlive != null) {
-            this.keepAlive.close();
-            this.keepAlive = null;
-        }
-        
-        this.socket = null;
-        
-        if (reader != null) {
-            try { reader.close(); } catch (IOException ignore) { /* ignore */ }
-            reader = null;
-        }
-       
-        if (writer != null) {
-            try { writer.close(); } catch (IOException ignore) { /* ignore */ }
-            writer = null;
-        }
-
-        connectionClosed = true;
     }
 
     private void proceedTLSReceived() throws Exception
