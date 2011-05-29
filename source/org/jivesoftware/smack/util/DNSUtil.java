@@ -263,7 +263,7 @@ public class DNSUtil {
                 return new Vector<String>();
             }
             if (lookup == null)
-                return new Vector<String>();
+                return null;
 
             Record recs[] = lookup.getAnswers();
             if (recs == null)
