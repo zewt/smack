@@ -8,6 +8,9 @@ import java.net.URISyntaxException;
 import java.security.cert.CertificateException;
 import java.util.Vector;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 import javax.net.ssl.SSLSocket;
 import javax.xml.parsers.DocumentBuilder;
@@ -46,8 +49,10 @@ public class XMPPStreamBOSH extends XMPPStream
 {
     private URI uri = null;
 
-    // bosh_client must only be accessed while synchronized, and only when
-    // connectionClosed is false.
+    private final ReentrantLock lock = new ReentrantLock();
+    private final Condition cond = lock.newCondition();
+    
+    // bosh_client must only be accessed while locked, and only when connectionClosed is false.
     private BOSHClient bosh_client;
     private boolean connectionClosed = false;
 
@@ -105,6 +110,8 @@ public class XMPPStreamBOSH extends XMPPStream
     };
 
     public ConnectData getConnectData() throws XMPPException {
+        assertNotLocked();
+
         if(bosh_client != null)
             throw new RuntimeException("The connection has already been initialized");
         if(this.uri == null)
@@ -115,7 +122,7 @@ public class XMPPStreamBOSH extends XMPPStream
         if(this.uri == null)
             return data;
 
-        if(this.uri.equals("")) {
+        if(!this.uri.equals(ConnectionConfiguration.AUTO_DETECT_BOSH)) {
             data.addresses.add(this.uri);
             return data;
         }
@@ -148,6 +155,8 @@ public class XMPPStreamBOSH extends XMPPStream
 
     public void initializeConnection(ConnectData data, int attempt, final PacketCallback userCallback) throws XMPPException
     {
+        assertNotLocked();
+
         if(bosh_client != null)
             throw new RuntimeException("The connection has already been initialized");
 
@@ -259,6 +268,8 @@ public class XMPPStreamBOSH extends XMPPStream
         }
 
         public void onBody(AbstractBody body) {
+            assertNotLocked();
+
             try {
                 handleFirstResponse(body);
             } catch(XMPPException e) {
@@ -271,9 +282,12 @@ public class XMPPStreamBOSH extends XMPPStream
             callback = userCallbacks;
 
             // Wake up waitForCompletion.
-            synchronized(XMPPStreamBOSH.this) {
+            lock.lock();
+            try {
                 complete = true;
-                XMPPStreamBOSH.this.notifyAll();
+                cond.signalAll();
+            } finally {
+                lock.unlock();
             }
         }
 
@@ -281,22 +295,30 @@ public class XMPPStreamBOSH extends XMPPStream
         public void onPacket(Element packet) { }
 
         public void onError(XMPPException error) {
-            synchronized(XMPPStreamBOSH.this) {
+            assertNotLocked();
+            lock.lock();
+            try {
                 this.error = error;
-                XMPPStreamBOSH.this.notifyAll();
+                cond.signalAll();
+            } finally {
+                lock.unlock();
             }
         }
 
         /** Wait until stream negotiation is complete. */
         public void waitForCompletion() throws XMPPException {
-            synchronized(XMPPStreamBOSH.this) {
+            assertNotLocked();
+            lock.lock();
+            try {
                 while(!complete && error == null) {
                     try {
-                        XMPPStreamBOSH.this.wait();
+                        cond.await();
                     } catch(InterruptedException e) {
                         Thread.currentThread().interrupt();
                     }
                 }
+            } finally {
+                lock.unlock();
             }
 
             if(error != null)
@@ -329,6 +351,7 @@ public class XMPPStreamBOSH extends XMPPStream
 
     public void gracefulDisconnect(String packet)
     {
+        assertNotLocked();
         // android.util.Log.w("SMACK", "XMPPStreamBOSH: close()");
 
         try {
@@ -348,18 +371,21 @@ public class XMPPStreamBOSH extends XMPPStream
         // receive a connectionEvent, which will call disconnect() and set connectionClosed.
         // android.util.Log.w("SMACK", "XMPPStreamBOSH: waiting for disconnect");
         long waitUntil = System.currentTimeMillis() + SmackConfiguration.getPacketReplyTimeout();
-        synchronized(this) {
+        lock.lock();
+        try {
             while(!connectionClosed) {
                 long ms = waitUntil - System.currentTimeMillis();
                 if(ms <= 0)
                     break;
                 try {
-                    wait(ms);
+                    cond.await(ms, TimeUnit.MILLISECONDS);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
                 }
             }
+        } finally {
+            lock.unlock();
         }
 
         // android.util.Log.w("SMACK", "XMPPStreamBOSH: done waiting, " + (connectionClosed? "connection is closed":"connection is not closed"));
@@ -369,14 +395,19 @@ public class XMPPStreamBOSH extends XMPPStream
     }
 
     public void disconnect() {
-        synchronized(this) {
+        assertNotLocked();
+
+        lock.lock();
+        try {
             if(connectionClosed)
                 return;
 
             bosh_client.close();
 
             connectionClosed = true;
-            notify();
+            cond.signalAll();
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -392,6 +423,7 @@ public class XMPPStreamBOSH extends XMPPStream
         // when restartlogic isn't present, then we'll break logins on older servers.  This really
         // isn't very useful: a BOSH server that we effectively can't authenticate through is useless,
         // so for now just pretend they all support stream restarts.
+        assertNotLocked();
 
         try {
             /* Make sure any written data is flushed and sent to the server.  According
@@ -425,8 +457,10 @@ public class XMPPStreamBOSH extends XMPPStream
 
     private class ResponseListener implements BOSHClientResponseListener
     {
-        public synchronized void responseReceived(BOSHMessageEvent event)
+        public void responseReceived(BOSHMessageEvent event)
         {
+            assertNotLocked();
+
             AbstractBody body = event.getBody();
 
             String xml = body.toXML();
@@ -466,8 +500,10 @@ public class XMPPStreamBOSH extends XMPPStream
 
     private class ConnectionListener implements BOSHClientConnListener
     {
-        public synchronized void connectionEvent(BOSHClientConnEvent connEvent)
+        public void connectionEvent(BOSHClientConnEvent connEvent)
         {
+            assertNotLocked();
+
             Throwable be = connEvent.getCause();
 
             // This is a hack: when the session is forcibly closed by calling
@@ -485,5 +521,10 @@ public class XMPPStreamBOSH extends XMPPStream
                 disconnect();
             }
         }
+    }
+
+    private void assertNotLocked() {
+        if(lock.isHeldByCurrentThread())
+            throw new RuntimeException("Lock should not be held");
     }
 };
