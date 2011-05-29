@@ -216,10 +216,15 @@ public class DNSUtil {
          */
         public Vector<HostAddress> run() {
             Vector<HostAddress> addresses = resolveSRV(asyncLookup1);
-            if(addresses.isEmpty())
-                addresses = resolveSRV(asyncLookup2);
-            if(addresses.isEmpty())
-                addresses.add(defaultResult);
+            if(addresses == null || !addresses.isEmpty())
+                return addresses;
+
+            addresses = resolveSRV(asyncLookup2);
+            if(addresses == null || !addresses.isEmpty())
+                return addresses;
+
+            addresses = new Vector<HostAddress>();
+            addresses.add(defaultResult);
             return addresses;
         }
 
@@ -355,14 +360,16 @@ public class DNSUtil {
         }
 
         /**
-         * Cancel the lookup.  If run() is called, or is called in the
-         * future, an exception will be thrown.  This function can be
-         * called asynchronously.
+         * Cancel the lookup.  If run() is called, or is called in the future, null
+         * will be returned.  This function can be called asynchronously.
          */
         public synchronized void cancel() {
             cancelled = true;
+            // Attempt to stop the lookup, if any.  XXX: This doesn't work, so the lookup
+            // is stranded until it times out.
             if(lookupThread != null)
                 lookupThread.interrupt();
+            notifyAll();
         }
     };
 
