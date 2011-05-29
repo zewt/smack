@@ -385,8 +385,6 @@ public class XMPPConnection extends Connection {
      * @param unavailablePresence the presence packet to send during shutdown.
      */
     protected void shutdown() {
-        packetReader.assertNotInThread();
-
         if (data_stream != null)
             data_stream.disconnect();
 
@@ -404,8 +402,6 @@ public class XMPPConnection extends Connection {
     }
 
     public void disconnect(Presence unavailablePresence) {
-        packetReader.assertNotInThread();
-
         boolean wasConnected;
         synchronized(this) {
             wasConnected = connected;
@@ -524,8 +520,6 @@ public class XMPPConnection extends Connection {
      * @throws XMPPException if establishing a connection to the server fails.
      */
     private void connectUsingConfiguration() throws XMPPException {
-        packetReader.assertNotInThread();
-
         // We may have several candidates to connect to: any number of XMPP
         // hosts via SRV discovery, and any number of BOSH hosts via TXT discovery.
         // Try transports in order of preference.
@@ -579,8 +573,6 @@ public class XMPPConnection extends Connection {
     }
 
     private void connectUsingConfigurationAttempt() throws XMPPException {
-        packetReader.assertNotInThread();
-
         data_stream.setReadWriteEvents(readEvent, writeEvent);
 
         // Start the packet writer.  This can't fail, and it won't do anything until
@@ -680,8 +672,8 @@ public class XMPPConnection extends Connection {
         }
     }
 
-    void initializeConnection() throws XMPPException {
-        data_stream.initializeConnection();
+    void initializeConnection(XMPPStream.PacketCallback callbacks) throws XMPPException {
+        data_stream.initializeConnection(callbacks);
     }
 
     /*
@@ -712,8 +704,6 @@ public class XMPPConnection extends Connection {
      *      appropiate error messages to end-users.
      */
     public void connect() throws XMPPException {
-        packetReader.assertNotInThread();
-
         // If we're already connected, or if we've disconnected but havn't yet cleaned
         // up, shut down.
         shutdown();
@@ -750,11 +740,6 @@ public class XMPPConnection extends Connection {
         if (!this.wasAuthenticated) {
             this.wasAuthenticated = wasAuthenticated;
         }
-    }
-
-    /** Read a single packet from the stream.  Used by PacketReader. */
-    protected Element readPacket() throws InterruptedException, XMPPException {
-        return data_stream.readPacket();
     }
 
     /** Write a list of packets to the stream.  Used by PacketWriter. */

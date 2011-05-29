@@ -14,7 +14,7 @@ public abstract class XMPPStream
      * 
      * @throws XMPPException if an error occurs during connection
      */
-    public abstract void initializeConnection() throws XMPPException;
+    public abstract void initializeConnection(PacketCallback callbacks) throws XMPPException;
     
     /**
      * Send the given packets to the server asynchronously.  This function may
@@ -43,15 +43,14 @@ public abstract class XMPPStream
      */
     public abstract void streamReset() throws XMPPException;
     
-    /**
-     * Returns a single parsed XML stanza, blocking if necessary.  If the stream is
-     * closed cleanly by either side, return null.
-     * 
-     * @return a parsed XMPP stanza.
-     * @throws XMPPException if an error occurs while reading or parsing the response.
-     */
-    public abstract Element readPacket() throws InterruptedException, XMPPException;
-    
+    static abstract class PacketCallback {
+        /** onPacket is called when a packet is received from the server. */
+        public abstract void onPacket(Element packet);
+
+        /** onError is called when the connection has been lost. */
+        public abstract void onError(XMPPException error);
+    };
+
     /**
      * Returns the current connection ID, or null if the connection hasn't
      * established an ID yet.

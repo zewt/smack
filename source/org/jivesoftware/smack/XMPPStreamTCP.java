@@ -28,7 +28,6 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
-import java.io.StringReader;
 import java.io.Writer;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -36,10 +35,11 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Vector;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 import javax.net.ssl.SSLSocket;
 import javax.xml.parsers.DocumentBuilder;
@@ -53,18 +53,11 @@ import org.jivesoftware.smack.util.ObservableWriter;
 import org.jivesoftware.smack.util.ThreadUtil;
 import org.jivesoftware.smack.util.WriterListener;
 import org.jivesoftware.smack.util.XmlUtil;
-import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.xml.sax.InputSource;
-import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
-
-import com.kenai.jbosh.AbstractBody;
 
 /**
  * XMPP TCP transport, implementing TLS and compression. 
@@ -92,6 +85,11 @@ public class XMPPStreamTCP extends XMPPStream
     /* True if TLS compression is enabled. */
     private boolean usingTLSCompression = false;
 
+    private boolean threadExited = false;
+
+    private final ReentrantLock lock = new ReentrantLock();
+    private final Condition cond = lock.newCondition();
+
     private ConnectionConfiguration config;
     private String originalServiceName;
 
@@ -104,18 +102,28 @@ public class XMPPStreamTCP extends XMPPStream
     /** The compression methods advertised in the most recent <features/>. */
     private List<String> featureCompressionMethods;
 
-    /** If true, readPacket received a null entry, and all future calls to readPacket will
-     *  return null. */
-    private boolean hitEndOfStream = false;
+    /** Callbacks for stream events. */
+    private PacketCallback callbacks;
+
+    private void assertNotLocked() {
+        if(lock.isHeldByCurrentThread())
+            throw new RuntimeException("Lock should not be held");
+    }
+
+    private void assertLocked() {
+        if(!lock.isHeldByCurrentThread())
+            throw new RuntimeException("Lock should be held");
+    }
 
     public void writePacket(String packet) throws IOException {
+        assertNotLocked();
+
         // writer can be cleared by calls to disconnect.  We can't hold a lock
         // on XMPPStreamTCP while we use it, since it can block indefinitely.
         // Take a reference to writer.
-        Writer writerCopy;
-        synchronized(this) {
-            writerCopy = this.writer;
-        }
+        lock.lock();
+        Writer writerCopy = this.writer;
+        lock.unlock();
 
         if(writerCopy == null)
             throw new IOException("Wrote a packet while the connection was closed");
@@ -131,16 +139,12 @@ public class XMPPStreamTCP extends XMPPStream
     String connectionID;
     public String getConnectionID() { return connectionID; }
 
-    // When this changes, XMPPStreamTCP must be signalled.
-    private QueuedMessage nextReadEvent = null;
-
     private PacketReaderThread packetReaderThread;
     private Thread threadUnjoined = null;
 
     public XMPPStreamTCP(ConnectionConfiguration config)
     {
         this.config = config;
-        connectionClosed = true;
         
         try {
             parser = XmlPullParserFactory.newInstance().newPullParser();
@@ -171,113 +175,153 @@ public class XMPPStreamTCP extends XMPPStream
      * Begin the initial connection to the server.  Returns when the connection
      * is established.
      */
-    public synchronized void initializeConnection() throws XMPPException {
+    public void initializeConnection(final PacketCallback userCallbacks) throws XMPPException {
+        assertNotLocked();
+
         if(socket != null)
             throw new RuntimeException("The connection has already been initialized");
 
-        String host = config.getHost();
-        int port = config.getPort();
-
-        // If no host was specified, look up the XMPP service name.
-        // XXX: This should be cancellable.
-        if(host == null) {
-            // This will return the same results each time, because the weight
-            // shuffling is cached.
-            DNSUtil.XMPPDomainLookup lookup = new DNSUtil.XMPPDomainLookup(config.getServiceName(), true);
-            Vector<DNSUtil.HostAddress> addresses = lookup.run();
-            if(discoveryIndex >= addresses.size())
-                throw new XMPPException("No more servers to attempt (tried all " + addresses.size() + ")",
-                        XMPPError.Condition.remote_server_not_found);
-            host = addresses.get(discoveryIndex).getHost();
-            port = addresses.get(discoveryIndex).getPort();
-        } else {
-            // If we're not autodiscovering servers, we have only one server to try.
-            if(discoveryIndex > 0)
-                throw new XMPPException("No more servers to attempt", XMPPError.Condition.remote_server_not_found);
-        }
-
+        lock.lock();
         try {
-            socket = config.getSocketFactory().createSocket(host, port);
-            
-            initReaderAndWriter();
-        } catch (UnknownHostException e) {
-            throw new XMPPException("Could not connect to " + host + ":" + port, e);
-        } catch(IOException e) {
-            throw new XMPPException("Could not connect to " + host + ":" + port, e);
+            String host = config.getHost();
+            int port = config.getPort();
+
+            // If no host was specified, look up the XMPP service name.
+            // XXX: This should be cancellable.
+            if(host == null) {
+                // This will return the same results each time, because the weight
+                // shuffling is cached.
+                DNSUtil.XMPPDomainLookup lookup = new DNSUtil.XMPPDomainLookup(config.getServiceName(), true);
+                Vector<DNSUtil.HostAddress> addresses = lookup.run();
+                if(discoveryIndex >= addresses.size())
+                    throw new XMPPException("No more servers to attempt (tried all " + addresses.size() + ")",
+                            XMPPError.Condition.remote_server_not_found);
+                host = addresses.get(discoveryIndex).getHost();
+                port = addresses.get(discoveryIndex).getPort();
+            } else {
+                // If we're not autodiscovering servers, we have only one server to try.
+                if(discoveryIndex > 0)
+                    throw new XMPPException("No more servers to attempt", XMPPError.Condition.remote_server_not_found);
+            }
+
+            // If threadExited is true, then disconnect() was called before we got this far.
+            // Exit without starting.
+            if(threadExited)
+                return;
+
+            try {
+                socket = config.getSocketFactory().createSocket(host, port);
+
+                initReaderAndWriter();
+            } catch (UnknownHostException e) {
+                throw new XMPPException("Could not connect to " + host + ":" + port, e);
+            } catch(IOException e) {
+                throw new XMPPException("Could not connect to " + host + ":" + port, e);
+            }
+
+            SetupPacketCallback setupCallbacks = new SetupPacketCallback(userCallbacks);
+            this.callbacks = setupCallbacks;
+
+            packetReaderThread = new PacketReaderThread();
+            packetReaderThread.setName("XMPP packet reader (" + host + ":" + port + ")");
+            packetReaderThread.start();
+
+            try {
+                // Wait for TLS and compression negotiation to complete.  If this returns successfully,
+                // this.callbacks is updated to point to userCallbacks.
+                setupCallbacks.waitForCompletion();
+            } catch(XMPPException e) {
+                lock.unlock();
+                assertNotLocked();
+
+                disconnect();
+
+                lock.lock();
+                throw e;
+            }
+
+            // After a successful connect, fill in config with the host we actually connected
+            // to.  This allows the client to detect what it's actually talking to, and is necessary
+            // for SASL authentication.  Don't do this until we're actually connected, so later
+            // autodiscovery attempts aren't modified.
+            config.setHost(host);
+            config.setPort(port);
+
+            /* Start keepalives after TLS has been set up. */
+            startKeepAliveProcess();
+        } finally {
+            lock.unlock();
         }
-
-        packetReaderThread = new PacketReaderThread();
-        packetReaderThread.setName("XMPP packet reader (" + host + ":" + port + ")");
-        packetReaderThread.start();
-
-        // Mark the connection open.  Once we do this, other threads can call disconnect()
-        // and gracefulDisconnect().
-        connectionClosed = false;
-
-        try {
-            setupTransport();
-        } catch(XMPPException e) {
-            disconnect();
-        }
-
-        // After a successful connect, fill in config with the host we actually connected
-        // to.  This allows the client to detect what it's actually talking to, and is necessary
-        // for SASL authentication.  Don't do this until we're actually connected, so later
-        // autodiscovery attempts aren't modified.
-        config.setHost(host);
-        config.setPort(port);
-
-        /* Start keepalives after TLS has been set up. */
-        startKeepAliveProcess();
     }
 
-    private void setupTransport() throws XMPPException {
-        /* Handle transport-level negotiation.  Read the <features/> packet to see if
-         * we should set up TLS or compression, and repeat until we have nothing more
-         * to negotiate. */
-        while(true) {
-            // Read the next packet, leaving it in the queue.  This serves two purposes:
-            // first, if this packet is a <features/> that we're not interested in, and
-            // therefore ends transport negotiation, we need to leave the packet in place,
-            // so the next call to readPacket() will retrieve it.  Second, it prevents
-            // the packet reader thread from moving on and trying to read the next packet,
-            // which is necessary when we negotiate a new stream format; if we enable TLS
-            // or compression, we can't begin reading the next packet until the new stream
-            // format is set up by initReaderAndWriter.
-            Element packet = peekPacket();
+    /**
+     * This callback handler receives packets during initial setup: TLS and
+     * compression negitiation.  Once we're finished with that, it switches
+     * callbacks over to the ones the user provided.
+     */
+    class SetupPacketCallback extends PacketCallback {
+        boolean complete = false;
+        XMPPException error = null;
+        /* After completing transport setup, the packet callbacks will be changed from this
+         * object to the user's callbacks. */
+        PacketCallback userCallbacks;
 
-            // If packet is null, the stream terminated normally.  The only way the
-            // stream can terminate normally here is if disconnect() was called asynchronously;
-            // report that as an error, akin to InterruptedException.
-            if(packet == null)
-                throw new XMPPException("Disconnected by user");
+        SetupPacketCallback(PacketCallback userCallbacks) {
+            this.userCallbacks = userCallbacks;
+        }
 
-            boolean consumePacket = true;
+        public void onPacket(Element packet) {
+            assertNotLocked();
+
             try {
-                if(processInitializationPacket(packet)) {
-                    /* We're still initializing the connection, so don't return any packets. */
-                    continue;
+                lock.lock();
+                try {
+                    // If this returns true, then initialization is continuing.
+                    if(processInitializationPacket(packet))
+                        return;
+
+                    // Initialization is complete.  Switch to the user's callbacks, and wake
+                    // initializeConnection back up.
+                    callbacks = userCallbacks;
+                    complete = true;
+                    cond.signalAll();
+                } finally {
+                    lock.unlock();
                 }
 
-                // Stream initialization is complete.  The packet we just read wasn't for us,
-                // so don't take it.
-                consumePacket = false;
-                return;
+                // We just received the first <features/> packet that isn't related to
+                // stream negotiation, so pass it on to the user's callback.
+                userCallbacks.onPacket(packet);
             } catch(IOException e) {
-                throw new XMPPException("I/O error establishing connection to server", e);
-            } finally {
-                if(consumePacket) {
-                    // This packet was for us, so call readPacket() now to actually remove it.
-                    Element actualPacket = readPacket();
-
-                    // Sanity check: the packet we just consumed is the same packet that we
-                    // received from peekPacket().
-                    if(actualPacket != packet)
-                        throw new AssertionError("readPacket didn't return the same result as peekPacket");
-                }
+                onError(new XMPPException("I/O error establishing connection to server", e));
+            } catch(XMPPException e) {
+                onError(e);
             }
         }
-    }
+
+        public void onError(XMPPException error) {
+            assertNotLocked();
+            lock.lock();
+            try {
+                this.error = error;
+                cond.signalAll();
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        /** Wait until stream negotiation is complete. */
+        public void waitForCompletion() throws XMPPException {
+            assertLocked();
+
+            while(!complete && error == null) {
+                waitUninterruptible(cond);
+            }
+
+            if(error != null)
+                throw new XMPPException(error);
+        }
+    };
 
     /**
      * Return true if zlib (deflate) compression is supported.
@@ -295,13 +339,15 @@ public class XMPPStreamTCP extends XMPPStream
 
 
     /**
-     * Attempt to negotiate a feature, based
+     * Attempt to negotiate a feature, based on the most recent <features/> packet.
      * 
      * @return true if a feature is being negotiated.
      * @throws XMPPException
      * @throws IOException
      */
     private boolean negotiateFeature() throws XMPPException, IOException {
+        assertLocked();
+
         // If TLS is required but the server doesn't offer it, disconnect
         // from the server and throw an error. First check if we've already negotiated TLS
         // and are secure, however (features get parsed a second time after TLS is established).
@@ -375,6 +421,8 @@ public class XMPPStreamTCP extends XMPPStream
     private boolean processInitializationPacket(Element node)
         throws XMPPException, IOException
     {
+        assertLocked();
+
         if (node.getNodeName().equals("features")) {
             featureStartTLSReceived = false;
             featureCompressionMethods = new ArrayList<String>();
@@ -451,6 +499,8 @@ public class XMPPStreamTCP extends XMPPStream
      * TLS is supported by the server.  If encryption is enabled, start TLS.  
      */
     private void startTLSReceived() throws IOException {
+        assertLocked();
+
         writer.write("<starttls xmlns=\"urn:ietf:params:xml:ns:xmpp-tls\"/>");
         writer.flush();
     }
@@ -468,6 +518,8 @@ public class XMPPStreamTCP extends XMPPStream
      * Note: to use stream compression the smackx.jar file has to be present in the classpath.
      */
     private void enableCompressionMethod(String method) throws IOException {
+        assertLocked();
+
         writer.write("<compress xmlns='http://jabber.org/protocol/compress'>");
         writer.write("<method>" + method + "</method></compress>");
         writer.flush();
@@ -497,7 +549,17 @@ public class XMPPStreamTCP extends XMPPStream
         return major * 100 + (minor % 100);
     }
 
-    private synchronized void shutdown_stream() {
+    private void shutdown_stream() {
+        assertLocked();
+
+        // If socket isn't set, then initializeConnection hasn't yet set up the
+        // socket or thread.  Skip to the threadExited state, so it'll abort without
+        // starting them.
+        if(socket == null) {
+            threadExited = true;
+            return;
+        }
+
         try {
             // Closing the socket will cause any blocking readers and writers on the
             // socket to stop waiting and throw an exception.
@@ -507,13 +569,17 @@ public class XMPPStreamTCP extends XMPPStream
             throw new RuntimeException("Unexpected I/O error disconnecting socket", e);
         }
 
-        // Shut down the reader thread, if we're not running in it.  Otherwise, this will be
-        // done when the owner thread calls disconnect().
+        // Unless we're running from the thread itself, wait for the thread to exit,
+        // so it isn't accessing anything we shut down.
+        if(packetReaderThread != Thread.currentThread() && packetReaderThread != threadUnjoined) {
+            while(!threadExited)
+                waitUninterruptible(cond);
+        }
+
         if(packetReaderThread != null) {
-            if(packetReaderThread == Thread.currentThread())
-                threadUnjoined = packetReaderThread;
-            else
-                ThreadUtil.uninterruptibleJoin(packetReaderThread);
+            // Stash the thread to be joined by disconnect() when we're not locked.
+            threadUnjoined = packetReaderThread;
+            packetReaderThread = null;
         }
 
         // Shut down the keepalive thread, if any.  Do this after closing the socket,
@@ -541,50 +607,45 @@ public class XMPPStreamTCP extends XMPPStream
      * Forcibly disconnect the stream.  If readPacket() is waiting for input, it will
      * return end of stream immediately.
      */
-    boolean connectionClosed = false;
     public void disconnect() {
-        synchronized(this) {
-            if(!connectionClosed) {
-                // Queue a QueuedEnd; this guarantees that anyone waiting on a readPacket
-                // call will stop.  If it's already a QueuedError, leave it alone.
-                if(nextReadEvent == null || !(nextReadEvent  instanceof QueuedError)) {
-                    nextReadEvent = new QueuedEnd();
-                    // notifyAll happens below
-                }
+        assertNotLocked();
 
-                connectionClosed = true;
-                notifyAll();
+        Thread threadToJoin = null;
 
-                shutdown_stream();
-            }
+        lock.lock();
+        try {
+            shutdown_stream();
 
             // If packetReaderThread calls disconnect(), it'll shut everything down except for
             // itself, since a thread can't join itself.  Join the thread now if necessary.
             if(threadUnjoined != null && threadUnjoined != Thread.currentThread()) {
-                Thread thread = threadUnjoined;
+                threadToJoin = threadUnjoined;
                 threadUnjoined = null;
-
-                ThreadUtil.uninterruptibleJoin(thread);
             }
+        } finally {
+            lock.unlock();
         }
+
+        if(threadToJoin != null)
+            ThreadUtil.uninterruptibleJoin(threadToJoin);
     }
 
-    static boolean waitUntilTime(Object obj, long waitUntil) {
+    static boolean waitUntilTime(Condition cond, long waitUntil) {
         long ms = waitUntil - System.currentTimeMillis();
         if(ms <= 0)
             return false;
 
         try {
-            obj.wait(ms);
+            cond.await(ms, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
         return true;
     }
 
-    static void waitUninterruptible(Object obj) {
+    static void waitUninterruptible(Condition obj) {
         try {
-            obj.wait();
+            obj.await();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -592,90 +653,39 @@ public class XMPPStreamTCP extends XMPPStream
 
     public void gracefulDisconnect(String packet)
     {
-        /* Attempt to close the stream. */
-        synchronized(this) {
-            if(connectionClosed) {
-                // If the connection is already closed or in the process of closing when
-                // we're called again, close immediately.
-                disconnect();
-                return;
-            }
+        assertNotLocked();
 
-            try {
-                if (packet == null)
-                    packet = "";
+        /* Ask the stream to close. */
+        try {
+            if (packet == null)
+                packet = "";
 
-                // Append the final packet (if any) and </stream> and send them together,
-                // so they're sent together.
-                packet += "</stream:stream>";
-                writePacket(packet);
-            }
-            catch (IOException e) {
-                // If this fails for some reason, just close the connection.
-                e.printStackTrace();
-                disconnect();
-                return;
-            }
+            // Append the final packet (if any) and </stream> and send them together,
+            // so they're sent together.
+            packet += "</stream:stream>";
+            writePacket(packet);
+        }
+        catch (IOException e) {
+            // If this fails for some reason, just close the connection.
+            e.printStackTrace();
+            disconnect();
+            return;
+        }
 
+        lock.lock();
+        try {
             // Wait for the connection to close gracefully.
             long waitUntil = System.currentTimeMillis() + SmackConfiguration.getPacketReplyTimeout();
-            while(!connectionClosed) {
-                if(!waitUntilTime(this, waitUntil))
+            while(!threadExited) {
+                if(!waitUntilTime(cond, waitUntil))
                     break;
             }
-
-            // If the connection didn't close gracefully, force it.
-            disconnect();
-        }
-    }
-
-    /* A queue of packets received from the server. */
-    private static abstract interface QueuedMessage { };
-    private static class QueuedResponse implements QueuedMessage {
-        public Element body;
-        QueuedResponse(Element body) { this.body = body; }
-    };
-    private static class QueuedError implements QueuedMessage {
-        QueuedError(XMPPException error) { this.error = error; }
-        XMPPException error;
-    };
-    private static class QueuedEnd implements QueuedMessage { };
-
-    /**
-     * Return the current read event.  If none is available, blocks.  The read
-     * event will not be cleared; multiple consecutive calls to this function
-     * will return the same value.
-     */
-    private synchronized Element peekPacket() throws XMPPException {
-        if(hitEndOfStream)
-            return null;
-
-        while(nextReadEvent == null)
-            waitUninterruptible(this);
-
-        if(nextReadEvent instanceof QueuedEnd || nextReadEvent instanceof QueuedError) {
-            // Set hitEndOfStream, so all future calls to readPacket will continue to return null.
-            hitEndOfStream = true;
+        } finally {
+            lock.unlock();
         }
 
-        // QueuedEnd indicates that the stream has terminated normally.
-        if(nextReadEvent instanceof QueuedEnd)
-            return null;
-
-        if(nextReadEvent instanceof QueuedError)
-            throw ((QueuedError) nextReadEvent).error;
-        else
-            return ((QueuedResponse) nextReadEvent).body;
-    }
-
-    public synchronized Element readPacket() throws XMPPException {
-        Element result = peekPacket();
-
-        // Clear the event.
-        nextReadEvent = null;
-        notifyAll();
-
-        return result;
+        // If the connection didn't close gracefully, force it.
+        disconnect();
     }
 
     /**
@@ -686,6 +696,8 @@ public class XMPPStreamTCP extends XMPPStream
      * received packet.
      */
     private Element loadStreamSettings(Element element) throws XMPPException {
+        assertLocked();
+
         // Save the connection id.
         connectionID = element.getAttribute("id");
 
@@ -722,8 +734,10 @@ public class XMPPStreamTCP extends XMPPStream
             while(true) {
                 try {
                     Element result = readPacketLoop(parser);
+                    assertNotLocked();
+                    lock.lock();
 
-                    synchronized(XMPPStreamTCP.this) {
+                    try {
                         if(parser.getDepth() == 1) {
                             // Process the stream header.  If it returns a packet, treat it
                             // as the received packet; otherwise move on and read the next packet.
@@ -731,24 +745,29 @@ public class XMPPStreamTCP extends XMPPStream
                             if(result == null)
                                 continue;
                         }
-
-                        QueuedResponse resp = new QueuedResponse(result);
-                        nextReadEvent = resp;
-                        XMPPStreamTCP.this.notifyAll();
-
-                        // Wait for someone to take the message.
-                        while(nextReadEvent == resp)
-                            waitUninterruptible(XMPPStreamTCP.this);
+                    } finally {
+                        lock.unlock();
                     }
+
+                    callbacks.onPacket(result);
                 } catch(XMPPException e) {
-                    synchronized(XMPPStreamTCP.this) {
-                        // This is our normal exit path; the stream will be closed and readPacketLoop
-                        // will throw a socket error.
-                        nextReadEvent = new QueuedError(e);
-                        XMPPStreamTCP.this.notifyAll();
+                    assertNotLocked();
+
+                    // This is our normal exit path; the stream will be closed and readPacketLoop
+                    // will throw a socket error.
+                    disconnect();
+
+                    callbacks.onError(e);
+
+                    // Notify any disconnect() calls in other threads that we're exiting.
+                    lock.lock();
+                    try {
+                        threadExited = true;
+                        cond.signalAll();
+                    } finally {
+                        lock.unlock();
                     }
 
-                    disconnect();
                     return;
                 }
             }

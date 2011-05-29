@@ -15,10 +15,12 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.jivesoftware.smack.ConnectionConfiguration.SecurityMode;
+import org.jivesoftware.smack.XMPPStream.PacketCallback;
 import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.util.DNSUtil;
 import org.jivesoftware.smack.util.ObservableReader;
 import org.jivesoftware.smack.util.ObservableWriter;
+import org.jivesoftware.smack.util.XmlUtil;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -95,7 +97,9 @@ public class XMPPStreamBOSH extends XMPPStream
         discoveryIndex = index;
     }
 
-    public void initializeConnection() throws XMPPException
+    private PacketCallback callback;
+
+    public void initializeConnection(PacketCallback userCallback) throws XMPPException
     {
         if(bosh_client != null)
             throw new RuntimeException("The connection has already been initialized");
@@ -172,9 +176,23 @@ public class XMPPStreamBOSH extends XMPPStream
             }
         });
 
+        SetupPacketCallback setupCallback = new SetupPacketCallback(userCallback);
+        callback = setupCallback;
+
         try {
             // Send the session creation request and receive the response.
-            startupConnection();
+            try {
+                bosh_client.send(ComposableBody.builder()
+                            .setNamespaceDefinition("xmpp", "urn:xmpp:xbosh")
+                            .setAttribute(BodyQName.createWithPrefix("urn:xmpp:xbosh", "version", "xmpp"), "1.0")
+                            .build());
+            }
+            catch(BOSHException e)
+            {
+                throw new XMPPException("Error connecting to BOSH server", e);
+            }
+
+            setupCallback.waitForCompletion();
         } catch(XMPPException e) {
             /* If an exception occurs while we're starting the connection, close it.
              * The connection should only be running on a successful return. */
@@ -197,24 +215,65 @@ public class XMPPStreamBOSH extends XMPPStream
         connectionClosed = false;
     }
 
-    private void startupConnection() throws XMPPException {
-        // android.util.Log.w("SMACK", "XMPPStreamBOSH: initializeConnectionInternal: send");
-        try {
-            bosh_client.send(ComposableBody.builder()
-                        .setNamespaceDefinition("xmpp", "urn:xmpp:xbosh")
-                        .setAttribute(BodyQName.createWithPrefix("urn:xmpp:xbosh", "version", "xmpp"), "1.0")
-                        .build());
-        }
-        catch(BOSHException e)
-        {
-            throw new XMPPException("Error connecting to BOSH server", e);
+    class SetupPacketCallback extends PacketCallback {
+        boolean complete = false;
+        XMPPException error = null;
+
+        /* After completing transport setup, the packet callbacks will be changed from this
+         * object to the user's callbacks. */
+        PacketCallback userCallbacks;
+
+        SetupPacketCallback(PacketCallback userCallbacks) {
+            this.userCallbacks = userCallbacks;
         }
 
-        // Read the response to the first packet.
-        AbstractBody packet = readAbstractPacket();
-        if(packet == null)
-            throw new XMPPException("Connection to BOSH server closed prematurely");
+        public void onBody(AbstractBody body) {
+            try {
+                handleFirstResponse(body);
+            } catch(XMPPException e) {
+                onError(e);
+                return;
+            }
 
+            // Switch callbacks to the user's, so ResponseListener sends onPacket
+            // calls to it.
+            callback = userCallbacks;
+
+            // Wake up waitForCompletion.
+            synchronized(XMPPStreamBOSH.this) {
+                complete = true;
+                XMPPStreamBOSH.this.notifyAll();
+            }
+        }
+
+        // This is never called, since we change to userCallbacks first.
+        public void onPacket(Element packet) { }
+
+        public void onError(XMPPException error) {
+            synchronized(XMPPStreamBOSH.this) {
+                this.error = error;
+                XMPPStreamBOSH.this.notifyAll();
+            }
+        }
+
+        /** Wait until stream negotiation is complete. */
+        public void waitForCompletion() throws XMPPException {
+            synchronized(XMPPStreamBOSH.this) {
+                while(!complete && error == null) {
+                    try {
+                        XMPPStreamBOSH.this.wait();
+                    } catch(InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
+
+            if(error != null)
+                throw new XMPPException(error);
+        }
+    };
+
+    private void handleFirstResponse(AbstractBody packet) throws XMPPException {
         // Check that secure='1' was sent in the response, indicating that the BOSH->XMPP connection
         // is also secure.
         String secure = packet.getAttribute(BodyQName.create("http://jabber.org/protocol/httpbind", "secure"));
@@ -235,10 +294,6 @@ public class XMPPStreamBOSH extends XMPPStream
         String from = packet.getAttribute(BodyQName.create("http://jabber.org/protocol/httpbind", "from"));
         if(from != null)
             config.setServiceName(from);
-
-        /* We still need to return this from readPacket, so queue it. */
-        read_queue.add(new QueuedResponse(packet));
-        // android.util.Log.w("SMACK", "XMPPStreamBOSH: initializeConnection: done");
     }
 
     public void gracefulDisconnect(String packet)
@@ -287,14 +342,6 @@ public class XMPPStreamBOSH extends XMPPStream
             if(connectionClosed)
                 return;
 
-            // android.util.Log.w("SMACK", "XMPPStreamBOSH: disconnect (queueing QueuedEnd)");
-
-            boolean added = read_queue.offer(new QueuedEnd());
-
-            // The queue doesn't have any limit set, so this should always succeed.
-            if(!added)
-                throw new AssertionError("Queueing packet failed");
-
             bosh_client.close();
 
             connectionClosed = true;
@@ -333,100 +380,6 @@ public class XMPPStreamBOSH extends XMPPStream
         }
     }
 
-    /* A queue of packets received from the server. */
-    private static abstract interface QueuedMessage { };
-    private static class QueuedResponse implements QueuedMessage {
-        public AbstractBody body;
-        QueuedResponse(AbstractBody body) { this.body = body; }
-    };
-    private static class QueuedError implements QueuedMessage {
-        QueuedError(XMPPException error) { this.error = error; }
-        XMPPException error;
-    };
-    private static class QueuedEnd implements QueuedMessage { };
-
-    LinkedBlockingQueue<QueuedMessage> read_queue = new LinkedBlockingQueue<QueuedMessage>();
-
-    public AbstractBody readAbstractPacket() throws XMPPException {
-        /* There should never be XML packets in this.nodes waiting to be delivered
-         * if we're requesting a new <body/>. */
-        assert(nodes == null || nodesNextIndex == nodes.getLength());
-
-        QueuedMessage msg = null;
-        try {
-            msg = read_queue.take();
-        }
-        catch(InterruptedException e)
-        {
-            throw new XMPPException("Interrupted while waiting for a packet", e);
-        }
-
-        // Null queued as a message indicates that the stream has terminated
-        // normally.
-        if(msg instanceof QueuedEnd)
-            return null;
-
-        if(msg instanceof QueuedError)
-            throw ((QueuedError) msg).error;
-        else
-            return ((QueuedResponse) msg).body;
-    }
-
-    NodeList nodes;
-    int nodesNextIndex = 0;
-    public Element readPacket() throws InterruptedException, XMPPException {
-        while(true) {
-            try {
-                if(nodesNextIndex == -1)
-                    return null;
-
-                // Return the next queued packet, if any.
-                while(nodes != null && nodesNextIndex < nodes.getLength()) {
-                    Node node = nodes.item(nodesNextIndex++);
-                    if(!(node instanceof Element))
-                        continue;
-
-                    return (Element) node;
-                }
-
-                // We don't have any nodes queued to return, so block and wait for the
-                // next one.
-                AbstractBody body = readAbstractPacket();
-
-                // If body is null, the stream is closed and we've flushed all packets.
-                if(body == null) {
-                    // Set nodesNextIndex as a sentinel, so all future calls to readPacket will
-                    // continue to return null.
-                    nodesNextIndex = -1;
-                    return null;
-                }
-
-                String xml = body.toXML();
-
-                DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
-                dbfac.setNamespaceAware(true);
-                DocumentBuilder docBuilder = dbfac.newDocumentBuilder();
-                Document doc = docBuilder.parse(new InputSource(new StringReader(xml)));
-
-                // Retrieve <body>.
-                Element bodyNode = (Element) doc.getFirstChild();
-
-                // The children of <body> are the XMPP payloads, so queue them.
-                nodes = bodyNode.getChildNodes();
-                nodesNextIndex = 0;
-            }
-            catch(IOException e) {
-                throw new XMPPException("Error reading packet", e);
-            }
-            catch(SAXException e) {
-                throw new XMPPException("Error reading packet", e);
-            }
-            catch(ParserConfigurationException e) {
-                throw new XMPPException("Error reading packet", e);
-            }
-        }
-    }
-
     private static ComposableBody.Builder createBoshPacket(String packet) {
         ComposableBody.Builder builder = ComposableBody.builder()
             .setNamespaceDefinition("xmpp", "urn:xmpp:xbosh")
@@ -443,13 +396,39 @@ public class XMPPStreamBOSH extends XMPPStream
     {
         public synchronized void responseReceived(BOSHMessageEvent event)
         {
+            AbstractBody body = event.getBody();
+
+            String xml = body.toXML();
+            Element bodyNode;
+
             try {
-                AbstractBody packet = event.getBody();
-                read_queue.put(new QueuedResponse(packet));
+                DocumentBuilder docBuilder = XmlUtil.getDocumentBuilder();
+                Document doc = docBuilder.parse(new InputSource(new StringReader(xml)));
+
+                // Retrieve <body>.
+                bodyNode = (Element) doc.getFirstChild();
             }
-            catch(InterruptedException e)
-            {
-                throw new RuntimeException("Interrupted while queuing received packet", e);
+            catch(IOException e) {
+                callback.onError(new XMPPException("Error reading packet", e));
+                return;
+            }
+            catch(SAXException e) {
+                callback.onError(new XMPPException("Error reading packet", e));
+                return;
+            }
+
+            if(callback instanceof SetupPacketCallback) {
+                SetupPacketCallback setupCallbacks = (SetupPacketCallback) callback;
+                setupCallbacks.onBody(body);
+            }
+
+            // The children of <body> are the XMPP payloads.
+            NodeList nodes = bodyNode.getChildNodes();
+            for(int i = 0; i < nodes.getLength(); ++i) {
+                Node node = nodes.item(i);
+                if(!(node instanceof Element))
+                    continue;
+                callback.onPacket((Element) node);
             }
         }
     }
@@ -458,26 +437,21 @@ public class XMPPStreamBOSH extends XMPPStream
     {
         public synchronized void connectionEvent(BOSHClientConnEvent connEvent)
         {
-            try {
-                Throwable be = connEvent.getCause();
+            Throwable be = connEvent.getCause();
 
-                // This is a hack: when the session is forcibly closed by calling
-                // bosh_client.close(), jbosh triggers an error, but that shouldn't
-                // actually be treated as one.  jbosh should use a separate exception
-                // class for this, so we can distinguish this case sanely, or just
-                // send this case as a disconnection instead of disconnection error.
-                boolean ignoredError = be != null && be.getMessage().equals("Session explicitly closed by caller");
+            // This is a hack: when the session is forcibly closed by calling
+            // bosh_client.close(), jbosh triggers an error, but that shouldn't
+            // actually be treated as one.  jbosh should use a separate exception
+            // class for this, so we can distinguish this case sanely, or just
+            // send this case as a disconnection instead of disconnection error.
+            boolean ignoredError = be != null && be.getMessage().equals("Session explicitly closed by caller");
 
-                if(connEvent.isError() && !ignoredError) {
-                    // Queue the error for delivery by readPacket.
-                    read_queue.put(new QueuedError(new XMPPException(be)));
-                }
+            if(connEvent.isError() && !ignoredError) {
+                callback.onError(new XMPPException(be));
+            }
 
-                if(!connEvent.isConnected() && !connectionClosed) {
-                    disconnect();
-                }
-            } catch(InterruptedException ie) {
-                throw new RuntimeException("Interrupted while queuing error packet", ie);
+            if(!connEvent.isConnected() && !connectionClosed) {
+                disconnect();
             }
         }
     }

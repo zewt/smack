@@ -21,6 +21,7 @@
 package org.jivesoftware.smack;
 
 import org.jivesoftware.smack.Connection.ListenerWrapper;
+import org.jivesoftware.smack.XMPPStream.PacketCallback;
 import org.jivesoftware.smack.SynchronousPacketListener;
 import org.jivesoftware.smack.packet.*;
 import org.jivesoftware.smack.util.PacketParserUtils;
@@ -41,35 +42,22 @@ import java.util.concurrent.*;
  * @author Matt Tucker
  */
 class PacketReader {
-
-    private Thread readerThread;
     private ExecutorService listenerExecutor;
 
     private XMPPConnection connection;
-    private boolean done;
 
     protected PacketReader(final XMPPConnection connection) {
         this.connection = connection;
-        done = false;
     }
 
-    /**
-     * Starts the packet reader thread and returns once a connection to the server
-     * has been established. A connection will be attempted for a maximum of five
-     * seconds. An XMPPException will be thrown if the connection fails.
-     *
-     * @throws XMPPException if the server fails to send an opening stream back
-     *      for more than five seconds.
-     */
-    private Semaphore connectionSemaphore;
-    private XMPPException connectionException;
-    private void connectionEstablished() {
-        connectionSemaphore.release();
-    }
-    private void connectionEstablishError(XMPPException e) {
-        connectionException = e;
-        connectionSemaphore.release();
-    }
+    class ReaderPacketCallbacks extends XMPPStream.PacketCallback {
+        public void onPacket(Element packet) {
+            parsePacket(packet);
+        }
+        public void onError(XMPPException error) {
+            handleError(error);
+        }
+    };
 
     /**
      * Start the reader thread, blocking until the transport is established.  If
@@ -79,12 +67,8 @@ class PacketReader {
      * @throws XMPPException if the connection could not be established
      */
     public void startup() throws XMPPException {
-        if(readerThread != null)
-            throw new RuntimeException("ReaderThread.startup called while already running");
-
-        done = false;
-        connectionException = null;
-        connectionSemaphore = new Semaphore(0);
+        if(listenerExecutor != null)
+            throw new RuntimeException("ReaderThread.startup called while already connected");
 
         // Create an executor to deliver incoming packets to listeners. We'll use a single
         // thread with an unbounded queue.
@@ -97,32 +81,48 @@ class PacketReader {
             }
         });
 
-        // Begin connecting.
-        readerThread = new Thread() {
+        class TimeoutThread extends Thread {
+            long waitTime;
+            boolean timedOut = false;
+            TimeoutThread(long ms) {
+                waitTime = ms;
+            }
             public void run() {
-                parsePackets(this);
+                try {
+                    Thread.sleep(waitTime);
+                } catch(InterruptedException e) {
+                    return;
+                }
+
+                timedOut = true;
+                connection.shutdown();
+            }
+
+            public void cancel() {
+                interrupt();
+                ThreadUtil.uninterruptibleJoin(this);
             }
         };
-        readerThread.setName("Smack Packet Reader (" + connection.connectionCounterValue + ")");
-        readerThread.setDaemon(true);
-        readerThread.start();
 
-        // Wait until the connection is established before returning.
+        // Schedule a timeout.
         int waitTime = SmackConfiguration.getPacketReplyTimeout();
+        TimeoutThread timeoutThread = new TimeoutThread(waitTime);
+        timeoutThread.setName("Connection timeout thread");
+        timeoutThread.start();
 
+        boolean waitingForEstablishedConnection = true;
         try {
-            if(!connectionSemaphore.tryAcquire(3 * waitTime, TimeUnit.MILLISECONDS)) {
-                /* The connection timed out. */
-                throw new XMPPException("Connection failed. No response from server.");
+            try {
+                connection.initializeConnection(new ReaderPacketCallbacks());
+            } finally {
+                timeoutThread.cancel();
             }
+        } catch(XMPPException e) {
+            // On timeout, ignore the connection-closed exception and throw a cleaner one.
+            if(timeoutThread.timedOut)
+                throw new XMPPException("Connection failed. No response from server.");
+            throw e;
         }
-        catch (InterruptedException ie) {
-            throw new XMPPException("Connection interrupted", ie);
-        }
-
-        // If an exception occurred during connection, re-throw it.
-        if (connectionException != null)
-            throw connectionException;
     }
 
     /**
@@ -131,29 +131,11 @@ class PacketReader {
      * The caller must first shut down the data stream to ensure the thread will exit.
      */
     public void shutdown() {
-        if(readerThread == Thread.currentThread())
-            throw new AssertionError("shutdown() can't be called from the packet reader thread");
-
-        // The actual shutdown happens due to the caller closing the data stream.
-        done = true;
-
-        // Do nothing if we're already shut down.
-        if(readerThread == null)
-            return;
-
-        // Wait for the reader thread to exit.  It's the caller's responsibility to ensure
-        // that the underlying reader returns an EOF before calling this function.
-        ThreadUtil.uninterruptibleJoin(readerThread);
-        readerThread = null;
-
         // Shut down the listener executor.
-        listenerExecutor.shutdown();
-    }
-
-    /** Assert that the current thread is not the reader thread. */
-    public void assertNotInThread() {
-        if(Thread.currentThread() == readerThread)
-            throw new RuntimeException("Call from within reader thread prohibited");
+        if(listenerExecutor != null) {
+            listenerExecutor.shutdown();
+            listenerExecutor = null;
+        }
     }
 
     /**
@@ -161,107 +143,61 @@ class PacketReader {
      *
      * @param thread the thread that is being used by the reader to parse incoming packets.
      */
-    private void parsePackets(Thread thread) {
-        boolean waitingForEstablishedConnection = true;
+    private void parsePacket(Element packet) {
         try {
-            try {
-                connection.initializeConnection();
-            } catch(XMPPException e) {
-                /* Before connection, users can't yet attach error listeners.  Errors before
-                 * connection are thrown from startup(). */
-                connectionEstablishError(e);
-                return;
-            }
+            /* Convert the stanza to an XmlPullParser. */
+            XmlPullParser parser = new XmlPullParserDom(packet, true);
 
-            while(!done) {
-                // Read the next packet.
-                Element packet = this.connection.readPacket();
+            for ( ; parser.getEventType() != XmlPullParser.END_DOCUMENT; parser.next() ) {
+                if(parser.getEventType() != XmlPullParser.START_TAG)
+                    continue;
 
-                if(packet == null) {
-                    // The session has terminated.
-                    throw new XMPPException("Connection closed");
+                Packet receivedPacket;
+                if (parser.getName().equals("message")) {
+                    receivedPacket = PacketParserUtils.parseMessage(parser);
+                }
+                else if (parser.getName().equals("iq")) {
+                    receivedPacket = PacketParserUtils.parseIQ(parser, connection);
+                }
+                else if (parser.getName().equals("presence")) {
+                    receivedPacket = PacketParserUtils.parsePresence(parser);
+                }
+                else if (parser.getName().equals("error")) {
+                    throw new XMPPException(PacketParserUtils.parseStreamError(parser));
+                } else {
+                    // Treat any unknown packet types generically.
+                    receivedPacket = new ReceivedPacket(packet);
                 }
 
-                /* Convert the stanza to an XmlPullParser. */
-                XmlPullParser parser = new XmlPullParserDom(packet, true);
-
-                for ( ; parser.getEventType() != XmlPullParser.END_DOCUMENT; parser.next() ) {
-                    if(parser.getEventType() != XmlPullParser.START_TAG)
-                        continue;
-
-                    Packet receivedPacket;
-                    if (parser.getName().equals("message")) {
-                        receivedPacket = PacketParserUtils.parseMessage(parser);
-                    }
-                    else if (parser.getName().equals("iq")) {
-                        receivedPacket = PacketParserUtils.parseIQ(parser, connection);
-                    }
-                    else if (parser.getName().equals("presence")) {
-                        receivedPacket = PacketParserUtils.parsePresence(parser);
-                    }
-                    else if (parser.getName().equals("error")) {
-                        throw new XMPPException(PacketParserUtils.parseStreamError(parser));
-                    }
-                    else if (parser.getName().equals("features")) {
-                        if(waitingForEstablishedConnection) {
-                            /* When initializeConnection returns, the connection is established and ready to use.
-                             * However, don't signal to continue until we receive the first packet, which will
-                             * be <features/>.  Otherwise, we're not ready for login() to be called. */
-                            connectionEstablished();
-                            waitingForEstablishedConnection = false;
-                        }
-
-                        receivedPacket = new ReceivedPacket(packet);
-                    } else {
-                        // Treat any unknown packet types generically.
-                        receivedPacket = new ReceivedPacket(packet);
-                    }
-
-                    for (ListenerWrapper listenerWrapper : connection.recvListeners.values()) {
-                        if(listenerWrapper.isSynchronous())
-                            listenerWrapper.notifyListener(receivedPacket);
-                    }
-
-                    // Loop through all collectors and notify the appropriate ones.
-                    for (PacketCollector collector: connection.getPacketCollectors())
-                        collector.processPacket(receivedPacket);
-
-                    // Deliver the received packet to listeners.
-                    listenerExecutor.submit(new ListenerNotification(receivedPacket));
+                for (ListenerWrapper listenerWrapper : connection.recvListeners.values()) {
+                    if(listenerWrapper.isSynchronous())
+                        listenerWrapper.notifyListener(receivedPacket);
                 }
+
+                // Loop through all collectors and notify the appropriate ones.
+                for (PacketCollector collector: connection.getPacketCollectors())
+                    collector.processPacket(receivedPacket);
+
+                // Deliver the received packet to listeners.
+                listenerExecutor.submit(new ListenerNotification(receivedPacket));
             }
-        }
-        catch (RuntimeException e) {
-            throw e; // don't handle unchecked exceptions below
+        } catch (XMPPException e) {
+            handleError(e);
         } catch (Exception e) {
-            if(!(e instanceof XMPPException))
-                e.printStackTrace();
-            if(waitingForEstablishedConnection) {
-                waitingForEstablishedConnection = false;
-                // If waitingForEstablishedConnection is true, startup() is still waiting for
-                // us, so deliver the exception there instead.
-                if(e instanceof XMPPException)
-                    connectionEstablishError((XMPPException) e);
-                else
-                    connectionEstablishError(new XMPPException(e));
-            }
-            else if (!done) {
-                // Close the connection and notify connection listeners of the
-                // error.
-                done = true;
-                connection.readerThreadException(e);
-            }
-
-            // Wake up any thread waiting for a packet collector, so they notice
-            // that we're disconnected.  This must be done after notifying connection,
-            // so connection.isConnected returns false.
-            if(connection.isConnected())
-                throw new AssertionError("Should be disconnected");
-            notifyCollectorsOfDisconnection();
+            e.printStackTrace();
+            handleError(new XMPPException(e));
         }
     }
 
-    private void notifyCollectorsOfDisconnection() {
+    private void handleError(XMPPException e) {
+        connection.readerThreadException(e);
+
+        // Wake up any thread waiting for a packet collector, so they notice
+        // that we're disconnected.  This must be done after notifying connection,
+        // so connection.isConnected returns false.
+        if(connection.isConnected())
+            throw new AssertionError("Should be disconnected");
+
         for (PacketCollector collector: connection.getPacketCollectors()) {
             collector.connectionLost();
         }
