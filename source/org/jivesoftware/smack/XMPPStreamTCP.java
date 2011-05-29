@@ -768,55 +768,55 @@ public class XMPPStreamTCP extends XMPPStream
      */
     private static Element readPacketLoop(XmlPullParser parser) throws XMPPException {
         try {
-                // Depth 0 means we're just starting; 1 means we've read the stream header;
-                // 2 means we've read at least one packet.  If we're at depth 2, then the
-                // previous element must be END_TAG, as a result of calling ReadNodeFromXmlPull
-                // below.
-                if (parser.getDepth() > 2)
-                    throw new RuntimeException("Unexpected parser depth: " + parser.getDepth());
-                if (parser.getDepth() == 2 && parser.getEventType() != XmlPullParser.END_TAG)
-                    throw new RuntimeException("Unexpected event type: " + parser.getEventType());
+            // Depth 0 means we're just starting; 1 means we've read the stream header;
+            // 2 means we've read at least one packet.  If we're at depth 2, then the
+            // previous element must be END_TAG, as a result of calling ReadNodeFromXmlPull
+            // below.
+            if (parser.getDepth() > 2)
+                throw new RuntimeException("Unexpected parser depth: " + parser.getDepth());
+            if (parser.getDepth() == 2 && parser.getEventType() != XmlPullParser.END_TAG)
+                throw new RuntimeException("Unexpected event type: " + parser.getEventType());
 
-                // Read the next packet.
+            // Read the next packet.
+            parser.next();
+
+            /* If there are any text nodes between stanzas, ignore them. */
+            while (parser.getEventType() == XmlPullParser.TEXT)
                 parser.next();
 
-                /* If there are any text nodes between stanzas, ignore them. */
-                while (parser.getEventType() == XmlPullParser.TEXT)
-                    parser.next();
+            // END_DOCUMENT means the stream has ended.
+            if (parser.getEventType() == XmlPullParser.END_DOCUMENT)
+                throw new XMPPException("Session terminated");
 
-                // END_DOCUMENT means the stream has ended.
-                if (parser.getEventType() == XmlPullParser.END_DOCUMENT)
-                    throw new XMPPException("Session terminated");
+            // If we receive END_TAG, then </stream:stream> has been closed and the
+            // connection is about to be closed.  If we receive END_DOCUMENT, then the
+            // stream has been closed abruptly.
+            if (parser.getEventType() == XmlPullParser.END_TAG)
+                throw new XMPPException("Session terminated");
 
-                // If we receive END_TAG, then </stream:stream> has been closed and the
-                // connection is about to be closed.  If we receive END_DOCUMENT, then the
-                // stream has been closed abruptly.
-                if (parser.getEventType() == XmlPullParser.END_TAG)
-                    throw new XMPPException("Session terminated");
+            // We've checked all other possibilities; the event type must be START_TAG.
+            if (parser.getEventType() != XmlPullParser.START_TAG)
+                throw new RuntimeException("Unexpected state from XmlPullParser: " + parser.getEventType());
 
-                // We've checked all other possibilities; the event type must be START_TAG.
-                if (parser.getEventType() != XmlPullParser.START_TAG)
-                    throw new RuntimeException("Unexpected state from XmlPullParser: " + parser.getEventType());
+            // We must now be at depth 1 (<stream> starting) or 2 (a new stanza).
+            if (parser.getDepth() != 1 && parser.getDepth() != 2)
+                throw new RuntimeException("Unexpected post-packet parser depth: " + parser.getDepth());
 
-                // We must now be at depth 1 (<stream> starting) or 2 (a new stanza).
-                if (parser.getDepth() != 1 && parser.getDepth() != 2)
-                    throw new RuntimeException("Unexpected post-packet parser depth: " + parser.getDepth());
-
-                /* If we havn't yet received the opening <stream> tag, wait until we get it. */
-                if(parser.getDepth() == 1) {
-                    // Check that the opening stream is what we expect.
-                    if (!parser.getName().equals("stream") ||
-                            !parser.getNamespace().equals("http://etherx.jabber.org/streams") ||
-                            !parser.getNamespace(null).equals("jabber:client")) {
-                        throw new XMPPException("Expected stream:stream");
-                    }
-
-                    Element element = XmlUtil.ReadElementFromXmlPullNonRecursive(parser);
-                    return element;
-                } else {
-                    // We have an XMPP stanza.  Read the whole thing into a DOM node and return it.
-                    return XmlUtil.ReadNodeFromXmlPull(parser);
+            /* If we havn't yet received the opening <stream> tag, wait until we get it. */
+            if(parser.getDepth() == 1) {
+                // Check that the opening stream is what we expect.
+                if (!parser.getName().equals("stream") ||
+                        !parser.getNamespace().equals("http://etherx.jabber.org/streams") ||
+                        !parser.getNamespace(null).equals("jabber:client")) {
+                    throw new XMPPException("Expected stream:stream");
                 }
+
+                Element element = XmlUtil.ReadElementFromXmlPullNonRecursive(parser);
+                return element;
+            } else {
+                // We have an XMPP stanza.  Read the whole thing into a DOM node and return it.
+                return XmlUtil.ReadNodeFromXmlPull(parser);
+            }
         }
         catch (XmlPullParserException e) {
             throw new XMPPException("XML error", e);
