@@ -1082,6 +1082,7 @@ public class XMPPStreamTCP extends XMPPStream
 
         /* Send the stream:stream to start the new stream. */
         StringBuilder stream = new StringBuilder();
+        stream.append("<?xml version='1.0'?>");
         stream.append("<stream:stream");
         stream.append(" to=\"").append(config.getServiceName()).append("\"");
         stream.append(" xmlns=\"jabber:client\"");
