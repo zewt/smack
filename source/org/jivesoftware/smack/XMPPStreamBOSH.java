@@ -61,18 +61,29 @@ public class XMPPStreamBOSH extends XMPPStream
     private boolean usingSecureConnection = false;
 
     public void writeData(ComposableBody body) throws XMPPException {
-        if(connectionClosed)
-            throw new XMPPException("Wrote a packet while the connection was closed");
+        assertNotLocked();
+
+        BOSHClient boshClientCopy;
+        lock.lock();
+        try {
+            if(connectionClosed)
+                throw new XMPPException("Wrote a packet while the connection was closed");
+            boshClientCopy = bosh_client;
+        } finally {
+            lock.unlock();
+        }
 
         try {
             // Note that this will block if the packet can't be sent immediately.
-            bosh_client.send(body);
+            boshClientCopy.send(body);
         } catch(BOSHException e) {
             throw new XMPPException("Error writing BOSH packet", e);
         }
     }
 
     public void writePacket(String packet) throws XMPPException {
+        assertNotLocked();
+
         writeData(createBoshPacket(packet).build());
     }
 
@@ -98,7 +109,6 @@ public class XMPPStreamBOSH extends XMPPStream
     {
         this.uri = config.getBoshURI();
         this.config = config;
-        connectionClosed = true;
     }
 
     private PacketCallback callback;
@@ -180,46 +190,59 @@ public class XMPPStreamBOSH extends XMPPStream
             throw new XMPPException("Discovered BOSH server is not HTTPS, but security required by connection configuration.",
                     XMPPError.Condition.forbidden);
 
-        BOSHClientConfig.Builder cfgBuilder = BOSHClientConfig.Builder.create(uri, config.getServiceName());
-        cfgBuilder.setSocketFactory(config.getProxyInfo().getSocketFactory());
-
+        SetupPacketCallback setupCallback;
         final XMPPSSLSocketFactory xmppSocketFactory = new XMPPSSLSocketFactory(config, config.getServiceName());
-        cfgBuilder.setSSLConnector(new com.kenai.jbosh.SSLConnector() {
-            public SSLSocket attachSSLConnection(Socket socket, String host, int port) throws IOException {
-                return xmppSocketFactory.attachSSLConnection(socket, host, port);
-            }
-        });
 
-        if(uri.getScheme().equals("http")) {
-            if(config.getSecurityMode() == SecurityMode.required)
-                throw new XMPPException("BOSH server is not HTTPS, but security required by connection configuration.",
-                        XMPPError.Condition.forbidden);
-            usingSecureConnection = false;
+        lock.lock();
+        try {
+            // Check whether disconnect() has already been called.
+            if(connectionClosed)
+                throw new XMPPException("Connection cancelled");
+
+            BOSHClientConfig.Builder cfgBuilder = BOSHClientConfig.Builder.create(uri, config.getServiceName());
+            cfgBuilder.setSocketFactory(config.getProxyInfo().getSocketFactory());
+
+            cfgBuilder.setSSLConnector(new com.kenai.jbosh.SSLConnector() {
+                public SSLSocket attachSSLConnection(Socket socket, String host, int port) throws IOException {
+                    return xmppSocketFactory.attachSSLConnection(socket, host, port);
+                }
+            });
+
+            if(uri.getScheme().equals("http")) {
+                if(config.getSecurityMode() == SecurityMode.required)
+                    throw new XMPPException("BOSH server is not HTTPS, but security required by connection configuration.",
+                            XMPPError.Condition.forbidden);
+                usingSecureConnection = false;
+            }
+
+            bosh_client = BOSHClient.create(cfgBuilder.build());
+            bosh_client.addBOSHClientResponseListener(new ResponseListener());
+            bosh_client.addBOSHClientConnListener(new ConnectionListener());
+
+            // Pass on requests and responses to observers.
+            bosh_client.addBOSHClientResponseListener(new BOSHClientResponseListener() {
+                public void responseReceived(BOSHMessageEvent event) {
+                    if (event.getBody() == null)
+                        return;
+                    readEvent.notifyListeners(event.getBody().toXML());
+                }
+            });
+
+            bosh_client.addBOSHClientRequestListener(new BOSHClientRequestListener() {
+                public void requestSent(BOSHMessageEvent event) {
+                    if (event.getBody() == null)
+                        return;
+                    writeEvent.notifyListeners(event.getBody().toXML());
+                }
+            });
+
+            setupCallback = new SetupPacketCallback(userCallback);
+            callback = setupCallback;
+        } finally {
+            lock.unlock();
         }
 
-        bosh_client = BOSHClient.create(cfgBuilder.build());
-        bosh_client.addBOSHClientResponseListener(new ResponseListener());
-        bosh_client.addBOSHClientConnListener(new ConnectionListener());
-
-        // Pass on requests and responses to observers.
-        bosh_client.addBOSHClientResponseListener(new BOSHClientResponseListener() {
-            public void responseReceived(BOSHMessageEvent event) {
-                if (event.getBody() == null)
-                    return;
-                readEvent.notifyListeners(event.getBody().toXML());
-            }
-        });
-
-        bosh_client.addBOSHClientRequestListener(new BOSHClientRequestListener() {
-            public void requestSent(BOSHMessageEvent event) {
-                if (event.getBody() == null)
-                    return;
-                writeEvent.notifyListeners(event.getBody().toXML());
-            }
-        });
-
-        SetupPacketCallback setupCallback = new SetupPacketCallback(userCallback);
-        callback = setupCallback;
+        // At this point, a call to disconnect() can close bosh_client.
 
         try {
             // Send the session creation request and receive the response.
@@ -247,8 +270,6 @@ public class XMPPStreamBOSH extends XMPPStream
             if(detail != null)
                 usingSecureConnection = false;
         }
-
-        connectionClosed = false;
     }
 
     class SetupPacketCallback extends PacketCallback {
@@ -393,14 +414,26 @@ public class XMPPStreamBOSH extends XMPPStream
     public void disconnect() {
         assertNotLocked();
 
+        BOSHClient boshClientCopy;
         lock.lock();
         try {
-            if(connectionClosed)
-                return;
+            boshClientCopy = bosh_client;
 
-            bosh_client.close();
-
+            // We signal this change below, after actually closing the connection.  Set
+            // it here, so if connectionClosed is false during a locked section, the connection
+            // is actually not closed.
             connectionClosed = true;
+        } finally {
+            lock.unlock();
+        }
+
+        // Don't hold the lock while we close bosh_client, so the lock isn't held
+        // when BOSHClientConnListener callbacks are called.
+        if(boshClientCopy != null)
+            boshClientCopy.close();
+
+        lock.lock();
+        try {
             cond.signalAll();
         } finally {
             lock.unlock();
