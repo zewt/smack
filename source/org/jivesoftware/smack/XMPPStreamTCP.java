@@ -195,6 +195,7 @@ public class XMPPStreamTCP extends XMPPStream
 
             ConnectDataTCP data = new ConnectDataTCP();
             if(host != null) {
+                data.addresses = new Vector<DNSUtil.HostAddress>();
                 data.addresses.add(new DNSUtil.HostAddress(host, port));
                 return data;
             }
@@ -244,7 +245,8 @@ public class XMPPStreamTCP extends XMPPStream
         if(attempt >= dataTCP.addresses.size())
             throw new IllegalArgumentException();
 
-        // XXX: need cancellable A lookups, not just SRV
+        SetupPacketCallback setupCallbacks;
+
         lock.lock();
         try {
             // If threadExited is true, then disconnect() was called before we got this far.
@@ -265,39 +267,30 @@ public class XMPPStreamTCP extends XMPPStream
                 throw new XMPPException("Could not connect to " + host + ":" + port, e);
             }
 
-            SetupPacketCallback setupCallbacks = new SetupPacketCallback(userCallbacks);
+            setupCallbacks = new SetupPacketCallback(userCallbacks, host, port);
             this.callbacks = setupCallbacks;
 
             packetReaderThread = new PacketReaderThread();
             packetReaderThread.setName("XMPP packet reader (" + host + ":" + port + ")");
             packetReaderThread.start();
-
-            try {
-                // Wait for TLS and compression negotiation to complete.  If this returns successfully,
-                // this.callbacks is updated to point to userCallbacks.
-                setupCallbacks.waitForCompletion();
-            } catch(XMPPException e) {
-                lock.unlock();
-                assertNotLocked();
-
-                disconnect();
-
-                lock.lock();
-                throw e;
-            }
-
-            // After a successful connect, fill in config with the host we actually connected
-            // to.  This allows the client to detect what it's actually talking to, and is necessary
-            // for SASL authentication.  Don't do this until we're actually connected, so later
-            // autodiscovery attempts aren't modified.
-            config.setHost(host);
-            config.setPort(port);
-
-            /* Start keepalives after TLS has been set up. */
-            startKeepAliveProcess();
         } finally {
             lock.unlock();
         }
+
+        // Send the initial stream header, starting the protocol.
+        streamReset();
+
+        try {
+            // Wait for TLS and compression negotiation to complete.  If this returns successfully,
+            // this.callbacks is updated to point to userCallbacks.
+            setupCallbacks.waitForCompletion();
+        } catch(XMPPException e) {
+            disconnect();
+            throw e;
+        }
+
+        /* Start keepalives after TLS has been set up. */
+        startKeepAliveProcess();
     }
 
     /**
@@ -312,23 +305,59 @@ public class XMPPStreamTCP extends XMPPStream
          * object to the user's callbacks. */
         PacketCallback userCallbacks;
 
-        SetupPacketCallback(PacketCallback userCallbacks) {
+        String host;
+        int port;
+
+        SetupPacketCallback(PacketCallback userCallbacks, String host, int port) {
             this.userCallbacks = userCallbacks;
+            this.host = host;
+            this.port = port;
         }
 
         public void onPacket(Element packet) {
             assertNotLocked();
 
             try {
+                String initResponse;
                 lock.lock();
                 try {
-                    // If this returns true, then initialization is continuing.
-                    if(processInitializationPacket(packet))
-                        return;
+                    throwIfDisconnected();
 
-                    // Initialization is complete.  Switch to the user's callbacks, and wake
-                    // initializeConnection back up.
+                    // If this returns null, then initialization is finished.
+                    initResponse = processInitializationPacket(packet);
+                } finally {
+                    lock.unlock();
+                }
+
+                if(initResponse != null) {
+                    // We need to be unlocked for these responses.  Note that we may be
+                    // disconnected asynchronously once we unlock.
+                    if(initResponse == ENABLE_COMPRESSION)
+                        enableCompression();
+                    else if(initResponse == ENABLE_TLS)
+                        proceedTLSReceived();
+                    else if(initResponse == DO_NOTHING)
+                        ;
+                    else
+                        writePacket(initResponse);
+
+                    return;
+                }
+
+                lock.lock();
+                try {
+                    throwIfDisconnected();
+
+                    // After a successful connect, fill in config with the host we actually connected
+                    // to.  This allows the client to detect what it's actually talking to.  Don't do
+                    // this until we're actually connected, so later autodiscovery attempts aren't modified.
+                    config.setHost(host);
+                    config.setPort(port);
+
+                    // Switch to the user's callbacks.
                     callbacks = userCallbacks;
+
+                    // Wake initializeConnection back up.
                     complete = true;
                     cond.signalAll();
                 } finally {
@@ -336,7 +365,9 @@ public class XMPPStreamTCP extends XMPPStream
                 }
 
                 // We just received the first <features/> packet that isn't related to
-                // stream negotiation, so pass it on to the user's callback.
+                // stream negotiation, so pass it on to the user's callback.  Do this
+                // after calling onComplete, so initialization is fully completed before
+                // any user callbacks are run.
                 userCallbacks.onPacket(packet);
             } catch(IOException e) {
                 onError(new XMPPException("I/O error establishing connection to server", e));
@@ -358,14 +389,19 @@ public class XMPPStreamTCP extends XMPPStream
 
         /** Wait until stream negotiation is complete. */
         public void waitForCompletion() throws XMPPException {
-            assertLocked();
+            assertNotLocked();
 
-            while(!complete && error == null) {
-                waitUninterruptible(cond);
+            lock.lock();
+            try {
+                while(!complete && error == null) {
+                    waitUninterruptible(cond);
+                }
+
+                if(error != null)
+                    throw new XMPPException(error);
+            } finally {
+                lock.unlock();
             }
-
-            if(error != null)
-                throw new XMPPException(error);
         }
     };
 
@@ -391,7 +427,7 @@ public class XMPPStreamTCP extends XMPPStream
      * @throws XMPPException
      * @throws IOException
      */
-    private boolean negotiateFeature() throws XMPPException, IOException {
+    private String negotiateFeature() throws XMPPException, IOException {
         assertLocked();
 
         // If TLS is required but the server doesn't offer it, disconnect
@@ -414,11 +450,8 @@ public class XMPPStreamTCP extends XMPPStream
                 sslSocketFactory = new XMPPSSLSocketFactory(config, originalServiceName);
 
             if(sslSocketFactory.isAvailable()) {
-                // The server is offering TLS, so enable it.
-                startTLSReceived();
-
-                /* Transport initialization is continuing; we should now receive <proceed/>. */
-                return true;
+                // The server is offering TLS, so enable it.  This should result in <proceed/>.
+                return "<starttls xmlns=\"urn:ietf:params:xml:ns:xmpp-tls\"/>";
             }
             
             // Encryption was offered, but we weren't able to initialize it.  If the user required
@@ -439,32 +472,41 @@ public class XMPPStreamTCP extends XMPPStream
                 // over.
                 featureCompressionMethods.remove("zlib");
 
-                // gar: we need to tell the thread to reset
-                enableCompressionMethod("zlib");
-
-                /* Transport initialization is continuing; we should now receive <compressed/>. */
-                return true;
+                // Request this protocol; we should now receive <compressed/>.
+                return "<compress xmlns='http://jabber.org/protocol/compress'>" + 
+                    "<method>" + "zlib" + "</method></compress>";
             }
         }
         
         // We're not interested in the transport features of this connection, so
         // the transport negotiation is complete.  The <features/> we just received
         // must be returned to the application.
-        return false;
+        return null;
     }
 
+    static final String ENABLE_TLS = "enable-tls";
+    static final String ENABLE_COMPRESSION = "enable-compression";
+    static final String DO_NOTHING = "do-nothing";
+
     /**
-     * Process a packet during initialization.  Return true if the packet was
-     * processed and we're still initializing.  Return false if initialization
-     * is no longer taking place, and the packet should be returned to the user
-     * via readPacket.
+     * Process a packet during initialization.  Returns one of the following values:
+     * <p>
+     * {@code ENABLE_TLS}: TLS must be enabled.
+     * <br>
+     * {@code ENABLE_COMPRESSION}: Compression must be enabled.
+     * <br>
+     * {@code DO_NOTHING}: Do nothing, and continue waiting for initialization packets.
+     * <br>
+     * Any other string is an initialization packet to be sent to the server.
+     * <br>
+     * {@code null}: Initialization is complete.  The packet should be sent to the user.
      * 
      * @param node The packet to process.
      * @return whether initialization continues.
      * @throws XMPPException
      * @throws IOException
      */
-    private boolean processInitializationPacket(Element node)
+    private String processInitializationPacket(Element node)
         throws XMPPException, IOException
     {
         assertLocked();
@@ -501,14 +543,7 @@ public class XMPPStreamTCP extends XMPPStream
 
         else if(node.getNodeName().equals("proceed") && node.getNamespaceURI().equals("urn:ietf:params:xml:ns:xmpp-tls")) {
             // The server has acknowledged our <starttls/> request.  Enable TLS.
-            try {
-                proceedTLSReceived();
-            } catch(Exception e) {
-                e.printStackTrace();
-                throw new XMPPException("Error initializing TLS", e);
-            }
-
-            return true;
+            return ENABLE_TLS;
         }
         else if(node.getNodeName().equals("failure")) { 
             if(node.getNamespaceURI().equals("urn:ietf:params:xml:ns:xmpp-tls")) {
@@ -526,49 +561,12 @@ public class XMPPStreamTCP extends XMPPStream
         else if (node.getNodeName().equals("compressed") && node.getNamespaceURI().equals("http://jabber.org/protocol/compress")) {
             // Server confirmed that it's possible to use stream compression. Start
             // stream compression
-            usingXMPPCompression = true;
-            
-            // Reinitialize the reader and writer with compression enabled.
-            initReaderAndWriter();
-            
-            /* Don't return this packet.  The stream is restarting, and the new stream:features
-             * received after the stream restart will be the first packet returned. */
-            return true;
+            return ENABLE_COMPRESSION;
         }
 
         /* We received an initialization packet we don't know about.  Is it valid for
          * the server to send anything at all before <features/>? */
-        return true;
-    }
-
-    /**
-     * TLS is supported by the server.  If encryption is enabled, start TLS.  
-     */
-    private void startTLSReceived() throws IOException {
-        assertLocked();
-
-        writer.write("<starttls xmlns=\"urn:ietf:params:xml:ns:xmpp-tls\"/>");
-        writer.flush();
-    }
-    
-    /**
-     * Starts using stream compression that will compress network traffic. Traffic can be
-     * reduced up to 90%. Therefore, stream compression is ideal when using a slow speed network
-     * connection. However, the server and the client will need to use more CPU time in order to
-     * un/compress network data so under high load the server performance might be affected.<p>
-     * <p/>
-     * Stream compression has to have been previously offered by the server. Currently only the
-     * zlib method is supported by the client. Stream compression negotiation has to be done
-     * before authentication took place.<p>
-     * <p/>
-     * Note: to use stream compression the smackx.jar file has to be present in the classpath.
-     */
-    private void enableCompressionMethod(String method) throws IOException {
-        assertLocked();
-
-        writer.write("<compress xmlns='http://jabber.org/protocol/compress'>");
-        writer.write("<method>" + method + "</method></compress>");
-        writer.flush();
+        return DO_NOTHING;
     }
 
     /**
@@ -896,26 +894,10 @@ public class XMPPStreamTCP extends XMPPStream
         }
     }
 
-    /**
-     * Sends to the server a new stream element. This operation may be requested several times
-     * so we need to encapsulate the logic in one place. This message will be sent while doing
-     * TLS, SASL and resource binding.
-     *
-     * @throws IOException If an error occurs while sending the stanza to the server.
-     */
-    private void openStream() throws IOException {
-        StringBuilder stream = new StringBuilder();
-        stream.append("<stream:stream");
-        stream.append(" to=\"").append(config.getServiceName()).append("\"");
-        stream.append(" xmlns=\"jabber:client\"");
-        stream.append(" xmlns:stream=\"http://etherx.jabber.org/streams\"");
-        stream.append(" version=\"1.0\">");
-        writer.write(stream.toString());
-        writer.flush();
-    }
-
     private void initReaderAndWriter() throws XMPPException, IOException
     {
+        assertLocked();
+
         InputStream inputStream = socket.getInputStream(); 
         OutputStream outputStream = socket.getOutputStream(); 
 
@@ -968,44 +950,104 @@ public class XMPPStreamTCP extends XMPPStream
             obsWriter.setWriteEvent(keepaliveMonitorWriteEvent);
             writer = obsWriter;
         }
-        
+    }
+
+    /** If the socket has been disconnected due to a call to disconnect(), throw
+     *  an exception. */
+    private void throwIfDisconnected() throws XMPPException {
+        assertLocked();
+        if(socket == null || socket.isClosed())
+            throw new XMPPException("Connection has been closed");
+    }
+
+    private void enableCompression() throws XMPPException, IOException {
+        assertNotLocked();
+
+        lock.lock();
+        try {
+            throwIfDisconnected();
+
+            usingXMPPCompression = true;
+            initReaderAndWriter();
+        } finally {
+            lock.unlock();
+        }
+
         streamReset();
     }
 
-    private void proceedTLSReceived() throws Exception
+    private void proceedTLSReceived() throws XMPPException
     {
-        // Secure the plain connection
-        SSLSocket sslSocket = sslSocketFactory.attachSSLConnection(socket, originalServiceName, socket.getPort());
-        sslSocket.setSoTimeout(0);
-        
-        // We have our own keepalive.  Don't enabling TCP keepalive, too.
-        // sslSocket.setKeepAlive(true);
-        
-        // Proceed to do the handshake
-        sslSocket.startHandshake();
+        // We need control over locking to support cancellation.
+        assertNotLocked();
 
-        socket = sslSocket;
-        
-        // If usingSecureConnection is false, we're encrypted but we couldn't verify
-        // the server's certificate.
-        usingTLS = true;
-        CertificateException insecureReason = sslSocketFactory.isInsecureConnection(sslSocket);
-        usingSecureConnection = (insecureReason == null);
+        // Take a reference to the socket.
+        Socket socketCopy;
+        lock.lock();
+        try {
+            throwIfDisconnected();
+            socketCopy = socket;
+        } finally {
+            lock.unlock();
+        }
 
-        // Record if TLS compression is active, so we won't try to negotiate XMPP
-        // compression too.   
-        if(sslSocketFactory.getCompressionMethod(sslSocket) != null)
-            usingTLSCompression = true;
+        // Create the SSLSocket.  This shouldn't block, but as it can throw IOException,
+        // let's assume that it might and not hold onto the lock.
+        SSLSocket sslSocket;
+        try {
+            sslSocket = sslSocketFactory.attachSSLConnection(socketCopy, originalServiceName, socketCopy.getPort());
+            sslSocket.setSoTimeout(0);
+        } catch(IOException e) {
+            throw new XMPPException("Error initializing TLS", e);
+        }
 
-        // Initialize the reader and writer with the new secured version
-        initReaderAndWriter();
-        
-        // If !usingSecureConnection, then we have an encrypted TLS connection but with
-        // an unvalidated certificate.  If a secure connection was required, fail.
-        if(!usingSecureConnection && config.getSecurityMode() == ConnectionConfiguration.SecurityMode.required) {
-            throw new XMPPException("Server does not support security (TLS), " + 
-                    "but the configuration requires a secure connection.",
-                    XMPPError.Condition.forbidden, insecureReason);
+        // Update socket to point to sslSocket, so calls to disconnect() will close it.
+        lock.lock();
+        try {
+            throwIfDisconnected();
+            socket = sslSocket;
+            initReaderAndWriter();
+        } catch(IOException e) {
+            throw new XMPPException(e);
+        } finally {
+            lock.unlock();
+        }
+
+        // Perform the TLS handshake unlocked.  If another thread calls disconnect(), it'll
+        // close the socket and this will throw an IOException.
+        try {
+            sslSocket.startHandshake();
+        } catch(IOException e) {
+            throw new XMPPException("Error initializing TLS", e);
+        }
+
+        // Send the new stream header.
+        streamReset();
+
+        lock.lock();
+        try {
+            throwIfDisconnected();
+
+            // If usingSecureConnection is false, we're encrypted but we couldn't verify
+            // the server's certificate.
+            usingTLS = true;
+            CertificateException insecureReason = sslSocketFactory.isInsecureConnection(sslSocket);
+            usingSecureConnection = (insecureReason == null);
+
+            // Record if TLS compression is active, so we won't try to negotiate XMPP
+            // compression too.
+            if(sslSocketFactory.getCompressionMethod(sslSocket) != null)
+                usingTLSCompression = true;
+
+            // If !usingSecureConnection, then we have an encrypted TLS connection but with
+            // an unvalidated certificate.  If a secure connection was required, fail.
+            if(!usingSecureConnection && config.getSecurityMode() == ConnectionConfiguration.SecurityMode.required) {
+                throw new XMPPException("Server does not support security (TLS), " + 
+                        "but the configuration requires a secure connection.",
+                        XMPPError.Condition.forbidden, insecureReason);
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
@@ -1015,23 +1057,39 @@ public class XMPPStreamTCP extends XMPPStream
      */
     public void streamReset() throws XMPPException
     {
-        // The <stream:stream> element will not be closed after a stream reset,
-        // so reset the parser state.
-        //
-        // Note that special care is needed for stream resets when the stream format is
-        // changing.  See comments in setupTransport.  External calls to this function
-        // don't involve stream format changes.
+        assertNotLocked();
+
+        lock.lock();
         try {
-            parser.setInput(reader);
-        }
-        catch (XmlPullParserException xppe) {
-            xppe.printStackTrace();
-            throw new RuntimeException(xppe);
+            throwIfDisconnected();
+
+            // The <stream:stream> element will not be closed after a stream reset,
+            // so reset the parser state.
+            //
+            // Note that special care is needed for stream resets when the stream format is
+            // changing.  See comments in setupTransport.  External calls to this function
+            // don't involve stream format changes.
+            try {
+                parser.setInput(reader);
+            }
+            catch (XmlPullParserException xppe) {
+                xppe.printStackTrace();
+                throw new RuntimeException(xppe);
+            }
+        } finally {
+            lock.unlock();
         }
 
         /* Send the stream:stream to start the new stream. */
+        StringBuilder stream = new StringBuilder();
+        stream.append("<stream:stream");
+        stream.append(" to=\"").append(config.getServiceName()).append("\"");
+        stream.append(" xmlns=\"jabber:client\"");
+        stream.append(" xmlns:stream=\"http://etherx.jabber.org/streams\"");
+        stream.append(" version=\"1.0\">");
+
         try {
-            openStream();
+            writePacket(stream.toString());
         } catch(IOException e) {
             throw new XMPPException("Error resetting stream", e);
         }
@@ -1098,19 +1156,16 @@ public class XMPPStreamTCP extends XMPPStream
             keepaliveMonitorWriteEvent.addWriterListener(listener);
             
             while (true) {
-                synchronized (writer) {
-                    // Send heartbeat if no packet has been sent to the server for a given time
-                    if (System.currentTimeMillis() - KeepAliveTask.this.lastActive >= delay) {
-                        try {
-                            writer.write(" ");
-                            writer.flush();
-                        }
-                        catch (IOException e) {
-                            // Do nothing, and assume that whatever caused an error
-                            // here will cause one in the main code path, too.  This
-                            // will also happen if the write blocked and XMPPStreamTCP.disconnect
-                            // closed the socket.
-                        }
+                // Send heartbeat if no packet has been sent to the server for a given time
+                if (System.currentTimeMillis() - KeepAliveTask.this.lastActive >= delay) {
+                    try {
+                        writePacket(" ");
+                    }
+                    catch (IOException e) {
+                        // Do nothing, and assume that whatever caused an error
+                        // here will cause one in the main code path, too.  This
+                        // will also happen if the write blocked and XMPPStreamTCP.disconnect
+                        // closed the socket.
                     }
                 }
 
