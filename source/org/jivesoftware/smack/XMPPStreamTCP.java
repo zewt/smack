@@ -46,6 +46,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import org.jivesoftware.smack.XMPPStream.ConnectData;
 import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.util.DNSUtil;
 import org.jivesoftware.smack.util.ObservableReader;
@@ -161,21 +162,27 @@ public class XMPPStreamTCP extends XMPPStream
         keepaliveMonitorWriteEvent = new ObservableWriter.WriteEvent();
     }
 
-    private int discoveryIndex;
-    public void setDiscoveryIndex(int index) {
-        discoveryIndex = index;
-    }
-
     public void setReadWriteEvents(ObservableReader.ReadEvent readEvent, ObservableWriter.WriteEvent writeEvent) {
         this.writeEvent = writeEvent;
         this.readEvent = readEvent;
     }
 
     /**
-     * Begin the initial connection to the server.  Returns when the connection
-     * is established.
+     * This class performs the initial DNS lookups.  This is only set during
+     * initializeConnection while performing the lookup.  Other threads may access
+     * this while locked in order to cancel the lookup, but must not clear it.
      */
-    public void initializeConnection(final PacketCallback userCallbacks) throws XMPPException {
+    DNSUtil.XMPPDomainLookup initialLookup;
+
+    class ConnectDataTCP extends ConnectData {
+        Vector<DNSUtil.HostAddress> addresses;
+
+        int connectionAttempts() {
+            return addresses.size();
+        }
+    };
+
+    public ConnectData getConnectData() throws XMPPException {
         assertNotLocked();
 
         if(socket != null)
@@ -186,28 +193,67 @@ public class XMPPStreamTCP extends XMPPStream
             String host = config.getHost();
             int port = config.getPort();
 
-            // If no host was specified, look up the XMPP service name.
-            // XXX: This should be cancellable.
-            if(host == null) {
-                // This will return the same results each time, because the weight
-                // shuffling is cached.
-                DNSUtil.XMPPDomainLookup lookup = new DNSUtil.XMPPDomainLookup(config.getServiceName(), true);
-                Vector<DNSUtil.HostAddress> addresses = lookup.run();
-                if(discoveryIndex >= addresses.size())
-                    throw new XMPPException("No more servers to attempt (tried all " + addresses.size() + ")",
-                            XMPPError.Condition.remote_server_not_found);
-                host = addresses.get(discoveryIndex).getHost();
-                port = addresses.get(discoveryIndex).getPort();
-            } else {
-                // If we're not autodiscovering servers, we have only one server to try.
-                if(discoveryIndex > 0)
-                    throw new XMPPException("No more servers to attempt", XMPPError.Condition.remote_server_not_found);
+            ConnectDataTCP data = new ConnectDataTCP();
+            if(host != null) {
+                data.addresses.add(new DNSUtil.HostAddress(host, port));
+                return data;
             }
 
+            // If no host was specified, look up the XMPP service name.
+            initialLookup = new DNSUtil.XMPPDomainLookup(config.getServiceName(), true);
+
+            // Unlock while we run the blocking lookup.  Other threads can call
+            // initialLookup.cancel while we have it unlocked, which will cause run()
+            // to cancel.  Other threads may not modify the value of initialLookup, so
+            // it doesn't disappear while we're unlocked.
+            lock.unlock();
+            try {
+                data.addresses = initialLookup.run();
+            } finally {
+                lock.lock();
+            }
+
+            initialLookup = null;
+
+            if(data.addresses == null) {
+                // Set remote_server_not_found, so connectUsingConfiguration knows to stop trying
+                // this transport.  If we don't do this, it'll treat it as a per-server error and
+                // try again with a higher index.
+                throw new XMPPException("Connection cancelled", XMPPError.Condition.remote_server_not_found);
+            }
+
+            return data;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Begin the initial connection to the server.  Returns when the connection
+     * is established.
+     */
+    public void initializeConnection(ConnectData data, int attempt, final PacketCallback userCallbacks) throws XMPPException {
+        if(!(data instanceof ConnectDataTCP))
+            throw new IllegalArgumentException("data argument was not created with XMPPStreamTCP.getConnectData");
+        ConnectDataTCP dataTCP = (ConnectDataTCP) data;
+
+        assertNotLocked();
+
+        if(socket != null)
+            throw new RuntimeException("The connection has already been initialized");
+        if(attempt >= dataTCP.addresses.size())
+            throw new IllegalArgumentException();
+
+        // XXX: need cancellable A lookups, not just SRV
+        lock.lock();
+        try {
             // If threadExited is true, then disconnect() was called before we got this far.
             // Exit without starting.
             if(threadExited)
-                return;
+                throw new XMPPException("Connection cancelled");
+
+            String host = dataTCP.addresses.get(attempt).getHost();
+            int port = dataTCP.addresses.get(attempt).getPort();
 
             try {
                 socket = config.getSocketFactory().createSocket(host, port);
@@ -551,6 +597,12 @@ public class XMPPStreamTCP extends XMPPStream
 
     private void shutdown_stream() {
         assertLocked();
+
+        if(initialLookup != null) {
+            // initializeConnection() is performing a DNS lookup.  Cancel it, but
+            // don't clear the reference.
+            initialLookup.cancel();
+        }
 
         // If socket isn't set, then initializeConnection hasn't yet set up the
         // socket or thread.  Skip to the threadExited state, so it'll abort without

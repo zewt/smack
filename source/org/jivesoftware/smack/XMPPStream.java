@@ -9,12 +9,26 @@ import org.w3c.dom.Element;
 public abstract class XMPPStream
 {
     /**
+     * Perform service discovery for this transport, returning a transport-specific
+     * ConnectData containing the results.
+     * <p>
+     * Service discovery can be cancelled asynchronously by a call to {@link XMPPStream#disconnect}.
+     * @return {@link ConnectData}
+     * @throws XMPPException if service discovery fails or is cancelled
+     */
+    public abstract ConnectData getConnectData() throws XMPPException;
+
+    /**
      * Begin establishing the connection.  Returns after the connection has been
      * established, or throws XMPPException.
+     * <p>
+     * {@code attempt} must be <= {@link ConnectData#connectionAttempts}, and indicates
+     * the discovered server to attempt.
      * 
+     * @param connectData a {@link ConnectData} instance returned by {@link #getConnectData}
      * @throws XMPPException if an error occurs during connection
      */
-    public abstract void initializeConnection(PacketCallback callbacks) throws XMPPException;
+    public abstract void initializeConnection(ConnectData connectData, int attempt, PacketCallback callbacks) throws XMPPException;
     
     /**
      * Send the given packets to the server asynchronously.  This function may
@@ -66,19 +80,6 @@ public abstract class XMPPStream
     public abstract void setReadWriteEvents(ObservableReader.ReadEvent readEvent, ObservableWriter.WriteEvent writeEvent);
 
     /**
-     * If service discovery is in use, set the index of the discovered resource to connect
-     * to.  For example, when discovering XMPP servers via SRV, setDiscoveryIndex(5) indicates
-     * that the 6th SRV entry by priority order will be attempted.
-     * <p>
-     * If index is greater than the highest discovered resource, or if this service does not
-     * support discovery and index is greater than 0, initializeConnection will raise an
-     * exception with a condition of remote_server_not_found.
-     * <p>
-     * This must be called before {@link #initializeConnection()}.
-     */
-    public abstract void setDiscoveryIndex(int index);
-
-    /**
      * Returns true if the connection to the server is secure.
      *
      * @return true if the connection to the server has successfully negotiated TLS.
@@ -89,4 +90,11 @@ public abstract class XMPPStream
      * @return true if the connection to the server is compressed.
      */
     public abstract boolean isUsingCompression();
+
+    /** Opaque subclasses of ConnectData are returned by each transport. */
+    static abstract public class ConnectData {
+        /** Return the number of servers available for connection attempts. */
+        abstract int connectionAttempts();
+    };
+
 };
