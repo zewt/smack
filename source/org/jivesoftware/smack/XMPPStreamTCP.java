@@ -826,42 +826,6 @@ public class XMPPStreamTCP extends XMPPStream
     }
 
     /**
-     * Resets the parser using the latest connection's reader. Reseting the parser is necessary
-     * when the plain connection has been secured or when a new opening stream element is going
-     * to be sent by the server.
-     */
-    private void resetParser()
-    {
-        /*
-         * There are two distinct cases where we need a stream reset.
-         *
-         * During transport negotiation, when compression and/or encryption are enabled,
-         * a stream reset is performed.  In this case, the input stream has changed, replaced
-         * with compression/encryption wrappers.
-         *
-         * Later on, higher-level systems like SASL require a stream reset.  (This seems to
-         * serve no purpose other than complicating clients.)  In this case, we don't need to
-         * change streams, since the stream is the same.
-         *
-         * The important distinction is that when a transport-level reset happens and changes
-         * the stream, readPacket is never being executed.  If it was, it would get confused:
-         * the existing parser would continue to operate on the old stream.
-         *
-         * When a higher-level reset happens, readPacket is likely to be currently running,
-         * so it's important that we not recreate the parser or change the stream.  We still
-         * call setInput, in order to reset the stream state, but we're giving it the same
-         * stream it already had.
-         */
-        try {
-            parser.setInput(reader);
-        }
-        catch (XmlPullParserException xppe) {
-            xppe.printStackTrace();
-            throw new RuntimeException(xppe);
-        }
-    }
-
-    /**
      * Sends to the server a new stream element. This operation may be requested several times
      * so we need to encapsulate the logic in one place. This message will be sent while doing
      * TLS, SASL and resource binding.
@@ -980,9 +944,19 @@ public class XMPPStreamTCP extends XMPPStream
      */
     public void streamReset() throws XMPPException
     {
-        /* The <stream:stream> element will not be closed after a stream reset,
-         * so reset the parser state. */
-        resetParser();
+        // The <stream:stream> element will not be closed after a stream reset,
+        // so reset the parser state.
+        //
+        // Note that special care is needed for stream resets when the stream format is
+        // changing.  See comments in setupTransport.  External calls to this function
+        // don't involve stream format changes.
+        try {
+            parser.setInput(reader);
+        }
+        catch (XmlPullParserException xppe) {
+            xppe.printStackTrace();
+            throw new RuntimeException(xppe);
+        }
 
         /* Send the stream:stream to start the new stream. */
         try {
