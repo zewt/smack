@@ -59,6 +59,10 @@ class PacketReader {
         }
     };
 
+    public ReaderPacketCallbacks getPacketCallbacks() {
+        return new ReaderPacketCallbacks();
+    }
+
     /**
      * Start the reader thread, blocking until the transport is established.  If
      * an exception is thrown, the caller must shut down the data stream to ensure
@@ -66,7 +70,7 @@ class PacketReader {
      *
      * @throws XMPPException if the connection could not be established
      */
-    public void startup() throws XMPPException {
+    public void startup() {
         if(listenerExecutor != null)
             throw new RuntimeException("ReaderThread.startup called while already connected");
 
@@ -80,49 +84,6 @@ class PacketReader {
                 return thread;
             }
         });
-
-        class TimeoutThread extends Thread {
-            long waitTime;
-            boolean timedOut = false;
-            TimeoutThread(long ms) {
-                waitTime = ms;
-            }
-            public void run() {
-                try {
-                    Thread.sleep(waitTime);
-                } catch(InterruptedException e) {
-                    return;
-                }
-
-                timedOut = true;
-                connection.shutdown();
-            }
-
-            public void cancel() {
-                interrupt();
-                ThreadUtil.uninterruptibleJoin(this);
-            }
-        };
-
-        // Schedule a timeout.
-        int waitTime = SmackConfiguration.getPacketReplyTimeout();
-        TimeoutThread timeoutThread = new TimeoutThread(waitTime);
-        timeoutThread.setName("Connection timeout thread");
-        timeoutThread.start();
-
-        boolean waitingForEstablishedConnection = true;
-        try {
-            try {
-                connection.initializeConnection(new ReaderPacketCallbacks());
-            } finally {
-                timeoutThread.cancel();
-            }
-        } catch(XMPPException e) {
-            // On timeout, ignore the connection-closed exception and throw a cleaner one.
-            if(timeoutThread.timedOut)
-                throw new XMPPException("Connection failed. No response from server.");
-            throw e;
-        }
     }
 
     /**

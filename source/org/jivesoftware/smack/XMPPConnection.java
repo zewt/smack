@@ -20,6 +20,7 @@
 
 package org.jivesoftware.smack;
 
+import org.jivesoftware.smack.PacketReader.ReaderPacketCallbacks;
 import org.jivesoftware.smack.debugger.SmackDebugger;
 import org.jivesoftware.smack.filter.PacketFilter;
 import org.jivesoftware.smack.filter.ReceivedPacketFilter;
@@ -30,6 +31,7 @@ import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.util.StringUtils;
 import org.jivesoftware.smack.util.ObservableReader;
 import org.jivesoftware.smack.util.ObservableWriter;
+import org.jivesoftware.smack.util.ThreadUtil;
 import org.jivesoftware.smack.util.XmlUtil;
 
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
@@ -572,12 +574,59 @@ public class XMPPConnection extends Connection {
             throw new XMPPException("Couldn't discover any servers to connect to");
     }
 
+
+    private void beginConnection() throws XMPPException {
+        class TimeoutThread extends Thread {
+            long waitTime;
+            boolean timedOut = false;
+            TimeoutThread(long ms) {
+                waitTime = ms;
+            }
+            public void run() {
+                try {
+                    Thread.sleep(waitTime);
+                } catch(InterruptedException e) {
+                    return;
+                }
+
+                timedOut = true;
+                shutdown();
+            }
+
+            public void cancel() {
+                interrupt();
+                ThreadUtil.uninterruptibleJoin(this);
+            }
+        };
+
+        // Schedule a timeout.
+        int waitTime = SmackConfiguration.getPacketReplyTimeout();
+        TimeoutThread timeoutThread = new TimeoutThread(waitTime);
+        timeoutThread.setName("Connection timeout thread");
+        timeoutThread.start();
+
+        try {
+            try {
+                data_stream.initializeConnection(packetReader.getPacketCallbacks());
+            } finally {
+                timeoutThread.cancel();
+            }
+        } catch(XMPPException e) {
+            // On timeout, ignore the connection-closed exception and throw a cleaner one.
+            if(timeoutThread.timedOut)
+                throw new XMPPException("Connection failed. No response from server.");
+            else
+                throw e;
+        }
+    }
+
     private void connectUsingConfigurationAttempt() throws XMPPException {
         data_stream.setReadWriteEvents(readEvent, writeEvent);
 
         // Start the packet writer.  This can't fail, and it won't do anything until
         // we receive packets.
         packetWriter.startup();
+        packetReader.startup();
 
         readyForDisconnection = false;
 
@@ -586,9 +635,8 @@ public class XMPPConnection extends Connection {
                 ReceivedPacket.class);
 
         try {
-            // Start the packet reader. The startup() method will block until we
-            // get an opening stream packet back from server.
-            packetReader.startup();
+            // Tell data_stream to initialize the connection.
+            beginConnection();
 
             // Connection is successful.
             connected = true;
@@ -670,10 +718,6 @@ public class XMPPConnection extends Connection {
                 continue;
             }
         }
-    }
-
-    void initializeConnection(XMPPStream.PacketCallback callbacks) throws XMPPException {
-        data_stream.initializeConnection(callbacks);
     }
 
     /*
