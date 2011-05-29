@@ -815,7 +815,7 @@ public class XMPPConnection extends Connection {
     }
 
     /** Write a list of packets to the stream.  Used by PacketWriter. */
-    protected void writePacket(Collection<Packet> packets) throws IOException {
+    protected void writePacket(Collection<Packet> packets) throws XMPPException {
         StringBuffer data = new StringBuffer();
         for(Packet packet: packets)
             data.append(packet.toXML());

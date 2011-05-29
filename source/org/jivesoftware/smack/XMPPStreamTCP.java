@@ -117,7 +117,7 @@ public class XMPPStreamTCP extends XMPPStream
             throw new RuntimeException("Lock should be held");
     }
 
-    public void writePacket(String packet) throws IOException {
+    public void writePacket(String packet) throws XMPPException {
         assertNotLocked();
 
         // writer can be cleared by calls to disconnect.  We can't hold a lock
@@ -128,11 +128,15 @@ public class XMPPStreamTCP extends XMPPStream
         lock.unlock();
 
         if(writerCopy == null)
-            throw new IOException("Wrote a packet while the connection was closed");
+            throw new XMPPException("Wrote a packet while the connection was closed");
 
-        synchronized(writerCopy) {
-            writerCopy.write(packet);
-            writerCopy.flush();
+        try {
+            synchronized(writerCopy) {
+                writerCopy.write(packet);
+                writerCopy.flush();
+            }
+        } catch(IOException e) {
+            throw new XMPPException(e);
         }
     }
     public boolean isSecureConnection() { return usingSecureConnection; }
@@ -765,7 +769,7 @@ public class XMPPStreamTCP extends XMPPStream
             packet += "</stream:stream>";
             writePacket(packet);
         }
-        catch (IOException e) {
+        catch (XMPPException e) {
             // If this fails for some reason, just close the connection.
             e.printStackTrace();
             disconnect();
@@ -1139,11 +1143,7 @@ public class XMPPStreamTCP extends XMPPStream
         stream.append(" xmlns:stream=\"http://etherx.jabber.org/streams\"");
         stream.append(" version=\"1.0\">");
 
-        try {
-            writePacket(stream.toString());
-        } catch(IOException e) {
-            throw new XMPPException("Error resetting stream", e);
-        }
+        writePacket(stream.toString());
     }
 
     /**
@@ -1212,7 +1212,7 @@ public class XMPPStreamTCP extends XMPPStream
                     try {
                         writePacket(" ");
                     }
-                    catch (IOException e) {
+                    catch (XMPPException e) {
                         // Do nothing, and assume that whatever caused an error
                         // here will cause one in the main code path, too.  This
                         // will also happen if the write blocked and XMPPStreamTCP.disconnect

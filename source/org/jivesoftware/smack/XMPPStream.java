@@ -32,9 +32,9 @@ public abstract class XMPPStream
     
     /**
      * Send the given packets to the server asynchronously.  This function may
-     * block.  If the connection has already been closed, throws IOException. 
+     * block.  If the connection has already been closed, throws XMPPException. 
      */
-    public abstract void writePacket(String packet) throws IOException;
+    public abstract void writePacket(String packet) throws XMPPException;
 
     /**
      * Permanently close the connection, flushing any pending messages and cleanly

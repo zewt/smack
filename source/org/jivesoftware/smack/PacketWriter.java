@@ -158,14 +158,14 @@ class PacketWriter {
                 packets.addAll(queue);
                 connection.writePacket(packets);
             }
-            catch (IOException e) {
+            catch (XMPPException e) {
                 // e.printStackTrace();
             }
 
             // Delete the queue contents (hopefully nothing is left).
             queue.clear();
         }
-        catch (IOException ioe){
+        catch (XMPPException ioe){
             // Don't report write errors.  Instead, require that any write errors at the
             // socket layer cause reads to throw an error as well, so all error handling
             // is consolidated in PacketReader.

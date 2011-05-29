@@ -60,17 +60,15 @@ public class XMPPStreamBOSH extends XMPPStream
     public boolean isSecureConnection() { return usingSecureConnection; }
     private boolean usingSecureConnection = false;
 
-    public void writePacket(String packet) throws IOException {
+    public void writePacket(String packet) throws XMPPException {
         if(connectionClosed)
-            throw new IOException("Wrote a packet while the connection was closed");
+            throw new XMPPException("Wrote a packet while the connection was closed");
 
         try {
             // Note that this will block if the packet can't be sent immediately.
             bosh_client.send(createBoshPacket(packet).build());
         } catch(BOSHException e) {
-            IOException io = new IOException("Error writing BOSH packet");
-            io.initCause(e); // IOException lacks a (message, cause) constructor
-            throw io;
+            throw new XMPPException("Error writing BOSH packet", e);
         }
     }
 
