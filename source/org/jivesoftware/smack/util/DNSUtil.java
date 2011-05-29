@@ -19,6 +19,7 @@
 
 package org.jivesoftware.smack.util;
 
+import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
@@ -29,6 +30,7 @@ import java.util.Vector;
 
 import org.xbill.DNS.Lookup;
 import org.xbill.DNS.Record;
+import org.xbill.DNS.ARecord;
 import org.xbill.DNS.SRVRecord;
 import org.xbill.DNS.TextParseException;
 import org.xbill.DNS.Type;
@@ -181,6 +183,10 @@ public class DNSUtil {
         return addresses;
     }
 
+    public static abstract class CancellableLookup {
+        public abstract void cancel();
+    };
+
     /**
      * Returns the host name and port that the specified XMPP server can be
      * reached at for client-to-server communication. A DNS lookup for a SRV
@@ -198,7 +204,7 @@ public class DNSUtil {
      * @return a HostAddress, which encompasses the hostname and port that the XMPP
      *      server can be reached at for the specified domain.
      */
-    public static class XMPPDomainLookup {
+    public static class XMPPDomainLookup extends CancellableLookup {
         private AsyncLookup asyncLookup1;
         private AsyncLookup asyncLookup2;
         private HostAddress defaultResult;
@@ -240,7 +246,7 @@ public class DNSUtil {
      * For example, resolveXmppConnect("example.com", "_xmpp-client-xbosh")
      * may return [http://bosh.example.com/bind].
      */
-    public static class XMPPConnectLookup {
+    public static class XMPPConnectLookup extends CancellableLookup {
         AsyncLookup asyncLookup;
         public XMPPConnectLookup(String domain, String attribute) {
             domain = "_xmppconnect." + domain;
@@ -283,6 +289,46 @@ public class DNSUtil {
             asyncLookup.cancel();
         }
     }
+
+    public static class AddressLookup extends CancellableLookup {
+        private AsyncLookup asyncLookup;
+
+        public AddressLookup(String domain) {
+            asyncLookup = new AsyncLookup(domain, Type.A);
+        }
+
+        /**
+         * Perform the lookup.  If cancelled by an asynchronous call to cancel(),
+         * return null.
+         */
+        public Vector<InetAddress> run() {
+            Lookup lookup;
+            try {
+                lookup = asyncLookup.run();
+            } catch (TextParseException e) {
+                return new Vector<InetAddress>();
+            }
+            if(lookup == null)
+                return null;
+
+            Record recs[] = lookup.getAnswers();
+            if (recs == null)
+                return new Vector<InetAddress>();
+
+            Vector<InetAddress> results = new Vector<InetAddress>();
+            for(int i = 0; i < recs.length; ++i) {
+                ARecord rec = (ARecord) recs[i];
+                InetAddress addr = rec.getAddress();
+                results.add(addr);
+            }
+
+            return results;
+        }
+
+        public void cancel() {
+            asyncLookup.cancel();
+        }
+    };
 
     public static class AsyncLookup {
         private Thread lookupThread;

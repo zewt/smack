@@ -31,6 +31,7 @@ import java.io.Reader;
 import java.io.Writer;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.security.cert.CertificateException;
@@ -172,7 +173,7 @@ public class XMPPStreamTCP extends XMPPStream
      * initializeConnection while performing the lookup.  Other threads may access
      * this while locked in order to cancel the lookup, but must not clear it.
      */
-    DNSUtil.XMPPDomainLookup initialLookup;
+    DNSUtil.CancellableLookup initialLookup;
 
     class ConnectDataTCP extends ConnectData {
         Vector<DNSUtil.HostAddress> addresses;
@@ -201,7 +202,8 @@ public class XMPPStreamTCP extends XMPPStream
             }
 
             // If no host was specified, look up the XMPP service name.
-            initialLookup = new DNSUtil.XMPPDomainLookup(config.getServiceName(), true);
+            DNSUtil.XMPPDomainLookup lookup = new DNSUtil.XMPPDomainLookup(config.getServiceName(), true);
+            initialLookup = lookup;
 
             // Unlock while we run the blocking lookup.  Other threads can call
             // initialLookup.cancel while we have it unlocked, which will cause run()
@@ -209,7 +211,7 @@ public class XMPPStreamTCP extends XMPPStream
             // it doesn't disappear while we're unlocked.
             lock.unlock();
             try {
-                data.addresses = initialLookup.run();
+                data.addresses = lookup.run();
             } finally {
                 lock.lock();
             }
@@ -224,6 +226,53 @@ public class XMPPStreamTCP extends XMPPStream
             }
 
             return data;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Look up the specified hostname.  An asynchronous call to disconnect() will
+     * abort the lookup.
+     * <p>
+     * @param host
+     * @return
+     * @throws XMPPException
+     */
+    private InetAddress lookupHostIP(String host) throws XMPPException {
+        assertNotLocked();
+
+        DNSUtil.AddressLookup lookup;
+        lock.lock();
+        try {
+            // This is called before the socket is open, so we can't call throwIfDisconnected().
+            // If threadExited is true, then disconnect() was called before we got this far.
+            // Exit without starting.
+            if(threadExited)
+                throw new XMPPException("Connection cancelled");
+
+            lookup = new DNSUtil.AddressLookup(host);
+            initialLookup = lookup;
+        } finally {
+            lock.unlock();
+        }
+
+        // Look up the host.
+        Vector<InetAddress> ips = lookup.run();
+
+        lock.lock();
+        try {
+            initialLookup = null;
+
+            if(ips == null)
+                throw new XMPPException("Connection cancelled");
+
+            if(ips.size() == 0)
+                throw new XMPPException("Couldn't resolve host: " + host);
+
+            // Although the address might have multiple A records, we only try the first.  DNS-
+            // based load balancing for XMPP should be done using SRV records, not A records.
+            return ips.get(0);
         } finally {
             lock.unlock();
         }
@@ -245,6 +294,12 @@ public class XMPPStreamTCP extends XMPPStream
         if(attempt >= dataTCP.addresses.size())
             throw new IllegalArgumentException();
 
+        String host = dataTCP.addresses.get(attempt).getHost();
+        int port = dataTCP.addresses.get(attempt).getPort();
+
+        // Look up the host.  This may be cancelled.
+        InetAddress ip = lookupHostIP(host);
+
         SetupPacketCallback setupCallbacks;
 
         lock.lock();
@@ -254,15 +309,10 @@ public class XMPPStreamTCP extends XMPPStream
             if(threadExited)
                 throw new XMPPException("Connection cancelled");
 
-            String host = dataTCP.addresses.get(attempt).getHost();
-            int port = dataTCP.addresses.get(attempt).getPort();
-
             try {
-                socket = config.getSocketFactory().createSocket(host, port);
+                socket = config.getSocketFactory().createSocket(ip, port);
 
                 initReaderAndWriter();
-            } catch (UnknownHostException e) {
-                throw new XMPPException("Could not connect to " + host + ":" + port, e);
             } catch(IOException e) {
                 throw new XMPPException("Could not connect to " + host + ":" + port, e);
             }
