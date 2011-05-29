@@ -17,7 +17,7 @@ public abstract class XMPPStream
     public abstract void initializeConnection() throws XMPPException;
     
     /**
-     * Send the given packets to the server asynchronously.  This function will not
+     * Send the given packets to the server asynchronously.  This function may
      * block.  If the connection has already been closed, throws IOException. 
      */
     public abstract void writePacket(String packet) throws IOException;
