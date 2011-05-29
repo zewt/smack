@@ -20,12 +20,15 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import org.jivesoftware.smack.XMPPException;
+import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -222,6 +225,113 @@ public class XmlUtil {
                 content.append(StringUtils.escapeForXML(text));
                 break;
             }
+        }
+    }
+
+
+    private static void ReadDomAttributesFromXmlPull(Document doc, Element tag, XmlPullParser parser)
+    {
+        for(int i = 0; i < parser.getAttributeCount(); ++i)
+        {
+            String name = parser.getAttributeName(i);
+            String namespace = parser.getAttributeNamespace(i);
+
+            /* Converting namespace declarations back and forth between DOM and XmlPullParser
+             * is annoying, because XmlPullParser only tells us the current list, not what's
+             * actually changed; we'd need to compare the current list against the parent's.
+             * This information is only needed to explicitly detecting namespace declarations,
+             * not to retain node namespaces, so for simplicity and efficiency, this isn't done. */
+/*
+                for(int i = 0; i < parser.getNamespaceCount(parser.getDepth()); ++i)
+                {
+                    String prefix = parser.getNamespacePrefix(i);
+                    String uri = parser.getNamespaceUri(i);
+                    tag.setAttribute("xmlns:" + prefix, uri);
+                }
+*/
+
+            /* For XmlPullParser, no namespace is "".  For DOM APIs, no namespace is null. */
+            if(namespace == "")
+                namespace = null;
+
+            String value = parser.getAttributeValue(i);
+
+            Attr attr = doc.createAttributeNS(namespace, name);
+            attr.setValue(value);
+            tag.setAttributeNode(attr);
+        }
+    }
+
+    /**
+     * Read a single START_TAG node from an {@link XmlPullParser}, returning an Element with attributes set.
+     * Does not advance the XmlPullParser.
+     */
+    public static Element ReadElementFromXmlPullNonRecursive(XmlPullParser parser) throws XMPPException, IOException
+    {
+        DocumentBuilder docBuilder = XmlUtil.getDocumentBuilder();
+        Document doc = docBuilder.newDocument();
+        Element tag = doc.createElementNS(parser.getNamespace(), parser.getName());
+        ReadDomAttributesFromXmlPull(doc, tag, parser);
+        return tag;
+    }
+
+    /**
+     * Read a single complete XMPP stanza from parser, returning it as a DOM Element.
+     */
+    public static Element ReadNodeFromXmlPull(XmlPullParser parser) throws XMPPException, IOException
+    {
+        try {
+            DocumentBuilder docBuilder = XmlUtil.getDocumentBuilder();
+            Document doc = docBuilder.newDocument();
+
+            LinkedList<Node> documentTree = new LinkedList<Node>();
+            while(true)
+            {
+                switch(parser.getEventType())
+                {
+                case XmlPullParser.START_TAG:
+                {
+                    Element tag = doc.createElementNS(parser.getNamespace(), parser.getName());
+                    if(!documentTree.isEmpty())
+                    {
+                        Node parent = documentTree.getLast();
+                        parent.appendChild(tag);
+                    }
+
+                    ReadDomAttributesFromXmlPull(doc, tag, parser);
+
+                    documentTree.add(tag);
+                    break;
+                }
+                case XmlPullParser.END_TAG:
+                {
+                    Node removed = documentTree.removeLast();
+
+                    /* If we popped the top-level node, then it's the final result. */
+                    if(documentTree.isEmpty())
+                        return (Element) removed;
+                    break;
+                }
+                case XmlPullParser.TEXT:
+                {
+                    Node tag = doc.createTextNode(parser.getText());
+                    Node parent = documentTree.getLast();
+                    parent.appendChild(tag);
+                    break;
+                }
+                case XmlPullParser.END_DOCUMENT:
+                    // Normally, we'll never receive END_DOCUMENT, because we're parsing a
+                    // single sub-tree; we stop when we reach the end tag matching the open
+                    // tag we started on, and never continue to receive END_DOCUMENT. If we
+                    // receive END_DOCUMENT, that means the document ended mid-stanza.
+                    throw new XMPPException("Stream closed unexpectedly");
+                }
+
+                parser.next();
+            }
+        }
+        catch (XmlPullParserException e) {
+            throw new XMPPException("XML error", e);
         }
     }
 };
