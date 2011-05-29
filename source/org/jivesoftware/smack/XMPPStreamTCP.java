@@ -28,6 +28,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
+import java.io.StringReader;
 import java.io.Writer;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -38,6 +39,7 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Vector;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import javax.net.ssl.SSLSocket;
 import javax.xml.parsers.DocumentBuilder;
@@ -55,9 +57,14 @@ import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
+
+import com.kenai.jbosh.AbstractBody;
 
 /**
  * XMPP TCP transport, implementing TLS and compression. 
@@ -85,12 +92,6 @@ public class XMPPStreamTCP extends XMPPStream
     /* True if TLS compression is enabled. */
     private boolean usingTLSCompression = false;
 
-    /** Set to true while close() is waiting for the connection to be closed. */
-    private boolean sessionTerminated = false;
-
-    /** Set to true after the connection has been closed. */
-    private boolean waitingForConnectionClose = false;
-
     private ConnectionConfiguration config;
     private String originalServiceName;
 
@@ -102,22 +103,26 @@ public class XMPPStreamTCP extends XMPPStream
     
     /** The compression methods advertised in the most recent <features/>. */
     private List<String> featureCompressionMethods;
-    
-    /**
-     * We can't tell that initialization is finished until we read a <features/> packet
-     * to know whether we have any more initialization work to do, but the final features
-     * packet that we don't need must be returned to the caller.  If this is non-null, it's
-     * a buffered packet waiting to be returned by readPacket().
-     */
-    private Element bufferedPacket = null;
+
+    /** If true, readPacket received a null entry, and all future calls to readPacket will
+     *  return null. */
+    private boolean hitEndOfStream = false;
 
     public void writePacket(String packet) throws IOException {
-        if(writer == null)
+        // writer can be cleared by calls to disconnect.  We can't hold a lock
+        // on XMPPStreamTCP while we use it, since it can block indefinitely.
+        // Take a reference to writer.
+        Writer writerCopy;
+        synchronized(this) {
+            writerCopy = this.writer;
+        }
+
+        if(writerCopy == null)
             throw new IOException("Wrote a packet while the connection was closed");
 
-        synchronized(writer) {
-            writer.write(packet);
-            writer.flush();
+        synchronized(writerCopy) {
+            writerCopy.write(packet);
+            writerCopy.flush();
         }
     }
     public boolean isSecureConnection() { return usingSecureConnection; }
@@ -125,10 +130,17 @@ public class XMPPStreamTCP extends XMPPStream
 
     String connectionID;
     public String getConnectionID() { return connectionID; }
-    
+
+    // When this changes, XMPPStreamTCP must be signalled.
+    private QueuedMessage nextReadEvent = null;
+
+    private PacketReaderThread packetReaderThread;
+    private Thread threadUnjoined = null;
+
     public XMPPStreamTCP(ConnectionConfiguration config)
     {
         this.config = config;
+        connectionClosed = true;
         
         try {
             parser = XmlPullParserFactory.newInstance().newPullParser();
@@ -159,7 +171,7 @@ public class XMPPStreamTCP extends XMPPStream
      * Begin the initial connection to the server.  Returns when the connection
      * is established.
      */
-    public void initializeConnection() throws XMPPException {
+    public synchronized void initializeConnection() throws XMPPException {
         if(socket != null)
             throw new RuntimeException("The connection has already been initialized");
 
@@ -194,31 +206,18 @@ public class XMPPStreamTCP extends XMPPStream
             throw new XMPPException("Could not connect to " + host + ":" + port, e);
         }
 
-        /* Handle transport-level negotiation.  Read the <features/> packet to see if
-         * we should set up TLS or compression, and repeat until we have nothing more
-         * to negotiate. */
-        while(true) {
-            Element packet = readPacket();
-            
-            // If packet is null, the stream terminated normally.  The only way the
-            // stream can terminate normally here is if disconnect() was called asynchronously;
-            // report that as an error, akin to InterruptedException.
-            if(packet == null)
-                throw new XMPPException("Disconnected by user");
+        packetReaderThread = new PacketReaderThread();
+        packetReaderThread.setName("XMPP packet reader (" + host + ":" + port + ")");
+        packetReaderThread.start();
 
-            try {
-                if(processInitializationPacket(packet)) {
-                    /* We're still initializing the connection, so don't return any packets. */
-                    continue;
-                }
-            } catch(IOException e) {
-                throw new XMPPException("I/O error establishing connection to server", e);
-            }
+        // Mark the connection open.  Once we do this, other threads can call disconnect()
+        // and gracefulDisconnect().
+        connectionClosed = false;
 
-            /* Stream initialization is complete.  The packet we just read wasn't consumed
-             * by processInitializationPacket, so save it for the first real call to readPcket. */
-            bufferedPacket = packet;
-            break;
+        try {
+            setupTransport();
+        } catch(XMPPException e) {
+            disconnect();
         }
 
         // After a successful connect, fill in config with the host we actually connected
@@ -231,7 +230,55 @@ public class XMPPStreamTCP extends XMPPStream
         /* Start keepalives after TLS has been set up. */
         startKeepAliveProcess();
     }
-    
+
+    private void setupTransport() throws XMPPException {
+        /* Handle transport-level negotiation.  Read the <features/> packet to see if
+         * we should set up TLS or compression, and repeat until we have nothing more
+         * to negotiate. */
+        while(true) {
+            // Read the next packet, leaving it in the queue.  This serves two purposes:
+            // first, if this packet is a <features/> that we're not interested in, and
+            // therefore ends transport negotiation, we need to leave the packet in place,
+            // so the next call to readPacket() will retrieve it.  Second, it prevents
+            // the packet reader thread from moving on and trying to read the next packet,
+            // which is necessary when we negotiate a new stream format; if we enable TLS
+            // or compression, we can't begin reading the next packet until the new stream
+            // format is set up by initReaderAndWriter.
+            Element packet = peekPacket();
+
+            // If packet is null, the stream terminated normally.  The only way the
+            // stream can terminate normally here is if disconnect() was called asynchronously;
+            // report that as an error, akin to InterruptedException.
+            if(packet == null)
+                throw new XMPPException("Disconnected by user");
+
+            boolean consumePacket = true;
+            try {
+                if(processInitializationPacket(packet)) {
+                    /* We're still initializing the connection, so don't return any packets. */
+                    continue;
+                }
+
+                // Stream initialization is complete.  The packet we just read wasn't for us,
+                // so don't take it.
+                consumePacket = false;
+                return;
+            } catch(IOException e) {
+                throw new XMPPException("I/O error establishing connection to server", e);
+            } finally {
+                if(consumePacket) {
+                    // This packet was for us, so call readPacket() now to actually remove it.
+                    Element actualPacket = readPacket();
+
+                    // Sanity check: the packet we just consumed is the same packet that we
+                    // received from peekPacket().
+                    if(actualPacket != packet)
+                        throw new AssertionError("readPacket didn't return the same result as peekPacket");
+                }
+            }
+        }
+    }
+
     /**
      * Return true if zlib (deflate) compression is supported.
      */
@@ -299,7 +346,8 @@ public class XMPPStreamTCP extends XMPPStream
                 // we don't do this, it'll just try to negotiate the same compressor over and
                 // over.
                 featureCompressionMethods.remove("zlib");
-                
+
+                // gar: we need to tell the thread to reset
                 enableCompressionMethod("zlib");
 
                 /* Transport initialization is continuing; we should now receive <compressed/>. */
@@ -448,14 +496,8 @@ public class XMPPStreamTCP extends XMPPStream
 
         return major * 100 + (minor % 100);
     }
-    
-    /**
-     * Forcibly disconnect the stream.  If readPacket() is waiting for input, it will
-     * return end of stream immediately.
-     */
-    boolean connectionClosed = false;
-    public void disconnect() {
-        connectionClosed = true;
+
+    private synchronized void shutdown_stream() {
         try {
             // Closing the socket will cause any blocking readers and writers on the
             // socket to stop waiting and throw an exception.
@@ -465,54 +507,14 @@ public class XMPPStreamTCP extends XMPPStream
             throw new RuntimeException("Unexpected I/O error disconnecting socket", e);
         }
 
-        // Now that we've closed the socket, close() won't block for I/O.
-        gracefulDisconnect(null);
-    }
-
-    public void gracefulDisconnect(String packet)
-    {
-        // Tell readPacket() that we expect the connection to be closing.
-        waitingForConnectionClose = true;
-
-        /* Attempt to close the stream. */
-        try {
-            if (packet == null)
-                packet = "";
-
-            // Append the final packet (if any) and </stream> and send them together,
-            // so they're sent together.
-            packet += "</stream:stream>";
-            writePacket(packet);
+        // Shut down the reader thread, if we're not running in it.  Otherwise, this will be
+        // done when the owner thread calls disconnect().
+        if(packetReaderThread != null) {
+            if(packetReaderThread == Thread.currentThread())
+                threadUnjoined = packetReaderThread;
+            else
+                ThreadUtil.uninterruptibleJoin(packetReaderThread);
         }
-        catch (IOException e) {
-            // Do nothing
-        }
-
-        // If the connection wasn't already closed, give the server a chance to close
-        // gracefully.
-        if(!connectionClosed) {
-            synchronized(this) {
-                long waitUntil = System.currentTimeMillis() + SmackConfiguration.getPacketReplyTimeout();
-                while(!sessionTerminated) {
-                    long ms = waitUntil - System.currentTimeMillis();
-                    if(ms <= 0)
-                        break;
-
-                    try {
-                        wait(ms);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
-                }
-            }
-        }
-
-        try {
-            if(socket != null)
-                socket.close();
-        }
-        catch (IOException ignore) { /* ignore */ }
 
         // Shut down the keepalive thread, if any.  Do this after closing the socket,
         // so it'll receive an IOException immediately if it's currently blocking to write,
@@ -533,25 +535,239 @@ public class XMPPStreamTCP extends XMPPStream
             try { writer.close(); } catch (IOException ignore) { /* ignore */ }
             writer = null;
         }
-
-        connectionClosed = true;
     }
 
-    public Element readPacket() throws XMPPException {
-        if(bufferedPacket != null) {
-            Element packet = bufferedPacket;
-            bufferedPacket = null;
-            return packet;
+    /**
+     * Forcibly disconnect the stream.  If readPacket() is waiting for input, it will
+     * return end of stream immediately.
+     */
+    boolean connectionClosed = false;
+    public void disconnect() {
+        synchronized(this) {
+            if(!connectionClosed) {
+                // Queue a QueuedEnd; this guarantees that anyone waiting on a readPacket
+                // call will stop.  If it's already a QueuedError, leave it alone.
+                if(nextReadEvent == null || !(nextReadEvent  instanceof QueuedError)) {
+                    nextReadEvent = new QueuedEnd();
+                    // notifyAll happens below
+                }
+
+                connectionClosed = true;
+                notifyAll();
+
+                shutdown_stream();
+            }
+
+            // If packetReaderThread calls disconnect(), it'll shut everything down except for
+            // itself, since a thread can't join itself.  Join the thread now if necessary.
+            if(threadUnjoined != null && threadUnjoined != Thread.currentThread()) {
+                Thread thread = threadUnjoined;
+                threadUnjoined = null;
+
+                ThreadUtil.uninterruptibleJoin(thread);
+            }
+        }
+    }
+
+    static boolean waitUntilTime(Object obj, long waitUntil) {
+        long ms = waitUntil - System.currentTimeMillis();
+        if(ms <= 0)
+            return false;
+
+        try {
+            obj.wait(ms);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        return true;
+    }
+
+    static void waitUninterruptible(Object obj) {
+        try {
+            obj.wait();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    public void gracefulDisconnect(String packet)
+    {
+        /* Attempt to close the stream. */
+        synchronized(this) {
+            if(connectionClosed) {
+                // If the connection is already closed or in the process of closing when
+                // we're called again, close immediately.
+                disconnect();
+                return;
+            }
+
+            try {
+                if (packet == null)
+                    packet = "";
+
+                // Append the final packet (if any) and </stream> and send them together,
+                // so they're sent together.
+                packet += "</stream:stream>";
+                writePacket(packet);
+            }
+            catch (IOException e) {
+                // If this fails for some reason, just close the connection.
+                e.printStackTrace();
+                disconnect();
+                return;
+            }
+
+            // Wait for the connection to close gracefully.
+            long waitUntil = System.currentTimeMillis() + SmackConfiguration.getPacketReplyTimeout();
+            while(!connectionClosed) {
+                if(!waitUntilTime(this, waitUntil))
+                    break;
+            }
+
+            // If the connection didn't close gracefully, force it.
+            disconnect();
+        }
+    }
+
+    /* A queue of packets received from the server. */
+    private static abstract interface QueuedMessage { };
+    private static class QueuedResponse implements QueuedMessage {
+        public Element body;
+        QueuedResponse(Element body) { this.body = body; }
+    };
+    private static class QueuedError implements QueuedMessage {
+        QueuedError(XMPPException error) { this.error = error; }
+        XMPPException error;
+    };
+    private static class QueuedEnd implements QueuedMessage { };
+
+    /**
+     * Return the current read event.  If none is available, blocks.  The read
+     * event will not be cleared; multiple consecutive calls to this function
+     * will return the same value.
+     */
+    private synchronized Element peekPacket() throws XMPPException {
+        if(hitEndOfStream)
+            return null;
+
+        while(nextReadEvent == null)
+            waitUninterruptible(this);
+
+        if(nextReadEvent instanceof QueuedEnd || nextReadEvent instanceof QueuedError) {
+            // Set hitEndOfStream, so all future calls to readPacket will continue to return null.
+            hitEndOfStream = true;
         }
 
-        if(connectionClosed)
+        // QueuedEnd indicates that the stream has terminated normally.
+        if(nextReadEvent instanceof QueuedEnd)
             return null;
-        
-        try {
-            /* This will only loop when the connection is newly opened or after an
-             * RFC6120 4.3.3 stream restart.  At other times, this will simply read
-             * a packet and return it. */
+
+        if(nextReadEvent instanceof QueuedError)
+            throw ((QueuedError) nextReadEvent).error;
+        else
+            return ((QueuedResponse) nextReadEvent).body;
+    }
+
+    public synchronized Element readPacket() throws XMPPException {
+        Element result = peekPacket();
+
+        // Clear the event.
+        nextReadEvent = null;
+        notifyAll();
+
+        return result;
+    }
+
+    /**
+     * Read settings from the top-level stream header.
+     * 
+     * If a non-null Element is returned, the stream header is from a legacy
+     * server, and the provided element should be processed as if it was a
+     * received packet.
+     */
+    private Element loadStreamSettings(Element element) throws XMPPException {
+        // Save the connection id.
+        connectionID = element.getAttribute("id");
+
+        // Save the service name.
+        String from = element.getAttribute("from");
+        if(from != null)
+            config.setServiceName(from);
+
+        // If the server isn't version 1.0, then we'll assume it doesn't support
+        // <features/>.  Consider the connection established now.
+
+        // The version attribute is only present for version 1.0 and higher.
+        int protocolVersion = parseVersionString(element.getAttribute("version"));
+
+        // If the protocol version is lower than 1.0, we may not receive <features/>.
+        // Disable compression and encryption, and establish the session now.
+        if(protocolVersion < 100) {
+            // Old versions of the protocol may not send <features/>.  Mask this to the
+            // user by returning a dummy <features/> node.
+            try {
+                DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
+                DocumentBuilder docBuilder = dbfac.newDocumentBuilder();
+                Document doc = docBuilder.newDocument();
+                return doc.createElementNS("http://etherx.jabber.org/streams", "features");
+            } catch(ParserConfigurationException e) {
+                throw new RuntimeException("Unexpected error", e);
+            }
+        }
+        return null;
+    }
+
+    class PacketReaderThread extends Thread {
+        public void run() {
             while(true) {
+                try {
+                    Element result = readPacketLoop(parser);
+
+                    synchronized(XMPPStreamTCP.this) {
+                        if(parser.getDepth() == 1) {
+                            // Process the stream header.  If it returns a packet, treat it
+                            // as the received packet; otherwise move on and read the next packet.
+                            result = loadStreamSettings(result);
+                            if(result == null)
+                                continue;
+                        }
+
+                        QueuedResponse resp = new QueuedResponse(result);
+                        nextReadEvent = resp;
+                        XMPPStreamTCP.this.notifyAll();
+
+                        // Wait for someone to take the message.
+                        while(nextReadEvent == resp)
+                            waitUninterruptible(XMPPStreamTCP.this);
+                    }
+                } catch(XMPPException e) {
+                    synchronized(XMPPStreamTCP.this) {
+                        // This is our normal exit path; the stream will be closed and readPacketLoop
+                        // will throw a socket error.
+                        nextReadEvent = new QueuedError(e);
+                        XMPPStreamTCP.this.notifyAll();
+                    }
+
+                    disconnect();
+                    return;
+                }
+            }
+        }
+    };
+
+    /**
+     * Read the next element from the given parser.
+     * <p>
+     * This function must run without locking XMPPStreamTCP, as it blocks.  In order to
+     * prevent accidental use of data which requires locking, this function is static
+     * and only uses the provided parser.
+     * <p>
+     * If the parser returns at depth 1, the returned Element represents the top-level
+     * stream header.  Otherwise, the parser returns at depth 2 and the returned Element
+     * represents a received XMPP stanza.
+     */
+    private static Element readPacketLoop(XmlPullParser parser) throws XMPPException {
+        try {
                 // Depth 0 means we're just starting; 1 means we've read the stream header;
                 // 2 means we've read at least one packet.  If we're at depth 2, then the
                 // previous element must be END_TAG, as a result of calling ReadNodeFromXmlPull
@@ -570,24 +786,13 @@ public class XMPPStreamTCP extends XMPPStream
 
                 // END_DOCUMENT means the stream has ended.
                 if (parser.getEventType() == XmlPullParser.END_DOCUMENT)
-                    return null;
+                    throw new XMPPException("Session terminated");
 
                 // If we receive END_TAG, then </stream:stream> has been closed and the
                 // connection is about to be closed.  If we receive END_DOCUMENT, then the
                 // stream has been closed abruptly.
-                if (parser.getEventType() == XmlPullParser.END_TAG) {
-                    synchronized(this) {
-                        sessionTerminated = true;
-                        notifyAll();
-
-                        // If waitingForConnectionClose is true, then close() is running, and we're expecting
-                        // this; return EOF.  Otherwise, this is an unexpected disconnection, so throw.
-                        if(waitingForConnectionClose)
-                            return null;
-                        else
-                            throw new XMPPException("Session terminated");
-                    }
-                }
+                if (parser.getEventType() == XmlPullParser.END_TAG)
+                    throw new XMPPException("Session terminated");
 
                 // We've checked all other possibilities; the event type must be START_TAG.
                 if (parser.getEventType() != XmlPullParser.START_TAG)
@@ -606,65 +811,83 @@ public class XMPPStreamTCP extends XMPPStream
                         throw new XMPPException("Expected stream:stream");
                     }
 
-                    // Save the connection id.
-                    connectionID = parser.getAttributeValue("", "id");
-
-                    // Save the service name.
-                    String from = parser.getAttributeValue("", "from");
-                    if(from != null)
-                        config.setServiceName(from);
-
-                    // If the server isn't version 1.0, then we'll assume it doesn't support
-                    // <features/>.  Consider the connection established now.
-
-                    // The version attribute is only present for version 1.0 and higher.
-                    int protocolVersion = parseVersionString(parser.getAttributeValue("", "version"));
-
-                    // If the protocol version is lower than 1.0, we may not receive <features/>.
-                    // Disable compression and encryption, and establish the session now.
-                    if(protocolVersion < 100) {
-                        // Old versions of the protocol may not send <features/>.  Mask this to the
-                        // user by returning a dummy <features/> node.
-                        try {
-                            DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
-                            DocumentBuilder docBuilder = dbfac.newDocumentBuilder();
-                            Document doc = docBuilder.newDocument();
-                            return doc.createElementNS("http://etherx.jabber.org/streams", "features");
-                        } catch(ParserConfigurationException e) {
-                            throw new RuntimeException("Unexpected error", e);
-                        }
-                    }
+                    Element element = ReadElementFromXmlPullNonRecursive(parser);
+                    return element;
                 } else {
                     // We have an XMPP stanza.  Read the whole thing into a DOM node and return it.
                     return ReadNodeFromXmlPull(parser);
                 }
-            }
         }
         catch (XmlPullParserException e) {
             throw new XMPPException("XML error", e);
         }
         catch (IOException e) {
-            if(connectionClosed)
-                return null;
             throw new XMPPException("I/O error", e);
         }
     }
-    
+
+    static void ReadDomAttributesFromXmlPull(Document doc, Element tag, XmlPullParser parser)
+    {
+        for(int i = 0; i < parser.getAttributeCount(); ++i)
+        {
+            String name = parser.getAttributeName(i);
+            String namespace = parser.getAttributeNamespace(i);
+
+            /* Converting namespace declarations back and forth between DOM and XmlPullParser
+             * is annoying, because XmlPullParser only tells us the current list, not what's
+             * actually changed; we'd need to compare the current list against the parent's.
+             * This information is only needed to explicitly detecting namespace declarations,
+             * not to retain node namespaces, so for simplicity and efficiency, this isn't done. */
+/*
+                for(int i = 0; i < parser.getNamespaceCount(parser.getDepth()); ++i)
+                {
+                    String prefix = parser.getNamespacePrefix(i);
+                    String uri = parser.getNamespaceUri(i);
+                    tag.setAttribute("xmlns:" + prefix, uri);
+                }
+*/
+
+            /* For XmlPullParser, no namespace is "".  For DOM APIs, no namespace is null. */
+            if(namespace == "")
+                namespace = null;
+
+            String value = parser.getAttributeValue(i);
+
+            Attr attr = doc.createAttributeNS(namespace, name);
+            attr.setValue(value);
+            tag.setAttributeNode(attr);
+        }
+    }
+
+    private static DocumentBuilder getDocumentBuilder() {
+        // XXX: stash the DocumentBuilder; don't make a new one on every stanza
+        DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
+        dbfac.setNamespaceAware(true);
+        DocumentBuilder docBuilder;
+        try {
+            docBuilder = dbfac.newDocumentBuilder();
+        } catch (ParserConfigurationException e) {
+            throw new RuntimeException("Unexpected parser error", e);
+        }
+        return docBuilder;
+    }
+
+    private static Element ReadElementFromXmlPullNonRecursive(XmlPullParser parser) throws XMPPException, IOException
+    {
+        DocumentBuilder docBuilder = getDocumentBuilder();
+        Document doc = docBuilder.newDocument();
+        Element tag = doc.createElementNS(parser.getNamespace(), parser.getName());
+        ReadDomAttributesFromXmlPull(doc, tag, parser);
+        return tag;
+    }
+
     /**
      * Read a single complete XMPP stanza from parser, returning it as a DOM Element.
      */
-    private Element ReadNodeFromXmlPull(XmlPullParser parser) throws XMPPException, IOException
+    private static Element ReadNodeFromXmlPull(XmlPullParser parser) throws XMPPException, IOException
     {
         try {
-            // XXX: stash the DocumentBuilder; don't make a new one on every stanza
-            DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
-            dbfac.setNamespaceAware(true);
-            DocumentBuilder docBuilder;
-            try {
-                docBuilder = dbfac.newDocumentBuilder();
-            } catch (ParserConfigurationException e) {
-                throw new RuntimeException("Unexpected parser error", e);
-            }
+            DocumentBuilder docBuilder = getDocumentBuilder();
             Document doc = docBuilder.newDocument();
 
             LinkedList<Node> documentTree = new LinkedList<Node>();
@@ -680,35 +903,8 @@ public class XMPPStreamTCP extends XMPPStream
                         Node parent = documentTree.getLast();
                         parent.appendChild(tag);
                     }
-                    
-                    /* Converting namespace declarations back and forth between DOM and XmlPullParser
-                     * is annoying, because XmlPullParser only tells us the current list, not what's
-                     * actually changed; we'd need to compare the current list against the parent's.
-                     * This information is only needed to explicitly detecting namespace declarations,
-                     * not to retain node namespaces, so for simplicity and efficiency, this isn't done. */
-/*
-                        for(int i = 0; i < parser.getNamespaceCount(parser.getDepth()); ++i)
-                        {
-                            String prefix = parser.getNamespacePrefix(i);
-                            String uri = parser.getNamespaceUri(i);
-                            tag.setAttribute("xmlns:" + prefix, uri);
-                        }
-*/                      
-                    for(int i = 0; i < parser.getAttributeCount(); ++i)
-                    {
-                        String name = parser.getAttributeName(i);
-                        String namespace = parser.getAttributeNamespace(i);
 
-                        /* For XmlPullParser, no namespace is "".  For DOM APIs, no namespace is null. */
-                        if(namespace == "")
-                            namespace = null;
-                        
-                        String value = parser.getAttributeValue(i);
-
-                        Attr attr = doc.createAttributeNS(namespace, name);
-                        attr.setValue(value);
-                        tag.setAttributeNode(attr);
-                    }
+                    ReadDomAttributesFromXmlPull(doc, tag, parser);
 
                     documentTree.add(tag);
                     break;
