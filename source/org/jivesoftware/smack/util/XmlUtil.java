@@ -104,6 +104,23 @@ public class XmlUtil {
     }
 
     /**
+     * Retrieve a namespace-aware DocumentBuilder.
+     * @return {@link DocumentBuilder}.
+     */
+    public static DocumentBuilder getDocumentBuilder() {
+        // XXX: stash the DocumentBuilder; don't make a new one on every stanza
+        DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
+        dbfac.setNamespaceAware(true);
+        DocumentBuilder docBuilder;
+        try {
+            docBuilder = dbfac.newDocumentBuilder();
+        } catch (ParserConfigurationException e) {
+            throw new RuntimeException("Unexpected parser error", e);
+        }
+        return docBuilder;
+    }
+
+    /**
      * Return the current XML element as a string.
      * @param an {@link XmlPullParser} with a current event type of START_TAG
      * @return an XML string

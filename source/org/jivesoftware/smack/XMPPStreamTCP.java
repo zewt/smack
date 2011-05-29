@@ -859,22 +859,9 @@ public class XMPPStreamTCP extends XMPPStream
         }
     }
 
-    private static DocumentBuilder getDocumentBuilder() {
-        // XXX: stash the DocumentBuilder; don't make a new one on every stanza
-        DocumentBuilderFactory dbfac = DocumentBuilderFactory.newInstance();
-        dbfac.setNamespaceAware(true);
-        DocumentBuilder docBuilder;
-        try {
-            docBuilder = dbfac.newDocumentBuilder();
-        } catch (ParserConfigurationException e) {
-            throw new RuntimeException("Unexpected parser error", e);
-        }
-        return docBuilder;
-    }
-
     private static Element ReadElementFromXmlPullNonRecursive(XmlPullParser parser) throws XMPPException, IOException
     {
-        DocumentBuilder docBuilder = getDocumentBuilder();
+        DocumentBuilder docBuilder = XmlUtil.getDocumentBuilder();
         Document doc = docBuilder.newDocument();
         Element tag = doc.createElementNS(parser.getNamespace(), parser.getName());
         ReadDomAttributesFromXmlPull(doc, tag, parser);
@@ -887,7 +874,7 @@ public class XMPPStreamTCP extends XMPPStream
     private static Element ReadNodeFromXmlPull(XmlPullParser parser) throws XMPPException, IOException
     {
         try {
-            DocumentBuilder docBuilder = getDocumentBuilder();
+            DocumentBuilder docBuilder = XmlUtil.getDocumentBuilder();
             Document doc = docBuilder.newDocument();
 
             LinkedList<Node> documentTree = new LinkedList<Node>();
