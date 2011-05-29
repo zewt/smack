@@ -83,38 +83,6 @@ public class LoginTest extends SmackTestCase {
     }
 
     /**
-     * Check that the server handles anonymous users correctly.
-     */
-    public void testNonSASLAnonymousLogin() throws Exception {
-        ConnectionConfiguration config = new ConnectionConfiguration(getHost(), getPort());
-        config.setSASLAuthenticationEnabled(false);
-        XMPPConnection conn1 = new XMPPConnection(config);
-        conn1.connect();
-
-        config = new ConnectionConfiguration(getHost(), getPort());
-        config.setSASLAuthenticationEnabled(false);
-        XMPPConnection conn2 = new XMPPConnection(config);
-        conn2.connect();
-
-        try {
-            // Try to login anonymously
-            conn1.loginAnonymously();
-            conn2.loginAnonymously();
-
-            assertNotNull("Resource is null", StringUtils.parseResource(conn1.getUser()));
-            assertNotNull("Resource is null", StringUtils.parseResource(conn2.getUser()));
-
-            assertNotNull("Username is null", StringUtils.parseName(conn1.getUser()));
-            assertNotNull("Username is null", StringUtils.parseName(conn2.getUser()));
-        }
-        finally {
-            // Close the connection
-            conn1.disconnect();
-            conn2.disconnect();
-        }
-    }
-
-    /**
      * Check server-assigned resources.
      */
     public void testLoginWithNoResource() throws Exception {

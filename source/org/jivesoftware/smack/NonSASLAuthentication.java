@@ -46,7 +46,7 @@ class NonSASLAuthentication implements UserAuthentication {
 
     public String authenticate(String username, String resource, CallbackHandler cbh) throws XMPPException {
         if(username == null)
-            return authenticateAnonymously();
+            throw new XMPPException("Non-SASL authentication does not support anonymous logins");
 
         //Use the callback handler to determine the password, and continue on.
         PasswordCallback pcb = new PasswordCallback("Password: ",false);
@@ -61,7 +61,7 @@ class NonSASLAuthentication implements UserAuthentication {
     public String authenticate(String username, String password, String resource) throws
             XMPPException {
         if(username == null)
-            return authenticateAnonymously();
+            throw new XMPPException("Non-SASL authentication does not support anonymous logins");
 
         // If we send an authentication packet in "get" mode with just the username,
         // the server will return the list of authentication protocols it supports.
@@ -118,32 +118,5 @@ class NonSASLAuthentication implements UserAuthentication {
         collector.cancel();
 
         return response.getTo();
-    }
-
-    private String authenticateAnonymously() throws XMPPException {
-        // Create the authentication packet we'll send to the server.
-        Authentication auth = new Authentication();
-
-        PacketCollector collector =
-            connection.createPacketCollector(new PacketIDFilter(auth.getPacketID()));
-        // Send the packet.
-        connection.sendPacket(auth);
-        // Wait up to a certain number of seconds for a response from the server.
-        IQ response = (IQ) collector.nextResult(SmackConfiguration.getPacketReplyTimeout());
-        if (response == null) {
-            throw new XMPPException("Anonymous login failed.");
-        }
-        else if (response.getType() == IQ.Type.ERROR) {
-            throw new XMPPException(response.getError());
-        }
-        // We're done with the collector, so explicitly cancel it.
-        collector.cancel();
-
-        if (response.getTo() != null) {
-            return response.getTo();
-        }
-        else {
-            return connection.getServiceName() + "/" + ((Authentication) response).getResource();
-        }
     }
 }
