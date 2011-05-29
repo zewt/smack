@@ -811,8 +811,7 @@ public class XMPPStreamTCP extends XMPPStream
                     throw new XMPPException("Expected stream:stream");
                 }
 
-                Element element = XmlUtil.ReadElementFromXmlPullNonRecursive(parser);
-                return element;
+                return XmlUtil.ReadElementFromXmlPullNonRecursive(parser);
             } else {
                 // We have an XMPP stanza.  Read the whole thing into a DOM node and return it.
                 return XmlUtil.ReadNodeFromXmlPull(parser);
