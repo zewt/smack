@@ -60,16 +60,20 @@ public class XMPPStreamBOSH extends XMPPStream
     public boolean isSecureConnection() { return usingSecureConnection; }
     private boolean usingSecureConnection = false;
 
-    public void writePacket(String packet) throws XMPPException {
+    public void writeData(ComposableBody body) throws XMPPException {
         if(connectionClosed)
             throw new XMPPException("Wrote a packet while the connection was closed");
 
         try {
             // Note that this will block if the packet can't be sent immediately.
-            bosh_client.send(createBoshPacket(packet).build());
+            bosh_client.send(body);
         } catch(BOSHException e) {
             throw new XMPPException("Error writing BOSH packet", e);
         }
+    }
+
+    public void writePacket(String packet) throws XMPPException {
+        writeData(createBoshPacket(packet).build());
     }
 
     // Although compression may or may not be in use by the HTTP stream, that can
@@ -219,16 +223,10 @@ public class XMPPStreamBOSH extends XMPPStream
 
         try {
             // Send the session creation request and receive the response.
-            try {
-                bosh_client.send(ComposableBody.builder()
-                            .setNamespaceDefinition("xmpp", "urn:xmpp:xbosh")
-                            .setAttribute(BodyQName.createWithPrefix("urn:xmpp:xbosh", "version", "xmpp"), "1.0")
-                            .build());
-            }
-            catch(BOSHException e)
-            {
-                throw new XMPPException("Error connecting to BOSH server", e);
-            }
+            writeData(ComposableBody.builder()
+                        .setNamespaceDefinition("xmpp", "urn:xmpp:xbosh")
+                        .setAttribute(BodyQName.createWithPrefix("urn:xmpp:xbosh", "version", "xmpp"), "1.0")
+                        .build());
 
             setupCallback.waitForCompletion();
         } catch(XMPPException e) {
@@ -423,22 +421,14 @@ public class XMPPStreamBOSH extends XMPPStream
         // so for now just pretend they all support stream restarts.
         assertNotLocked();
 
-        try {
-            /* Make sure any written data is flushed and sent to the server.  According
-             * to XEP-0206, any stanzas we put in a <body restart='true'> packet will be
-             * ignored. */
-            if(connectionClosed)
-                throw new XMPPException("Connection has closed");
-
-            bosh_client.send(ComposableBody.builder()
-                    .setNamespaceDefinition("xmpp", "urn:xmpp:xbosh")
-                    .setAttribute(BodyQName.createWithPrefix("urn:xmpp:xbosh", "version", "xmpp"), "1.0")
-                    .setAttribute(BodyQName.createWithPrefix("urn:xmpp:xbosh", "restart", "xmpp"), "true")
-                    .build());
-        }
-        catch(BOSHException e) {
-            throw new XMPPException("BOSH error while sending xmpp:restart", e);
-        }
+        /* Make sure any written data is flushed and sent to the server.  According
+         * to XEP-0206, any stanzas we put in a <body restart='true'> packet will be
+         * ignored. */
+        writeData(ComposableBody.builder()
+                .setNamespaceDefinition("xmpp", "urn:xmpp:xbosh")
+                .setAttribute(BodyQName.createWithPrefix("urn:xmpp:xbosh", "version", "xmpp"), "1.0")
+                .setAttribute(BodyQName.createWithPrefix("urn:xmpp:xbosh", "restart", "xmpp"), "true")
+                .build());
     }
 
     private static ComposableBody.Builder createBoshPacket(String packet) {
