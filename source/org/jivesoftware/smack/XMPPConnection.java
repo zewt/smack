@@ -303,7 +303,8 @@ public class XMPPConnection extends Connection {
             this.roster = new Roster(this);
         }
         if (config.isRosterLoadedAtLogin()) {
-            this.roster.reload();
+            PacketCollector rosterLoadCollector = roster.reloadCollector();
+            rosterLoadCollector.getResult(0);
         }
 
         // Stores the authentication for future reconnection
@@ -316,6 +317,9 @@ public class XMPPConnection extends Connection {
     }
 
     public Roster getRoster() {
+        if (!config.isRosterLoadedAtLogin())
+            throw new IllegalStateException("Roster loading is disabled");
+
         // synchronize against login()
         synchronized(this) {
             // if connection is authenticated the roster is already set by login() 
@@ -328,36 +332,6 @@ public class XMPPConnection extends Connection {
             }
         }
 
-        if (!config.isRosterLoadedAtLogin()) {
-            roster.reload();
-        }
-        // If this is the first time the user has asked for the roster after calling
-        // login, we want to wait for the server to send back the user's roster. This
-        // behavior shields API users from having to worry about the fact that roster
-        // operations are asynchronous, although they'll still have to listen for
-        // changes to the roster. Note: because of this waiting logic, internal
-        // Smack code should be wary about calling the getRoster method, and may need to
-        // access the roster object directly.
-        if (!roster.rosterInitialized) {
-            try {
-                synchronized (roster) {
-                    long waitTime = SmackConfiguration.getPacketReplyTimeout();
-                    long start = System.currentTimeMillis();
-                    while (!roster.rosterInitialized) {
-                        if (waitTime <= 0) {
-                            break;
-                        }
-                        roster.wait(waitTime);
-                        long now = System.currentTimeMillis();
-                        waitTime -= now - start;
-                        start = now;
-                    }
-                }
-            }
-            catch (InterruptedException ie) {
-                // Ignore.
-            }
-        }
         return roster;
     }
 

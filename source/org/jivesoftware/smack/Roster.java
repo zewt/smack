@@ -63,9 +63,6 @@ public class Roster {
     private final List<RosterEntry> unfiledEntries;
     private final List<RosterListener> rosterListeners;
     private Map<String, Map<String, Presence>> presenceMap;
-    // The roster is marked as initialized when at least a single roster packet
-    // has been received and processed.
-    boolean rosterInitialized = false;
     private PresencePacketListener presencePacketListener;
 
     private SubscriptionMode subscriptionMode = getDefaultSubscriptionMode();
@@ -108,6 +105,7 @@ public class Roster {
         presenceMap = new ConcurrentHashMap<String, Map<String, Presence>>();
         // Listen for any roster packets.
         PacketFilter rosterFilter = new PacketTypeFilter(RosterPacket.class);
+        connection.addPacketListener(new RosterPacketListenerSync(), rosterFilter);
         connection.addPacketListener(new RosterPacketListener(), rosterFilter);
         // Listen for any presence packets.
         PacketFilter presenceFilter = new PacketTypeFilter(Presence.class);
@@ -183,6 +181,16 @@ public class Roster {
      * @throws IllegalStateException if connection is not logged in or logged in anonymously
      */
     public void reload() {
+        PacketCollector coll = reloadCollector();
+        coll.cancel();
+    }
+
+    /**
+     * Like {@link #reload}, but returns a PacketCollector.  Call collector.getResult
+     * to wait for the roster to finish loading.  The collector must be cancelled by
+     * the caller.
+     */
+    public PacketCollector reloadCollector() {
         if (!connection.isAuthenticated()) {
             throw new IllegalStateException("Not logged in to server.");
         }
@@ -190,7 +198,10 @@ public class Roster {
             throw new IllegalStateException("Anonymous users can't have a roster.");
         }
 
-        connection.sendPacket(new RosterPacket());
+        RosterPacket packet = new RosterPacket();
+        PacketCollector coll = connection.createPacketCollector(new PacketIDFilter(packet));
+        connection.sendPacket(packet);
+        return coll;
     }
 
     /**
@@ -972,11 +983,17 @@ public class Roster {
         markDeleted(entry.getUser());
     }
 
-    /**
-     * Listens for all roster packets and processes them.
+    /** 
+     * Update the roster based on roster packets.
+     * <p>
+     * Handle the actual updates synchronously, so they're always run in order.  This
+     * also ensures that packet collectors for roster packets receive packets after
+     * we've processed them.
+     * <p>
+     * Fire the roster changed event from an async listener, since we don't want to
+     * call user code from a synchronous listener.
      */
-    private class RosterPacketListener implements PacketListener {
-
+    private class RosterPacketListenerSync extends SynchronousPacketListener {
         public void processPacket(Packet packet) {
             RosterPacket rosterPacket = (RosterPacket) packet;
             for (RosterPacket.Item item : rosterPacket.getRosterItems()) {
@@ -988,13 +1005,11 @@ public class Roster {
                     updateGroupsLocal(item, item.getGroupNames());
                 }
             }
+        }
+    }
 
-            // Mark the roster as initialized.
-            synchronized (Roster.this) {
-                rosterInitialized = true;
-                Roster.this.notifyAll();
-            }
-
+    private class RosterPacketListener implements PacketListener {
+        public void processPacket(Packet packet) {
             // Grab the current change sets atomically.
             Set<String> addedEntriesToFire;
             Set<String> updatedEntriesToFire;
