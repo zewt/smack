@@ -314,23 +314,16 @@ public class XMPPConnection extends Connection {
     @Override
     public synchronized void loginAnonymously() throws XMPPException {
         performLogin(null, null, null);
+
+        // Create the roster if it is not a reconnection or roster already created by getRoster()
+        if (this.roster == null) {
+            this.roster = new Roster(this);
+        }
     }
 
     public Roster getRoster() {
         if (!config.isRosterLoadedAtLogin())
             throw new IllegalStateException("Roster loading is disabled");
-
-        // synchronize against login()
-        synchronized(this) {
-            // if connection is authenticated the roster is already set by login() 
-            // or a previous call to getRoster()
-            if (!isAuthenticated() || isAnonymous()) {
-                if (roster == null) {
-                    roster = new Roster(this);
-                }
-                return roster;
-            }
-        }
 
         return roster;
     }
