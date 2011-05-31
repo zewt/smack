@@ -289,6 +289,11 @@ public class XMPPConnection extends Connection {
         if (debugger != null) {
             debugger.userHasLogged(user);
         }
+
+        // Create the roster if necessary.  The roster will already exist during a
+        // reconnection.
+        if (this.roster == null)
+            this.roster = new Roster(this);
     }
 
     @Override
@@ -298,10 +303,6 @@ public class XMPPConnection extends Connection {
 
         performLogin(username, password, resource);
 
-        // Create the roster if it is not a reconnection or roster already created by getRoster()
-        if (this.roster == null) {
-            this.roster = new Roster(this);
-        }
         if (config.isRosterLoadedAtLogin()) {
             PacketCollector rosterLoadCollector = roster.reloadCollector();
             rosterLoadCollector.getResult(0);
@@ -314,11 +315,6 @@ public class XMPPConnection extends Connection {
     @Override
     public synchronized void loginAnonymously() throws XMPPException {
         performLogin(null, null, null);
-
-        // Create the roster if it is not a reconnection or roster already created by getRoster()
-        if (this.roster == null) {
-            this.roster = new Roster(this);
-        }
     }
 
     public Roster getRoster() {
