@@ -87,14 +87,11 @@ public class RosterTest {
         // Setup
         final Roster roster = connection.getRoster();
         assertNotNull("Can't get the roster from the provided connection!", roster);
-        assertFalse("Roster shouldn't be already initialized!",
-                roster.rosterInitialized);
 
         // Perform roster initialization
         initRoster(connection, roster);
 
         // Verify roster
-        assertTrue("Roster can't be initialized!", roster.rosterInitialized);
         verifyRomeosEntry(roster.getEntry("romeo@example.net"));
         verifyMercutiosEntry(roster.getEntry("mercutio@example.com"));
         verifyBenvoliosEntry(roster.getEntry("benvolio@example.net"));
