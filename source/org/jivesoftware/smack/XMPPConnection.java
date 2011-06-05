@@ -70,15 +70,7 @@ public class XMPPConnection extends Connection {
      */
     private boolean readyForDisconnection;
 
-    /**
-     * Flag that indicates if the user was authenticated with the server when the connection
-     * to the server was closed (abruptly or not).
-     */
-    private boolean wasAuthenticated = false;
     private boolean anonymous = false;
-
-    /** True if we've yet to connect to a server. */
-    private boolean isFirstInitialization = true;
 
     private boolean suppressConnectionErrors;
 
@@ -361,7 +353,6 @@ public class XMPPConnection extends Connection {
         // packetReader and packetWriter are gone, so we can safely clear data_stream.
         data_stream = null;
 
-        this.setWasAuthenticated(authenticated);
         authenticated = false;
         connected = false;
     }
@@ -388,7 +379,6 @@ public class XMPPConnection extends Connection {
             roster = null;
         }
 
-        wasAuthenticated = false;
         suppressConnectionErrors = false;
 
         // If we're the one that cleared connected, it's our job to notify about the
@@ -508,11 +498,16 @@ public class XMPPConnection extends Connection {
     }
 
     /**
-     * Initializes the connection, opening an XMPP stream to the server.
+     * Establishes a connection to the XMPP server and performs an automatic login
+     * only if the previous connection state was logged (authenticated). It basically
+     * creates and maintains a socket connection to the server.<p>
+     * <p/>
+     * Listeners will be preserved from a previous connection if the reconnection
+     * occurs after an abrupt termination.
      *
-     * @throws XMPPException if establishing a connection to the server fails.
+     * @throws XMPPException if an error occurs while trying to establish the connection.
      */
-    private void connectUsingConfiguration() throws XMPPException {
+    public void connect() throws XMPPException {
         // We may have several candidates to connect to: any number of XMPP
         // hosts via SRV discovery, and any number of BOSH hosts via TXT discovery.
         // Try transports in order of preference.
@@ -521,6 +516,10 @@ public class XMPPConnection extends Connection {
         transportsToAttempt.add(XMPPStreamBOSH.class);
         transportsToAttempt.add(XMPPStreamTCP.class);
 
+        // If we're already connected, or if we've disconnected but havn't yet cleaned
+        // up, shut down.
+        shutdown();
+        
         XMPPException firstFailure = null;
         for(Class<? extends XMPPStream> transport: transportsToAttempt) {
             // Look up the connectData for this transport.  Note that we only log failures
@@ -651,16 +650,9 @@ public class XMPPConnection extends Connection {
             }
         }
 
-        if (isFirstInitialization) {
-            isFirstInitialization = false;
-
-            // Notify listeners that a new connection has been established
-            for (ConnectionCreationListener listener: getConnectionCreationListeners()) {
-                listener.connectionCreated(XMPPConnection.this);
-            }
-        }
-        else if (!wasAuthenticated) {
-            notifyReconnection();
+        // Notify listeners that a new connection has been established
+        for (ConnectionCreationListener listener: getConnectionCreationListeners()) {
+            listener.connectionCreated(XMPPConnection.this);
         }
 
         // Inform readerThreadException that disconnections are now allowed.
@@ -724,59 +716,6 @@ public class XMPPConnection extends Connection {
         return data_stream.isUsingCompression();
     }
 
-    /**
-     * Establishes a connection to the XMPP server and performs an automatic login
-     * only if the previous connection state was logged (authenticated). It basically
-     * creates and maintains a socket connection to the server.<p>
-     * <p/>
-     * Listeners will be preserved from a previous connection if the reconnection
-     * occurs after an abrupt termination.
-     *
-     * @throws XMPPException if an error occurs while trying to establish the connection.
-     *      Two possible errors can occur which will be wrapped by an XMPPException --
-     *      UnknownHostException (XMPP error code 504), and IOException (XMPP error code
-     *      502). The error codes and wrapped exceptions can be used to present more
-     *      appropiate error messages to end-users.
-     */
-    public void connect() throws XMPPException {
-        // If we're already connected, or if we've disconnected but havn't yet cleaned
-        // up, shut down.
-        shutdown();
-
-        // Establishes the connection, readers and writers
-        connectUsingConfiguration();
-        // Automatically makes the login if the user was previouslly connected successfully
-        // to the server and the connection was terminated abruptly
-        if (connected && wasAuthenticated) {
-            // Make the login
-            try {
-                if (isAnonymous()) {
-                    // Make the anonymous login
-                    loginAnonymously();
-                }
-                else {
-                    login(config.getUsername(), config.getPassword(),
-                            config.getResource());
-                }
-                notifyReconnection();
-            }
-            catch (XMPPException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    /**
-     * Sets whether the connection has already logged in the server.
-     *
-     * @param wasAuthenticated true if the connection has already been authenticated.
-     */
-    private void setWasAuthenticated(boolean wasAuthenticated) {
-        if (!this.wasAuthenticated) {
-            this.wasAuthenticated = wasAuthenticated;
-        }
-    }
-
     /** Write a list of packets to the stream.  Used by PacketWriter. */
     protected void writePacket(Collection<Packet> packets) throws XMPPException {
         StringBuffer data = new StringBuffer();
@@ -784,23 +723,6 @@ public class XMPPConnection extends Connection {
             data.append(packet.toXML());
 
         data_stream.writePacket(data.toString());
-    }
-
-    /**
-     * Sends a notification indicating that the connection was reconnected successfully.
-     */
-    protected void notifyReconnection() {
-        // Notify connection listeners of the reconnection.
-        for (ConnectionListener listener: getConnectionListeners()) {
-            try {
-                listener.reconnectionSuccessful();
-            }
-            catch (Exception e) {
-                // Catch and print any exception so we can recover
-                // from a faulty listener
-                e.printStackTrace();
-            }
-        }
     }
 
     /**
