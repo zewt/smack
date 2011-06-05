@@ -137,29 +137,6 @@ public class XMPPConnection extends Connection {
         this(config, null, null);
     }
 
-    /**
-     * Creates a new XMPP connection using the specified connection configuration.<p>
-     * <p/>
-     * Manually specifying connection configuration information is suitable for
-     * advanced users of the API. In many cases, using the
-     * {@link #XMPPConnection(String)} constructor is a better approach.<p>
-     * <p/>
-     * Note that XMPPConnection constructors do not establish a connection to the server
-     * and you must call {@link #connect()}.<p>
-     * <p/>
-     *
-     * The CallbackHandler will only be used if the connection requires the client provide
-     * an SSL certificate to the server. The CallbackHandler must handle the PasswordCallback
-     * to prompt for a password to unlock the keystore containing the SSL certificate.
-     *
-     * @deprecated call {@link ConnectionConfiguration#setCallbackHandler} and use {@link XMPPConnection#XMPPConnection(ConnectionConfiguration)}.
-     * @param config the connection configuration.
-     * @param callbackHandler the CallbackHandler used to prompt for the password to the keystore.
-     */
-    public XMPPConnection(ConnectionConfiguration config, CallbackHandler callbackHandler) {
-        this(config, callbackHandler, null);
-    }
-
     /** The primary constructor. */
     private XMPPConnection(ConnectionConfiguration config, CallbackHandler callbackHandler, String serviceName) {
         super(config);
