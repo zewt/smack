@@ -176,9 +176,6 @@ public class FormTest extends SmackTestCase {
             assertEquals("The age is bad", "20", completedForm.getField("age").getValues().next());
 
         }
-        catch (XMPPException ex) {
-            fail(ex.getMessage());
-        }
         finally {
             collector.cancel();
             collector2.cancel();

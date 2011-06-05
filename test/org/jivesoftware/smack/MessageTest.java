@@ -53,13 +53,7 @@ public class MessageTest extends SmackTestCase {
 
         PacketCollector collector = getConnection(0)
                 .createPacketCollector(new MessageTypeFilter(Message.Type.chat));
-        try {
-            getConnection(1).getChatManager().createChat(getBareJID(0), null).sendMessage("Test 1");
-        }
-        catch (XMPPException e) {
-            e.printStackTrace();
-            fail(e.getMessage());
-        }
+        getConnection(1).getChatManager().createChat(getBareJID(0), null).sendMessage("Test 1");
 
         Message message = (Message) collector.nextResult(2500);
         assertNotNull("Message not recieved from remote user", message);

@@ -464,12 +464,7 @@ public class MultiUserChatTest extends SmackTestCase {
                         "Sender of chat is incorrect",
                         room + "/testbot2",
                         chat2.getParticipant());
-                    try {
-                        chat2.sendMessage("ACK");
-                    }
-                    catch (XMPPException e) {
-                        fail(e.getMessage());
-                    }
+                    chat2.sendMessage("ACK");
                 }
             });
 

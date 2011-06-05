@@ -90,7 +90,7 @@ public class Chat {
      * @param text the text to send.
      * @throws XMPPException if sending the message fails.
      */
-    public void sendMessage(String text) throws XMPPException {
+    public void sendMessage(String text) {
         Message message = new Message(participant, Message.Type.chat);
         message.setThread(threadID);
         message.setBody(text);
@@ -104,7 +104,7 @@ public class Chat {
      * @param message the message to send.
      * @throws XMPPException if an error occurs sending the message.
      */
-    public void sendMessage(Message message) throws XMPPException {
+    public void sendMessage(Message message) {
         // Force the recipient, message type, and thread ID since the user elected
         // to send the message through this chat object.
         message.setTo(participant);

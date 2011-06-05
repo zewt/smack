@@ -71,7 +71,7 @@ public class ChatTest extends SmackTestCase {
     }
 
     public void testProperties() {
-        try {
+        {
             Chat newChat = getConnection(0).getChatManager().createChat(getFullJID(1), null);
             PacketCollector collector = getConnection(1)
                     .createPacketCollector(new ThreadFilter(newChat.getThreadID()));
@@ -117,10 +117,6 @@ public class ChatTest extends SmackTestCase {
                     "birthdates are different",
                     msg.getProperty("birthdate"),
                     msg2.getProperty("birthdate"));
-        }
-        catch (XMPPException e) {
-            e.printStackTrace();
-            fail(e.getMessage());
         }
     }
 
