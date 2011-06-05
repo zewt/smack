@@ -74,8 +74,8 @@ public class XMPPConnection extends Connection {
 
     private boolean suppressConnectionErrors;
 
-    private PacketWriter packetWriter;
-    private PacketReader packetReader;
+    final private PacketWriter packetWriter;
+    final private PacketReader packetReader;
 
     /** The SmackDebugger allows to log and debug XML traffic. */
     protected SmackDebugger debugger = null;
