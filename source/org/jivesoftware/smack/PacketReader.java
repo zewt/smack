@@ -95,6 +95,12 @@ class PacketReader {
         // Shut down the listener executor.
         if(listenerExecutor != null) {
             listenerExecutor.shutdown();
+            try {
+                listenerExecutor.awaitTermination(9999, TimeUnit.HOURS);
+            } catch(InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+
             listenerExecutor = null;
         }
     }
