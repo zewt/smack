@@ -86,25 +86,9 @@ public class XMPPConnection extends Connection {
     private ReceivedPacket initialFeatures;
     Roster roster = null;
 
-    /**
-     * Creates a new XMPP connection in the same way {@link #XMPPConnection(ConnectionConfiguration,CallbackHandler)} does, but
-     * with no callback handler for password prompting of the keystore.  This will work
-     * in most cases, provided the client is not required to provide a certificate to 
-     * the server.
-     *
-     * @param config the connection configuration.
-     */
+    /** Creates a new XMPP connection with the given {@link ConnectionConfiguration}. */
     public XMPPConnection(ConnectionConfiguration config) {
-        this(config, null, null);
-    }
-
-    /** The primary constructor. */
-    private XMPPConnection(ConnectionConfiguration config, CallbackHandler callbackHandler, String serviceName) {
         super(config);
-        if(serviceName != null)
-            this.config.setServiceName(serviceName);
-        if(callbackHandler != null)
-            this.config.setCallbackHandler(callbackHandler);
 
         readEvent = new ObservableReader.ReadEvent();
         writeEvent = new ObservableWriter.WriteEvent();
