@@ -110,16 +110,13 @@ public class ChatManager {
         connection.addPacketListener(new PacketListener() {
             public void processPacket(Packet packet) {
                 Message message = (Message) packet;
-                Chat chat;
-                if (message.getThread() == null) {
-                	chat = getUserChat(message.getFrom());
-                }
-                else {
+                Chat chat = null;
+                if (message.getThread() != null)
                     chat = getThreadChat(message.getThread());
-                    if (chat == null) {
-                        // Try to locate the chat based on the sender of the message
-                    	chat = getUserChat(message.getFrom());
-                    }
+
+                if (chat == null) {
+                    // Try to locate the chat based on the sender of the message
+                    chat = getUserChat(message.getFrom());
                 }
 
                 if(chat == null) {
