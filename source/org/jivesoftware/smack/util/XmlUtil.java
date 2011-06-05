@@ -154,6 +154,12 @@ public class XmlUtil {
 
             content.append(parser.getName());
             for(int i = 0; i < parser.getAttributeCount(); ++i) {
+                // Some XML parsers include xmlns attributes and some don't.  We handle them below
+                // in case they don't, so exclude any provided xmlns attributes.
+                String attrName = parser.getAttributeName(i);
+                if(attrName.equals("xmlns"))
+                    continue;
+
                 content.append(" ");
 
                 // Append the attribute prefix, if any.
@@ -163,7 +169,6 @@ public class XmlUtil {
                 if(attrPrefix != null)
                     content.append(attrPrefix + ":");
 
-                String attrName = parser.getAttributeName(i);
                 content.append(attrName + "='");
                 String attrValue = parser.getAttributeValue(i);
                 content.append(StringUtils.escapeForXML(attrValue));
