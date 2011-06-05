@@ -87,23 +87,10 @@ public class XMPPConnection extends Connection {
     Roster roster = null;
 
     /**
-     * Creates a new XMPP connection in the same way {@link #XMPPConnection(String,CallbackHandler)} does, but
-     * with no callback handler for password prompting of the keystore.  This will work
-     * in most cases, provided the client is not required to provide a certificate to 
-     * the server.
-     *
-     * @param serviceName the name of the XMPP server to connect to; e.g. <tt>example.com</tt>.
-     */
-    public XMPPConnection(String serviceName) {
-        this(new ConnectionConfiguration(serviceName), null, serviceName);
-    }
-
-    /**
      * Creates a new XMPP connection in the same way {@link #XMPPConnection(ConnectionConfiguration,CallbackHandler)} does, but
      * with no callback handler for password prompting of the keystore.  This will work
      * in most cases, provided the client is not required to provide a certificate to 
      * the server.
-     *
      *
      * @param config the connection configuration.
      */

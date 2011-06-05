@@ -23,7 +23,7 @@ public class RosterOfflineTest {
 
     @Before
     public void setup() {
-        this.connection = new XMPPConnection("localhost");
+        this.connection = new XMPPConnection(new ConnectionConfiguration("localhost"));
         assertFalse(connection.isConnected());
 
         roster = connection.getRoster();
