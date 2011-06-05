@@ -195,7 +195,7 @@ public class ChatManager {
      * @param userJID
      * @return
      */
-    private Chat getUserChat(String userJID) {
+    public Chat getUserChat(String userJID) {
 	Chat match = jidChats.get(userJID);
 	
 	if (match == null) {
