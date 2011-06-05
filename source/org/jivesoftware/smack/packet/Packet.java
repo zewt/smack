@@ -45,7 +45,7 @@ public abstract class Packet {
     protected static final String DEFAULT_LANGUAGE =
             java.util.Locale.getDefault().getLanguage().toLowerCase();
 
-    private static String DEFAULT_XML_NS = null;
+    private static String DEFAULT_XML_NS = "jabber:client";
 
     /**
      * Constant used as packetID to indicate that a packet has no id. To indicate that a packet
