@@ -74,7 +74,9 @@ public abstract class SmackTestCase extends TestCase {
      * 
      * @return the maximum number of connections to initialize for this test case.
      */
-    protected abstract int getMaxConnections();
+    protected int getMaxConnections() {
+        return 0;
+    }
 
     /**
      * Returns a SocketFactory that will be used to create the socket to the XMPP server. By 
