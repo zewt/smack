@@ -87,32 +87,6 @@ public class XMPPConnection extends Connection {
     Roster roster = null;
 
     /**
-     * Creates a new connection to the specified XMPP server. A DNS SRV lookup will be
-     * performed to determine the IP address and port corresponding to the
-     * service name; if that lookup fails, it's assumed that server resides at
-     * <tt>serviceName</tt> with the default port of 5222. Encrypted connections (TLS)
-     * will be used if available, stream compression is disabled, and standard SASL
-     * mechanisms will be used for authentication.<p>
-     * <p/>
-     * This is the simplest constructor for connecting to an XMPP server. Alternatively,
-     * you can get fine-grained control over connection settings using the
-     * {@link #XMPPConnection(ConnectionConfiguration)} constructor.<p>
-     * <p/>
-     * Note that XMPPConnection constructors do not establish a connection to the server
-     * and you must call {@link #connect()}.<p>
-     * <p/>
-     * The CallbackHandler will only be used if the connection requires the client provide
-     * an SSL certificate to the server. The CallbackHandler must handle the PasswordCallback
-     * to prompt for a password to unlock the keystore containing the SSL certificate.
-     *
-     * @param serviceName the name of the XMPP server to connect to; e.g. <tt>example.com</tt>.
-     * @param callbackHandler the CallbackHandler used to prompt for the password to the keystore.
-     */
-    public XMPPConnection(String serviceName, CallbackHandler callbackHandler) {
-        this(new ConnectionConfiguration(serviceName), callbackHandler, serviceName);
-    }
-
-    /**
      * Creates a new XMPP connection in the same way {@link #XMPPConnection(String,CallbackHandler)} does, but
      * with no callback handler for password prompting of the keystore.  This will work
      * in most cases, provided the client is not required to provide a certificate to 
