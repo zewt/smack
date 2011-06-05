@@ -199,7 +199,7 @@ public class XmlUtil {
                 namespaceNodes.put(prefix, namespace);
 
                 content.append(" xmlns");
-                if(prefix.length() == 0)
+                if(prefix.length() != 0)
                     content.append(":" + prefix);
 
                 content.append("='");
