@@ -328,46 +328,6 @@ public class XMPPConnection extends Connection {
         packetWriter.sendPacket(packet);
     }
 
-    /** Create a new XMPPStream. */
-    private static XMPPStream createDataStream(Class<? extends XMPPStream> transport, ConnectionConfiguration config) {
-        // Create an instance of this transport.
-        Constructor<? extends XMPPStream> constructor;
-        try {
-            constructor = transport.getConstructor(ConnectionConfiguration.class);
-            return constructor.newInstance(config);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * Look up the ConnectionData for the given transport and configuration.
-     */
-    private static XMPPStream.ConnectData lookupConnectionData(Class<? extends XMPPStream> transport,
-            ConnectionConfiguration config) throws XMPPException {
-        final XMPPStream lookup_data_stream = createDataStream(transport, config);
-
-        // Schedule a timeout.
-        int waitTime = SmackConfiguration.getPacketReplyTimeout();
-        // waitTime = 99999999;
-        TimeoutThread timeoutThread = new TimeoutThread("Connection timeout thread", waitTime, new Runnable() {
-            public void run() { lookup_data_stream.disconnect(); }
-        });
-
-        try {
-            try {
-                return lookup_data_stream.getConnectData();
-            } finally {
-                timeoutThread.cancel();
-            }
-        } catch(XMPPException e) {
-            if(timeoutThread.executed)
-                throw new XMPPException("Connection failed. No response from server.");
-            else
-                throw e;
-        }
-    }
-
     /**
      * Establishes a connection to the XMPP server and performs an automatic login
      * only if the previous connection state was logged (authenticated). It basically
@@ -378,127 +338,24 @@ public class XMPPConnection extends Connection {
      *
      * @throws XMPPException if an error occurs while trying to establish the connection.
      */
+    ConnectionOpener opener;
     public void connect() throws XMPPException {
-        // We may have several candidates to connect to: any number of XMPP
-        // hosts via SRV discovery, and any number of BOSH hosts via TXT discovery.
-        // Try transports in order of preference.
-        Vector<Class<? extends XMPPStream>> transportsToAttempt =
-            new Vector<Class<? extends XMPPStream>>();
-        transportsToAttempt.add(XMPPStreamBOSH.class);
-        transportsToAttempt.add(XMPPStreamTCP.class);
-
         // If we're already connected, or if we've disconnected but havn't yet cleaned
         // up, shut down.
         shutdown();
-        
-        XMPPException firstFailure = null;
-        for(Class<? extends XMPPStream> transport: transportsToAttempt) {
-            // Look up the connectData for this transport.  Note that we only log failures
-            // here and don't throw.  TCP transport lookup, and lookup for an explicit
-            // BOSH URL, will never fail; in the fallback case it'll always give us a
-            // default host:5222 lookup.
-            XMPPStream.ConnectData connectData;
-            try {
-                connectData = lookupConnectionData(transport, config);
-                if(connectData.connectionAttempts() == 0)
-                    continue;
-            } catch(XMPPException e) {
-                continue;
-            }
 
-            // Attempt to connect using this transport.  If the transport discovers more
-            // than one server to connect to, try each in order.  Note that timeouts are
-            // per-server.
-            for(int i = 0; i < connectData.connectionAttempts(); ++i) {
-                if(data_stream != null)
-                    throw new AssertionError("data_stream should be null");
-
-                data_stream = createDataStream(transport, config);
-                try {
-                    connectUsingConfigurationAttempt(connectData, i);
-                    return;
-                } catch(XMPPException e) {
-                    // On failure, connectUsingConfigurationAttempt always clears data_stream.
-                    if(data_stream != null)
-                        throw new AssertionError("connectUsingConfigurationAttempt failed, but left data_stream set");
-
-                    firstFailure = e;
-                }
-            }
-        }
-
-        // We didn't connect.  Report the first failure other than remote_server_not_found
-        // as the error.
-        throw firstFailure;
-    }
-
-    static class TimeoutThread extends Thread {
-        long waitTime;
-        boolean executed = false;
-        Runnable task;
-        TimeoutThread(String name, long ms, Runnable task) {
-            setName(name);
-            waitTime = ms;
-            this.task = task;
-            start();
-        }
-        public void run() {
-            try {
-                Thread.sleep(waitTime);
-            } catch(InterruptedException e) {
-                return;
-            }
-
-            task.run();
-            executed = true;
-        }
-
-        public void cancel() {
-            interrupt();
-            ThreadUtil.uninterruptibleJoin(this);
-        }
-    };
-
-    private void beginConnection(XMPPStream.ConnectData connectData, int attempt) throws XMPPException {
-        // Schedule a timeout.
-        int waitTime = SmackConfiguration.getPacketReplyTimeout();
-        TimeoutThread timeoutThread = new TimeoutThread("Connection timeout thread", waitTime, new Runnable() {
-            public void run() { shutdown(); }
-        });
+        opener = new ConnectionOpener(config);
 
         try {
-            try {
-                data_stream.initializeConnection(connectData, attempt);
-            } finally {
-                timeoutThread.cancel();
-            }
-        } catch(XMPPException e) {
-            // On timeout, ignore the connection-closed exception and throw a cleaner one.
-            if(timeoutThread.executed)
-                throw new XMPPException("Connection failed. No response from server.");
-            else
-                throw e;
+            data_stream = opener.connect(readEvent, writeEvent);
+        } finally {
+            opener = null;
         }
-    }
 
-    private void connectUsingConfigurationAttempt(XMPPStream.ConnectData connectData, int attempt) throws XMPPException {
-        data_stream.setReadWriteEvents(readEvent, writeEvent);
+        // Connection is successful.
+        connected = true;
 
         readyForDisconnection = false;
-
-        try {
-            // Tell data_stream to initialize the connection.
-            beginConnection(connectData, attempt);
-
-            // Connection is successful.
-            connected = true;
-        }
-        catch (XMPPException ex) {
-            // An exception occurred in setting up the connection. Make sure we shut down the
-            // readers and writers and close the socket.
-            shutdown();
-            throw ex;        // Everything stopped. Now throw the exception.
-        }
 
         packetReader.startup();
         packetWriter.startup();
