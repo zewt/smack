@@ -26,6 +26,7 @@ import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.util.DNSUtil;
 import org.jivesoftware.smack.util.ObservableReader;
 import org.jivesoftware.smack.util.ObservableWriter;
+import org.jivesoftware.smack.util.ThreadUtil;
 import org.jivesoftware.smack.util.XmlUtil;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -96,6 +97,9 @@ public class XMPPStreamBOSH extends XMPPStream
     private ObservableReader.ReadEvent readEvent;
     private ObservableWriter.WriteEvent writeEvent;
 
+    /** This is null, our SetupPacketCallback, or the user's callback from setPacketCallback. */
+    private PacketCallback callback;
+    
     String authID;
     public String getConnectionID() { return authID; }
 
@@ -117,8 +121,6 @@ public class XMPPStreamBOSH extends XMPPStream
         this.uri = config.getBoshURI();
         this.config = config;
     }
-
-    private PacketCallback callback;
 
     class ConnectDataBOSH extends ConnectData {
         Vector<URI> addresses = new Vector<URI>();
@@ -235,7 +237,7 @@ public class XMPPStreamBOSH extends XMPPStream
         }
     }
 
-    public void initializeConnection(ConnectData data, int attempt, final PacketCallback userCallback) throws XMPPException
+    public void initializeConnection(ConnectData data, int attempt) throws XMPPException
     {
         assertNotLocked();
 
@@ -310,7 +312,7 @@ public class XMPPStreamBOSH extends XMPPStream
                 }
             });
 
-            setupCallback = new SetupPacketCallback(userCallback);
+            setupCallback = new SetupPacketCallback();
             callback = setupCallback;
         } finally {
             lock.unlock();
@@ -346,17 +348,29 @@ public class XMPPStreamBOSH extends XMPPStream
         }
     }
 
+    public void setPacketCallbacks(PacketCallback userCallbacks) {
+        if(userCallbacks == null)
+            throw new IllegalArgumentException("userCallbacks can not be null");
+
+        assertNotLocked();
+        lock.lock();
+        try {
+            if(callback != null)
+                throw new IllegalStateException("PacketCallbacks is already set");
+
+            // Set the user's callback.
+            this.callback = userCallbacks;
+
+            // If PacketReaderThread is waiting for callbacks to be set, wake it up.
+            cond.signalAll();
+        } finally {
+            lock.unlock();
+        }
+    }    
+
     class SetupPacketCallback extends PacketCallback {
         boolean complete = false;
         XMPPException error = null;
-
-        /* After completing transport setup, the packet callbacks will be changed from this
-         * object to the user's callbacks. */
-        PacketCallback userCallbacks;
-
-        SetupPacketCallback(PacketCallback userCallbacks) {
-            this.userCallbacks = userCallbacks;
-        }
 
         public void onBody(AbstractBody body) {
             assertNotLocked();
@@ -368,13 +382,14 @@ public class XMPPStreamBOSH extends XMPPStream
                 return;
             }
 
-            // Switch callbacks to the user's, so ResponseListener sends onPacket
-            // calls to it.
-            callback = userCallbacks;
-
-            // Wake up waitForCompletion.
             lock.lock();
             try {
+                // Clear ourself as the callback.
+                if(callback != this)
+                    throw new IllegalStateException("unexpected value for callback");
+                callback = null;
+                
+                // Wake up waitForCompletion.
                 complete = true;
                 cond.signalAll();
             } finally {
@@ -412,8 +427,9 @@ public class XMPPStreamBOSH extends XMPPStream
                 lock.unlock();
             }
 
-            if(error != null)
+            if(error != null) {
                 throw new XMPPException(error);
+            }
         }
     };
 
@@ -500,10 +516,10 @@ public class XMPPStreamBOSH extends XMPPStream
 
             boshClientCopy = bosh_client;
 
-            // We signal this change below, after actually closing the connection.  Set
-            // it here, so if connectionClosed is false during a locked section, the connection
-            // is actually not closed.
+            // Set connectionClosed now, so if ResponseListener is waiting for callbacks, it'll
+            // stop waiting.  Otherwise, boshClientCopy.close() won't be able to join its thread.
             connectionClosed = true;
+            cond.signalAll();
         } finally {
             lock.unlock();
         }
@@ -513,6 +529,7 @@ public class XMPPStreamBOSH extends XMPPStream
         if(boshClientCopy != null)
             boshClientCopy.close();
 
+        /* Signal connectionClosed again, now that we've actually closed the connection. */
         lock.lock();
         try {
             cond.signalAll();
@@ -545,6 +562,21 @@ public class XMPPStreamBOSH extends XMPPStream
                 .build());
     }
 
+    /** Wait for callbacks to be available.  Returns {@link PacketCallback}, or
+     *  null if {@link XMPPStreamTCP#disconnect} is called. */
+    private PacketCallback getCallbacks() {
+        assertNotLocked();
+
+        lock.lock();
+        try {
+            while(callback == null && !connectionClosed)
+                ThreadUtil.uninterruptibleWait(cond);
+            return callback;
+        } finally {
+            lock.unlock();
+        }
+    }
+    
     private static ComposableBody.Builder createBoshPacket(String packet) {
         ComposableBody.Builder builder = ComposableBody.builder()
             .setNamespaceDefinition("xmpp", "urn:xmpp:xbosh")
@@ -563,6 +595,10 @@ public class XMPPStreamBOSH extends XMPPStream
         {
             assertNotLocked();
 
+            PacketCallback currentCallback = getCallbacks();
+            if(currentCallback == null)
+                return;
+
             AbstractBody body = event.getBody();
 
             String xml = body.toXML();
@@ -576,17 +612,23 @@ public class XMPPStreamBOSH extends XMPPStream
                 bodyNode = (Element) doc.getFirstChild();
             }
             catch(IOException e) {
-                callback.onError(new XMPPException("Error reading packet", e));
+                currentCallback.onError(new XMPPException("Error reading packet", e));
                 return;
             }
             catch(SAXException e) {
-                callback.onError(new XMPPException("Error reading packet", e));
+                currentCallback.onError(new XMPPException("Error reading packet", e));
                 return;
             }
 
             if(callback instanceof SetupPacketCallback) {
                 SetupPacketCallback setupCallbacks = (SetupPacketCallback) callback;
                 setupCallbacks.onBody(body);
+                
+                // SetupCallbacks receives the first packet to onBody, and clears itself.
+                // When that happens, wait for the new PacketCallbacks from setPacketCallbacks.
+                currentCallback = getCallbacks();
+                if(currentCallback == null)
+                    return;
             }
 
             // The children of <body> are the XMPP payloads.
@@ -595,7 +637,7 @@ public class XMPPStreamBOSH extends XMPPStream
                 Node node = nodes.item(i);
                 if(!(node instanceof Element))
                     continue;
-                callback.onPacket((Element) node);
+                currentCallback.onPacket((Element) node);
             }
         }
     }
@@ -615,8 +657,16 @@ public class XMPPStreamBOSH extends XMPPStream
             // send this case as a disconnection instead of disconnection error.
             boolean ignoredError = be != null && be.getMessage().equals("Session explicitly closed by caller");
 
-            if(connEvent.isError() && !ignoredError) {
-                callback.onError(new XMPPException(be));
+            if(connEvent.isError()) {
+                PacketCallback currentCallback = getCallbacks();
+
+                // Never ignore errors during setup, or SetupPacketCallback.waitForCompletion
+                // will never return.
+                if(currentCallback instanceof SetupPacketCallback)
+                    ignoredError = false;
+                
+                if(currentCallback != null && !ignoredError)
+                    currentCallback.onError(new XMPPException(be));
             }
 
             if(!connEvent.isConnected() && !connectionClosed) {
@@ -628,5 +678,10 @@ public class XMPPStreamBOSH extends XMPPStream
     private void assertNotLocked() {
         if(lock.isHeldByCurrentThread())
             throw new RuntimeException("Lock should not be held");
+    }
+
+    private void assertLocked() {
+        if(!lock.isHeldByCurrentThread())
+            throw new RuntimeException("Lock should be held");
     }
 };

@@ -468,7 +468,7 @@ public class XMPPConnection extends Connection {
 
         try {
             try {
-                data_stream.initializeConnection(connectData, attempt, packetReader.getPacketCallbacks());
+                data_stream.initializeConnection(connectData, attempt);
             } finally {
                 timeoutThread.cancel();
             }
@@ -484,16 +484,7 @@ public class XMPPConnection extends Connection {
     private void connectUsingConfigurationAttempt(XMPPStream.ConnectData connectData, int attempt) throws XMPPException {
         data_stream.setReadWriteEvents(readEvent, writeEvent);
 
-        // Start the packet writer.  This can't fail, and it won't do anything until
-        // we receive packets.
-        packetWriter.startup();
-        packetReader.startup();
-
         readyForDisconnection = false;
-
-        PacketCollector<ReceivedPacket> coll =
-            this.createPacketCollector(new ReceivedPacketFilter("features", "http://etherx.jabber.org/streams"),
-                ReceivedPacket.class);
 
         try {
             // Tell data_stream to initialize the connection.
@@ -501,15 +492,28 @@ public class XMPPConnection extends Connection {
 
             // Connection is successful.
             connected = true;
-
-            // A <features/> packet has been received.  Read it; we'll need it for login.
-            initialFeatures = coll.getResult(0);
         }
         catch (XMPPException ex) {
             // An exception occurred in setting up the connection. Make sure we shut down the
             // readers and writers and close the socket.
             shutdown();
             throw ex;        // Everything stopped. Now throw the exception.
+        }
+
+        packetReader.startup();
+        packetWriter.startup();
+
+        PacketCollector<ReceivedPacket> coll =
+            this.createPacketCollector(new ReceivedPacketFilter("features", "http://etherx.jabber.org/streams"),
+                ReceivedPacket.class);
+        try {
+            // Once we set callbacks, PacketCollectors will start receiving messages.  They'll be
+            // queued until then, so we won't miss the packet we're looking for if it's received
+            // before we get here.
+            data_stream.setPacketCallbacks(packetReader.getPacketCallbacks());
+
+            // A <features/> packet has been received.  Read it; we'll need it for login.
+            initialFeatures = coll.getResult(0);
         } finally {
             coll.cancel();
         }

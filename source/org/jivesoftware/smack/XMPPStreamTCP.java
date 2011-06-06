@@ -48,6 +48,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.jivesoftware.smack.XMPPStream.ConnectData;
+import org.jivesoftware.smack.XMPPStream.PacketCallback;
 import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.util.DNSUtil;
 import org.jivesoftware.smack.util.ObservableReader;
@@ -286,7 +287,7 @@ public class XMPPStreamTCP extends XMPPStream
      * Begin the initial connection to the server.  Returns when the connection
      * is established.
      */
-    public void initializeConnection(ConnectData data, int attempt, final PacketCallback userCallbacks) throws XMPPException {
+    public void initializeConnection(ConnectData data, int attempt) throws XMPPException {
         if(!(data instanceof ConnectDataTCP))
             throw new IllegalArgumentException("data argument was not created with XMPPStreamTCP.getConnectData");
         ConnectDataTCP dataTCP = (ConnectDataTCP) data;
@@ -321,7 +322,7 @@ public class XMPPStreamTCP extends XMPPStream
                 throw new XMPPException("Could not connect to " + host + ":" + port, e);
             }
 
-            setupCallbacks = new SetupPacketCallback(userCallbacks, host, port);
+            setupCallbacks = new SetupPacketCallback(host, port);
             this.callbacks = setupCallbacks;
 
             packetReaderThread = new PacketReaderThread();
@@ -338,6 +339,11 @@ public class XMPPStreamTCP extends XMPPStream
             // Wait for TLS and compression negotiation to complete.  If this returns successfully,
             // this.callbacks is updated to point to userCallbacks.
             setupCallbacks.waitForCompletion();
+
+            // On successful completion, setupCallbacks cleared callbacks.  We're not locked,
+            // but setPacketCallbacks must not be called until connect() returns.
+            if(callbacks != null) 
+                throw new IllegalStateException("callbacks should be cleared");
         } catch(XMPPException e) {
             disconnect();
             throw e;
@@ -347,6 +353,43 @@ public class XMPPStreamTCP extends XMPPStream
         startKeepAliveProcess();
     }
 
+    public void setPacketCallbacks(PacketCallback userCallbacks) {
+        if(userCallbacks == null)
+            throw new IllegalArgumentException("userCallbacks can not be nnull");
+        
+        Element packet;
+
+        assertNotLocked();
+        lock.lock();
+        try {
+            if(queuedPacket == null)
+                throw new IllegalStateException("Should have had a packet buffered, but didn't");
+            packet = queuedPacket;
+            queuedPacket = null;
+        } finally {
+            lock.unlock();
+        }
+
+        // Pass the initial <features> packet that we received in SetupPacketCallback to the
+        // user's handler.  Don't call this while locked.
+        userCallbacks.onPacket(packet);
+        
+        lock.lock();
+        try {
+            if(this.callbacks != null)
+                throw new IllegalStateException("PacketCallbacks already set");
+
+            // Set the user's callback.
+            this.callbacks = userCallbacks;
+            
+            // If PacketReaderThread is waiting for callbacks to be set, wake it up.
+            cond.signalAll();
+        } finally {
+            lock.unlock();
+        }
+    }
+    Element queuedPacket;
+
     /**
      * This callback handler receives packets during initial setup: TLS and
      * compression negitiation.  Once we're finished with that, it switches
@@ -355,15 +398,11 @@ public class XMPPStreamTCP extends XMPPStream
     class SetupPacketCallback extends PacketCallback {
         boolean complete = false;
         XMPPException error = null;
-        /* After completing transport setup, the packet callbacks will be changed from this
-         * object to the user's callbacks. */
-        PacketCallback userCallbacks;
 
         String host;
         int port;
 
-        SetupPacketCallback(PacketCallback userCallbacks, String host, int port) {
-            this.userCallbacks = userCallbacks;
+        SetupPacketCallback(String host, int port) {
             this.host = host;
             this.port = port;
         }
@@ -408,21 +447,22 @@ public class XMPPStreamTCP extends XMPPStream
                     config.setHost(host);
                     config.setPort(port);
 
-                    // Switch to the user's callbacks.
-                    callbacks = userCallbacks;
+                    // We just received the first <features/> packet that isn't related to
+                    // stream negotiation.  Queue it; we'll pass it to the user's callback
+                    // when it's set.
+                    queuedPacket = packet;
 
+                    // Clear ourself as the callback.
+                    if(callbacks != this)
+                        throw new IllegalStateException("unexpected value for callbacks");
+                    callbacks = null;
+                    
                     // Wake initializeConnection back up.
                     complete = true;
                     cond.signalAll();
                 } finally {
                     lock.unlock();
                 }
-
-                // We just received the first <features/> packet that isn't related to
-                // stream negotiation, so pass it on to the user's callback.  Do this
-                // after calling onComplete, so initialization is fully completed before
-                // any user callbacks are run.
-                userCallbacks.onPacket(packet);
             } catch(IOException e) {
                 onError(new XMPPException("I/O error establishing connection to server", e));
             } catch(XMPPException e) {
@@ -448,7 +488,7 @@ public class XMPPStreamTCP extends XMPPStream
             lock.lock();
             try {
                 while(!complete && error == null) {
-                    waitUninterruptible(cond);
+                    ThreadUtil.uninterruptibleWait(cond);
                 }
 
                 if(error != null)
@@ -677,7 +717,7 @@ public class XMPPStreamTCP extends XMPPStream
         // so it isn't accessing anything we shut down.
         if(packetReaderThread != Thread.currentThread() && packetReaderThread != threadUnjoined) {
             while(!threadExited)
-                waitUninterruptible(cond);
+                ThreadUtil.uninterruptibleWait(cond);
         }
 
         if(packetReaderThread != null) {
@@ -745,14 +785,6 @@ public class XMPPStreamTCP extends XMPPStream
             Thread.currentThread().interrupt();
         }
         return true;
-    }
-
-    static void waitUninterruptible(Condition obj) {
-        try {
-            obj.await();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
     }
 
     public void gracefulDisconnect(String packet)
@@ -834,12 +866,25 @@ public class XMPPStreamTCP extends XMPPStream
     }
 
     class PacketReaderThread extends Thread {
+        /** Wait for callbacks to be available.  Returns {@link PacketCallback}, or
+         *  null if {@link XMPPStreamTCP#disconnect} is called. */
+        private PacketCallback getCallbacks() {
+            assertLocked();
+
+            while(callbacks == null && socket != null && !socket.isClosed())
+                ThreadUtil.uninterruptibleWait(cond);
+
+            return callbacks;
+        }
+
         public void run() {
             while(true) {
                 try {
                     Element result = readPacketLoop(parser);
                     assertNotLocked();
                     lock.lock();
+
+                    PacketCallback currentCallbacks = null;
 
                     try {
                         if(parser.getDepth() == 1) {
@@ -849,19 +894,32 @@ public class XMPPStreamTCP extends XMPPStream
                             if(result == null)
                                 continue;
                         }
+                        
+                        currentCallbacks = getCallbacks();
                     } finally {
                         lock.unlock();
                     }
 
-                    callbacks.onPacket(result);
+                    if(currentCallbacks != null)
+                        currentCallbacks.onPacket(result);
                 } catch(XMPPException e) {
                     assertNotLocked();
 
+                    PacketCallback currentCallbacks = null;
+
+                    lock.lock();
+                    try {
+                        currentCallbacks = getCallbacks();
+                    } finally {
+                        lock.unlock();
+                    }
+                    
                     // This is our normal exit path; the stream will be closed and readPacketLoop
                     // will throw a socket error.
                     disconnect();
 
-                    callbacks.onError(e);
+                    if(currentCallbacks != null)
+                        currentCallbacks.onError(e);
 
                     // Notify any disconnect() calls in other threads that we're exiting.
                     lock.lock();

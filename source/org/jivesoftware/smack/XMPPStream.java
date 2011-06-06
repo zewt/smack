@@ -1,6 +1,7 @@
 package org.jivesoftware.smack;
 
 import java.io.IOException;
+import java.util.LinkedList;
 
 import org.jivesoftware.smack.util.ObservableReader;
 import org.jivesoftware.smack.util.ObservableWriter;
@@ -24,12 +25,23 @@ public abstract class XMPPStream
      * <p>
      * {@code attempt} must be <= {@link ConnectData#connectionAttempts}, and indicates
      * the discovered server to attempt.
+     * <p>
+     * After a successful call, {@link #setPacketCallbacks} must be called.
      * 
      * @param connectData a {@link ConnectData} instance returned by {@link #getConnectData}
      * @throws XMPPException if an error occurs during connection
      */
-    public abstract void initializeConnection(ConnectData connectData, int attempt, PacketCallback callbacks) throws XMPPException;
+    public abstract void initializeConnection(ConnectData connectData, int attempt) throws XMPPException;
     
+    /**
+     * Set the {@link PacketCallback} to receive packets.  Until this is called, received
+     * packets will be buffered.
+     * <p>
+     * This must not be called until {@link #initializeConnection} returns successfully, and
+     * must only be called once.
+     */
+    public abstract void setPacketCallbacks(PacketCallback callbacks);
+
     /**
      * Send the given packets to the server asynchronously.  This function may
      * block.  If the connection has already been closed, throws XMPPException. 

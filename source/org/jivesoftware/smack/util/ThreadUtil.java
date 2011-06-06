@@ -20,6 +20,8 @@
 
 package org.jivesoftware.smack.util;
 
+import java.util.concurrent.locks.Condition;
+
 public class ThreadUtil {
     /**
      * Join a thread without observing interrupts.
@@ -44,5 +46,13 @@ public class ThreadUtil {
         }
         if(interrupted)
             Thread.currentThread().interrupt();
+    }
+
+    static public void uninterruptibleWait(Condition obj) {
+        try {
+            obj.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 };
