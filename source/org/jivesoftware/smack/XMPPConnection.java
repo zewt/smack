@@ -579,7 +579,7 @@ public class XMPPConnection extends Connection {
      */
     private void assertConnectCalled() {
         if(data_stream == null)
-            throw new IllegalStateException("connect() has not ");
+            throw new IllegalStateException("connect() has yet not been called successfully");
     }
     
     private void assertNotLocked() {

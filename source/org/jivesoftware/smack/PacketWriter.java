@@ -144,7 +144,11 @@ class PacketWriter {
             try {
                 Vector<Packet> packets = new Vector<Packet>();
                 packets.addAll(queue);
-                connection.writePacket(packets);
+
+                // Until we receive a packet, it's not valid to call writePacket.  Don't call
+                // it at all if we have no packets to send.
+                if(packets.size() > 0)
+                    connection.writePacket(packets);
             }
             catch (XMPPException e) {
                 // e.printStackTrace();
