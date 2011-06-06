@@ -20,18 +20,19 @@
 
 package org.jivesoftware.smack;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+
 import org.jivesoftware.smack.Connection.ListenerWrapper;
 import org.jivesoftware.smack.XMPPStream.PacketCallback;
-import org.jivesoftware.smack.SynchronousPacketListener;
-import org.jivesoftware.smack.packet.*;
+import org.jivesoftware.smack.packet.Packet;
+import org.jivesoftware.smack.packet.ReceivedPacket;
 import org.jivesoftware.smack.util.PacketParserUtils;
-import org.jivesoftware.smack.util.ThreadUtil;
 import org.jivesoftware.smack.util.XmlPullParserDom;
-import org.jivesoftware.smack.util.XmlUtil;
 import org.w3c.dom.Element;
 import org.xmlpull.v1.XmlPullParser;
-
-import java.util.concurrent.*;
 
 /**
  * Listens for XML traffic from the XMPP server and parses it into packet objects.
@@ -48,31 +49,6 @@ class PacketReader {
 
     protected PacketReader(final XMPPConnection connection) {
         this.connection = connection;
-    }
-
-    class ReaderPacketCallbacks extends XMPPStream.PacketCallback {
-        public void onPacket(Element packet) {
-            parsePacket(packet);
-        }
-        public void onError(XMPPException error) {
-            handleError(error);
-        }
-    };
-
-    public ReaderPacketCallbacks getPacketCallbacks() {
-        return new ReaderPacketCallbacks();
-    }
-
-    /**
-     * Start the reader thread, blocking until the transport is established.  If
-     * an exception is thrown, the caller must shut down the data stream to ensure
-     * the reader thread exits, and call our shutdown() method.
-     *
-     * @throws XMPPException if the connection could not be established
-     */
-    public void startup() {
-        if(listenerExecutor != null)
-            throw new RuntimeException("ReaderThread.startup called while already connected");
 
         // Create an executor to deliver incoming packets to listeners. We'll use a single
         // thread with an unbounded queue.
@@ -86,17 +62,30 @@ class PacketReader {
         });
     }
 
+    class ReaderPacketCallbacks extends PacketCallback {
+        public void onPacket(Element packet) {
+            parsePacket(packet);
+        }
+        public void onError(XMPPException error) {
+            handleError(error);
+        }
+    };
+
+    public ReaderPacketCallbacks getPacketCallbacks() {
+        return new ReaderPacketCallbacks();
+    }
+    
     /**
      * Shuts the packet reader down.
-     *
-     * The caller must first shut down the data stream to ensure the thread will exit.
      */
     public void shutdown() {
         // Shut down the listener executor.
         if(listenerExecutor != null) {
             listenerExecutor.shutdown();
             try {
-                listenerExecutor.awaitTermination(9999, TimeUnit.HOURS);
+                // There's no non-timeout awaitTermination method, but we want to wait
+                // indefinitely.
+                listenerExecutor.awaitTermination(99999999, TimeUnit.SECONDS);
             } catch(InterruptedException e) {
                 throw new RuntimeException(e);
             }

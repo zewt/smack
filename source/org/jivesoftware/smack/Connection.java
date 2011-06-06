@@ -286,13 +286,8 @@ public abstract class Connection {
     public abstract boolean isUsingCompression();
 
     /**
-     * Establishes a connection to the XMPP server and performs an automatic login
-     * only if the previous connection state was logged (authenticated). It basically
-     * creates and maintains a connection to the server.<p>
-     * <p/>
-     * Listeners will be preserved from a previous connection if the reconnection
-     * occurs after an abrupt termination.
-     * 
+     * Establishes a connection to the XMPP server.
+     * <p>
      * @throws XMPPException if an error occurs while trying to establish the connection.
      */
     public abstract void connect() throws XMPPException;
@@ -440,38 +435,32 @@ public abstract class Connection {
     public abstract Roster getRoster();
 
     /**
-     * Closes the connection by setting presence to unavailable then closing the connection to
-     * the XMPP server. The Connection can still be used for connecting to the server
-     * again.<p>
-     * <p/>
-     * This method cleans up all resources used by the connection. Therefore, the roster,
-     * listeners and other stateful objects cannot be re-used by simply calling connect()
-     * on this connection again. This is unlike the behavior during unexpected disconnects
-     * (and subsequent connections). In that case, all state is preserved to allow for
-     * more seamless error recovery.
+     * Closes the connection.  This is a shortcut for {@link #disconnect(Presence)}
+     * with an argument of {@link Presence}({@link Presence.Type#unavailable}).
      */
     public void disconnect() {
         disconnect(new Presence(Presence.Type.unavailable));
     }
 
     /**
-     * Closes the connection. A custom unavailable presence is sent to the server, followed
-     * by closing the stream. The Connection can still be used for connecting to the server
-     * again. A custom unavilable presence is useful for communicating offline presence
-     * information such as "On vacation". Typically, just the status text of the presence
-     * packet is set with online information, but most XMPP servers will deliver the full
-     * presence packet with whatever data is set.<p>
-     * <p/>
-     * This method cleans up all resources used by the connection. Therefore, the roster,
-     * listeners and other stateful objects cannot be re-used by simply calling connect()
-     * on this connection again. This is unlike the behavior during unexpected disconnects
-     * (and subsequent connections). In that case, all state is preserved to allow for
-     * more seamless error recovery.
-     * 
-     * @param unavailablePresence the presence packet to send during shutdown.
+     * Closes the connection gracefully.  The specified {@link Presence} is sent to the
+     * server, and the connection is closed.
+     * <p>
+     * A closed Connection can not be reused.  Create a new instance to reconnect to
+     * the server.
      */
     public abstract void disconnect(Presence unavailablePresence);
 
+    /**
+     * Forcefully closes the connection.
+     * <p>
+     * If a call is being made asynchronously to {@link #connect}, it will abort immediately,
+     * and all future calls to {@link #connect} will throw an exception.
+     * <p>
+     * This is the only method that can be called before {@link #connect} returns. 
+     */
+    public abstract void shutdown();
+    
     /**
      * Adds a new listener that will be notified when new Connections are created. Note
      * that newly created connections will not be actually connected to the server.

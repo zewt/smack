@@ -40,6 +40,8 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.Collection;
 import java.util.Vector;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.w3c.dom.Element;
 
@@ -55,6 +57,7 @@ public class XMPPConnection extends Connection {
      * The XMPPStream used for this connection.
      */
     private XMPPStream data_stream = null;
+    private ConnectionOpener opener;
 
     private String user = null;
     private boolean connected = false;
@@ -62,13 +65,6 @@ public class XMPPConnection extends Connection {
      * Flag that indicates if the user is currently authenticated with the server.
      */
     private boolean authenticated = false;
-
-    /**
-     * This is false between connectUsingConfiguration calling packetReader.startup()
-     * and connection events being fired, during which time no disconnection events
-     * will be sent.
-     */
-    private boolean readyForDisconnection;
 
     private boolean anonymous = false;
 
@@ -86,6 +82,12 @@ public class XMPPConnection extends Connection {
     private ReceivedPacket initialFeatures;
     Roster roster = null;
 
+    /** If true, shutdown() has been called.  No further connections are allowed. */
+    private boolean permanentlyShutdown = false;
+    
+    private final ReentrantLock lock = new ReentrantLock();
+    private final Condition cond = lock.newCondition();
+    
     /** Creates a new XMPP connection with the given {@link ConnectionConfiguration}. */
     public XMPPConnection(ConnectionConfiguration config) {
         super(config);
@@ -129,7 +131,7 @@ public class XMPPConnection extends Connection {
      * Log in with the specified username.  SASL will be used if available,
      * falling back on non-SASL.  If username is null, login anonymously.
      */
-    private synchronized void performLogin(String username, String password, String resource) throws XMPPException {
+    private void performLogin(String username, String password, String resource) throws XMPPException {
         if (!isConnected()) {
             throw new IllegalStateException("Not connected to server.");
         }
@@ -210,8 +212,7 @@ public class XMPPConnection extends Connection {
             this.roster = new Roster(this);
     }
 
-    @Override
-    public synchronized void login(String username, String password, String resource) throws XMPPException {
+    public void login(String username, String password, String resource) throws XMPPException {
         // Do partial version of nameprep on the username.
         username = username.toLowerCase().trim();
 
@@ -226,8 +227,7 @@ public class XMPPConnection extends Connection {
         config.setLoginInfo(username, password, resource);
     }
 
-    @Override
-    public synchronized void loginAnonymously() throws XMPPException {
+    public void loginAnonymously() throws XMPPException {
         performLogin(null, null, null);
     }
 
@@ -254,41 +254,50 @@ public class XMPPConnection extends Connection {
         return anonymous;
     }
 
-    /**
-     * Closes the connection by setting presence to unavailable then closing the stream to
-     * the XMPP server. The shutdown logic will be used during a planned disconnection or when
-     * dealing with an unexpected disconnection. Unlike {@link #disconnect()} the connection's
-     * packet reader, packet writer, and {@link Roster} will not be removed; thus
-     * connection's state is kept.
-     *
-     * @param unavailablePresence the presence packet to send during shutdown.
-     */
-    protected void shutdown() {
-        if (data_stream != null)
-            data_stream.disconnect();
+    public void shutdown() {
+        assertNotLocked();
+
+        lock.lock();
+        try {
+            // If we're currently connecting, cancel the connection. */
+            if(opener != null)
+                opener.cancel();
+
+            // If we're already connected, disconnect.
+            if(data_stream != null)
+                data_stream.disconnect();
+            
+            permanentlyShutdown = true;
+        } finally {
+            lock.unlock();
+        }
 
         // These will block until the threads are completely shut down.  This should happen
         // immediately, due to calling data_stream.disconnect().
         packetReader.shutdown();
         packetWriter.shutdown();
 
-        // packetReader and packetWriter are gone, so we can safely clear data_stream.
-        data_stream = null;
-
         authenticated = false;
         connected = false;
     }
 
     public void disconnect(Presence unavailablePresence) {
+        assertNotLocked();
+        assertConnectCalled();
+        
         boolean wasConnected;
-        synchronized(this) {
+
+        lock.lock();
+        try {
             wasConnected = connected;
             connected = false;
-        }
 
-        // Shutting down will cause I/O exceptions in the reader and writer threads;
-        // suppress them.
-        suppressConnectionErrors = true;
+            // Shutting down will cause I/O exceptions in the reader and writer threads;
+            // suppress them.
+            suppressConnectionErrors = true;
+        } finally {
+            lock.unlock();
+        }
 
         // Cleanly close down the connection.
         if (wasConnected)
@@ -328,45 +337,63 @@ public class XMPPConnection extends Connection {
         packetWriter.sendPacket(packet);
     }
 
-    /**
-     * Establishes a connection to the XMPP server and performs an automatic login
-     * only if the previous connection state was logged (authenticated). It basically
-     * creates and maintains a socket connection to the server.<p>
-     * <p/>
-     * Listeners will be preserved from a previous connection if the reconnection
-     * occurs after an abrupt termination.
-     *
-     * @throws XMPPException if an error occurs while trying to establish the connection.
-     */
-    ConnectionOpener opener;
     public void connect() throws XMPPException {
-        // If we're already connected, or if we've disconnected but havn't yet cleaned
-        // up, shut down.
-        shutdown();
+        assertNotLocked();
 
-        opener = new ConnectionOpener(config);
-
+        lock.lock();
         try {
-            data_stream = opener.connect(readEvent, writeEvent);
+            if(data_stream != null)
+                throw new IllegalStateException("connect() has already been called on this XMPPConnection");
+            
+            // If permanentlyShutdown is set, shutdown() was called.  To allow reliable
+            // cancellation, don't allow reusing a shutdown XMPPConnection; behave the
+            // same whether we're cancelled before or during a call to connect().
+            if(permanentlyShutdown)
+                throw new XMPPException("Connection cancelled");
+
+            opener = new ConnectionOpener(config);
         } finally {
-            opener = null;
+            lock.unlock();
         }
 
-        // Connection is successful.
-        connected = true;
+        try {
+            // Call opener.connect while unlocked, so shutdown() can cancel.
+            data_stream = opener.connect(readEvent, writeEvent);
+        } finally {
+            lock.lock();
+            try {
+                opener = null;
+            } finally {
+                lock.unlock();
+            }
+        }
 
-        readyForDisconnection = false;
+        lock.lock();
+        try {
+            // Connection is successful.
+            connected = true;
+        } finally {
+            lock.unlock();
+        }
 
-        packetReader.startup();
-        packetWriter.startup();
+        // Notify listeners that a new connection has been established.  Do this before
+        // waiting for <features>.  The user may have listeners for <features> as well,
+        // and we should guarantee that connectionCreated callbacks are called before
+        // listeners start receiving packets.
+        for (ConnectionCreationListener listener: getConnectionCreationListeners()) {
+            listener.connectionCreated(XMPPConnection.this);
+        }
 
+        // Once we setPacketCallbacks, we'll immediately receive a callback with the features
+        // packet.  This will always happen without blocking (as this packet was already received),
+        // so we don't need to allow for disconnection while we wait.
+        //
+        // readerThreadException will not be called before we set setPacketCallbacks, since
+        // the reader thread won't receive any callbacks.
         PacketCollector<ReceivedPacket> coll =
             this.createPacketCollector(new ReceivedPacketFilter("features", "http://etherx.jabber.org/streams"),
                 ReceivedPacket.class);
         try {
-            // Once we set callbacks, PacketCollectors will start receiving messages.  They'll be
-            // queued until then, so we won't miss the packet we're looking for if it's received
-            // before we get here.
             data_stream.setPacketCallbacks(packetReader.getPacketCallbacks());
 
             // A <features/> packet has been received.  Read it; we'll need it for login.
@@ -380,17 +407,6 @@ public class XMPPConnection extends Connection {
                node.getNamespaceURI().equals("http://jabber.org/features/iq-register")) {
                 getAccountManager().setSupportsAccountCreation(true);
             }
-        }
-
-        // Notify listeners that a new connection has been established
-        for (ConnectionCreationListener listener: getConnectionCreationListeners()) {
-            listener.connectionCreated(XMPPConnection.this);
-        }
-
-        // Inform readerThreadException that disconnections are now allowed.
-        synchronized(this) {
-            readyForDisconnection = true;
-            this.notifyAll();
         }
     }
 
@@ -434,22 +450,29 @@ public class XMPPConnection extends Connection {
             }
         }
     }
-
-    /*
+    
+    /**
      * Called when the XMPP stream is reset, usually due to successful
      * authentication.
      */
     public void streamReset() throws XMPPException
     {
+        assertNotLocked();
+        assertConnectCalled();
         this.data_stream.streamReset();
     }
 
     public boolean isUsingCompression() {
+        assertNotLocked();
+        assertConnectCalled();
         return data_stream.isUsingCompression();
     }
 
     /** Write a list of packets to the stream.  Used by PacketWriter. */
     protected void writePacket(Collection<Packet> packets) throws XMPPException {
+        assertNotLocked();
+        assertConnectCalled();
+
         StringBuffer data = new StringBuffer();
         for(Packet packet: packets)
             data.append(packet.toXML());
@@ -461,6 +484,9 @@ public class XMPPConnection extends Connection {
      * Sends a notification indicating that the connection was closed gracefully.
      */
     protected void notifyConnectionClosed() {
+        assertNotLocked();
+        assertConnectCalled();
+
         for (ConnectionListener listener: getConnectionListeners()) {
             try {
                 listener.connectionClosed();
@@ -474,6 +500,9 @@ public class XMPPConnection extends Connection {
     }
 
     protected void notifyConnectionClosedOnError(Exception e) {
+        assertNotLocked();
+        assertConnectCalled();
+
         for (ConnectionListener listener: getConnectionListeners()) {
             try {
                 listener.connectionClosedOnError(e);
@@ -492,13 +521,19 @@ public class XMPPConnection extends Connection {
      * @param error the exception that caused the connection close event.
      */
     protected void readerThreadException(Exception error) {
+        assertNotLocked();
+        assertConnectCalled();
+
         // If errors are being suppressed, do nothing.  This happens during shutdown().
-        synchronized(this) {
+        lock.lock();
+        try {
             if(suppressConnectionErrors)
                 return;
 
             // Only send one connection error.
             suppressConnectionErrors = true;
+        } finally {
+            lock.unlock();
         }
 
         // Print the stack trace to help catch the problem.  Include the current
@@ -512,17 +547,12 @@ public class XMPPConnection extends Connection {
         // notifications and set connected = true.  If that hasn't happened
         // yet, wait for it, so we never send a disconnected event before its
         // corresponding connect event.
-        synchronized(this) {
-            while(!readyForDisconnection) {
-                try {
-                    this.wait();
-                } catch(InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }
-
+        lock.lock();
+        try {
             wasConnected = connected;
             connected = false;
+        } finally {
+            lock.unlock();
         }
 
         // Shut down the data stream.  shutdown() must be called to complete shutdown;
@@ -534,5 +564,26 @@ public class XMPPConnection extends Connection {
         // disconnection.
         if(wasConnected)
             notifyConnectionClosedOnError(error);
+    }
+
+    /**
+     * Most of the API can only be called after a successful call to {@link #connect}.
+     * Verify that this is the case, throwing IllegalStateException if not.
+     * <p>
+     * The lock may or may not be held.  Once data_stream is set it's never cleared,
+     * so neither is required.
+     * <p>
+     * If this returns without throwing, {@link #data_stream} is set and may be accessed.
+     * Note that this does not check whether we're actually still connected; only that
+     * connect() has been called.
+     */
+    private void assertConnectCalled() {
+        if(data_stream == null)
+            throw new IllegalStateException("connect() has not ");
+    }
+    
+    private void assertNotLocked() {
+        if(lock.isHeldByCurrentThread())
+            throw new RuntimeException("Lock should not be held");
     }
 }

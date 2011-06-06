@@ -620,8 +620,8 @@ public class XMPPStreamBOSH extends XMPPStream
                 return;
             }
 
-            if(callback instanceof SetupPacketCallback) {
-                SetupPacketCallback setupCallbacks = (SetupPacketCallback) callback;
+            if(currentCallback instanceof SetupPacketCallback) {
+                SetupPacketCallback setupCallbacks = (SetupPacketCallback) currentCallback;
                 setupCallbacks.onBody(body);
                 
                 // SetupCallbacks receives the first packet to onBody, and clears itself.

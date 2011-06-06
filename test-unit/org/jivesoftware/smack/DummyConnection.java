@@ -69,13 +69,17 @@ public class DummyConnection extends Connection {
         connectionID = "dummy-" + new Random(new Date().getTime()).nextInt();
     }
 
-    @Override
-    public void disconnect(Presence unavailablePresence) {
+    public void shutdown() {
         user = null;
         connectionID = null;
         roster = null;
         authenticated = false;
         anonymous = false;
+    }
+    
+    @Override
+    public void disconnect(Presence unavailablePresence) {
+        shutdown();
     }
 
     @Override

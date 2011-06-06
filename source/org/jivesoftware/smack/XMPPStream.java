@@ -39,6 +39,9 @@ public abstract class XMPPStream
      * <p>
      * This must not be called until {@link #initializeConnection} returns successfully, and
      * must only be called once.
+     * <p>
+     * Either a &lt;features/&gt; packet or an error callback is guaranteed to be made immediately
+     * upon calling setPacketCallbacks, without waiting for I/O.
      */
     public abstract void setPacketCallbacks(PacketCallback callbacks);
 

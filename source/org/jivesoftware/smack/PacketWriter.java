@@ -53,6 +53,15 @@ class PacketWriter {
     protected PacketWriter(XMPPConnection connection) {
         this.queue = new ArrayBlockingQueue<Packet>(500, true);
         this.connection = connection;
+        
+        done = false;
+
+        writerThread = new Thread() {
+            public void run() { writePackets(this); }
+        };
+        writerThread.setName("Smack Packet Writer (" + connection.connectionCounterValue + ")");
+        writerThread.setDaemon(true);
+        writerThread.start();
     }
 
     /**
@@ -77,27 +86,6 @@ class PacketWriter {
             // thread so it's expected that listeners are fast.
             connection.firePacketSendingListeners(packet);
         }
-    }
-
-    /**
-     * Starts the packet writer thread and opens a connection to the server. The
-     * packet writer will continue writing packets until {@link #shutdown} or an
-     * error occurs.
-     */
-    public void startup() {
-        if(writerThread != null)
-            throw new RuntimeException("WriterThread.startup called while already running");
-
-        done = false;
-
-        writerThread = new Thread() {
-            public void run() {
-                writePackets(this);
-            }
-        };
-        writerThread.setName("Smack Packet Writer (" + connection.connectionCounterValue + ")");
-        writerThread.setDaemon(true);
-        writerThread.start();
     }
 
     /**
