@@ -163,7 +163,7 @@ public class ChatStateManager {
 
         public void interceptPacket(Packet packet) {
             Message message = (Message) packet;
-            Chat chat = connection.getChatManager().getThreadChat(message.getThread());
+            Chat chat = connection.getChatManager().getThreadChat(message.getTo(), message.getThread());
             if (chat == null) {
                 return;
             }

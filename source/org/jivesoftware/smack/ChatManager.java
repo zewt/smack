@@ -34,6 +34,7 @@ import org.jivesoftware.smack.filter.ThreadFilter;
 import org.jivesoftware.smack.packet.Message;
 import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.util.StringUtils;
+import org.jivesoftware.smack.util.collections.Pair;
 import org.jivesoftware.smack.util.collections.ReferenceMap;
 
 /**
@@ -69,8 +70,8 @@ public class ChatManager {
     /**
      * Maps thread ID to chat.
      */
-    private Map<String, Chat> threadChats = Collections.synchronizedMap(new ReferenceMap<String, Chat>(ReferenceMap.HARD,
-            ReferenceMap.WEAK));
+    private Map<Pair<String,String>, Chat> threadChats = Collections.synchronizedMap(
+            new ReferenceMap<Pair<String,String>, Chat>(ReferenceMap.HARD, ReferenceMap.WEAK));
 
     /**
      * Maps jids to chats
@@ -112,7 +113,7 @@ public class ChatManager {
                 Message message = (Message) packet;
                 Chat chat = null;
                 if (message.getThread() != null)
-                    chat = getThreadChat(message.getThread());
+                    chat = getThreadChat(message.getFrom(), message.getThread());
 
                 if (chat == null) {
                     // Try to locate the chat based on the sender of the message
@@ -135,12 +136,15 @@ public class ChatManager {
      * @return the created chat.
      */
     public Chat createChat(String userJID, MessageListener listener) {
-        String threadID;
-        do  {
-            threadID = nextID();
-        } while (threadChats.get(threadID) != null);
+        String bareJID = StringUtils.parseBareAddress(userJID);
 
-        return createChat(userJID, threadID, listener);
+        String threadID;
+        while(true) {
+            threadID = nextID();
+            Pair<String,String> jidAndThreadId = new Pair<String,String>(bareJID, threadID);
+            if(threadChats.get(jidAndThreadId) != null)
+                return createChat(userJID, threadID, listener);
+        }
     }
 
     /**
@@ -155,7 +159,11 @@ public class ChatManager {
         if(thread == null) {
             thread = nextID();
         }
-        Chat chat = threadChats.get(thread);
+        
+        String bareJID = StringUtils.parseBareAddress(userJID);
+        Pair<String,String> jidAndThreadId = new Pair<String,String>(bareJID, thread);
+
+        Chat chat = threadChats.get(jidAndThreadId);
         if(chat != null) {
             throw new IllegalArgumentException("ThreadID is already used");
         }
@@ -166,9 +174,13 @@ public class ChatManager {
 
     private Chat createChat(String userJID, String threadID, boolean createdLocally) {
         Chat chat = new Chat(this, userJID, threadID);
-        threadChats.put(threadID, chat);
+
+        String bareJID = StringUtils.parseBareAddress(userJID);
+        Pair<String,String> jidAndThreadId = new Pair<String,String>(bareJID, threadID);
+        threadChats.put(jidAndThreadId, chat);
+
         jidChats.put(userJID, chat);
-        baseJidChats.put(StringUtils.parseBareAddress(userJID), chat);
+        baseJidChats.put(bareJID, chat);
 
         for(ChatManagerListener listener : chatManagerListeners) {
             listener.chatCreated(chat, createdLocally);
@@ -204,8 +216,10 @@ public class ChatManager {
 	return match;
     }
 
-    public Chat getThreadChat(String thread) {
-        return threadChats.get(thread);
+    public Chat getThreadChat(String jid, String thread) {
+        String bareJID = StringUtils.parseBareAddress(jid);
+        Pair<String,String> jidAndThreadId = new Pair<String,String>(bareJID, thread);
+        return threadChats.get(jidAndThreadId);
     }
 
     /**
