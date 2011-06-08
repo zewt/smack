@@ -257,21 +257,28 @@ public class XMPPConnection extends Connection {
     public void shutdown() {
         assertNotLocked();
 
+        ConnectionOpener openerRef;
+        XMPPStream streamRef;
+        
         lock.lock();
         try {
-            // If we're currently connecting, cancel the connection. */
-            if(opener != null)
-                opener.cancel();
+            openerRef = opener;
+            streamRef = data_stream;
 
-            // If we're already connected, disconnect.
-            if(data_stream != null)
-                data_stream.disconnect();
-            
             permanentlyShutdown = true;
         } finally {
             lock.unlock();
         }
 
+        // Since these objects have their own locks, this avoids potential deadlocks.
+        // If we're currently connecting, cancel the connection.
+        if(openerRef != null)
+            openerRef.cancel();
+
+        // If we're already connected, disconnect.
+        if(streamRef != null)
+            streamRef.disconnect();
+        
         // These will block until the threads are completely shut down.  This should happen
         // immediately, due to calling data_stream.disconnect().
         packetReader.shutdown();
