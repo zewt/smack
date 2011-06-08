@@ -538,12 +538,15 @@ public class XMPPConnection extends Connection {
 
         // If errors are being suppressed, do nothing.  This happens during shutdown().
         lock.lock();
+        boolean wasConnected;
         try {
             if(suppressConnectionErrors)
                 return;
 
             // Only send one connection error.
             suppressConnectionErrors = true;
+            wasConnected = connected;
+            connected = false;
         } finally {
             lock.unlock();
         }
@@ -551,21 +554,6 @@ public class XMPPConnection extends Connection {
         // Print the stack trace to help catch the problem.  Include the current
         // stack in the output.
         new Exception(error).printStackTrace();
-
-        boolean wasConnected;
-
-        // beginConnection() has returned, so it's guaranteed that
-        // connectUsingConfiguration will send out connection or reconnection
-        // notifications and set connected = true.  If that hasn't happened
-        // yet, wait for it, so we never send a disconnected event before its
-        // corresponding connect event.
-        lock.lock();
-        try {
-            wasConnected = connected;
-            connected = false;
-        } finally {
-            lock.unlock();
-        }
 
         // Shut down the data stream.  shutdown() must be called to complete shutdown;
         // we're running under the reader thread, which shutdown() shuts down, so we
