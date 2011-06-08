@@ -80,17 +80,21 @@ class PacketReader {
      */
     public void shutdown() {
         // Shut down the listener executor.
-        if(listenerExecutor != null) {
-            listenerExecutor.shutdown();
+        ExecutorService executorRef;
+        synchronized(this) {
+            executorRef = listenerExecutor;
+            listenerExecutor = null;
+        }
+
+        if(executorRef != null) {
+            executorRef.shutdown();
             try {
                 // There's no non-timeout awaitTermination method, but we want to wait
                 // indefinitely.
-                listenerExecutor.awaitTermination(99999999, TimeUnit.SECONDS);
+                executorRef.awaitTermination(99999999, TimeUnit.SECONDS);
             } catch(InterruptedException e) {
                 throw new RuntimeException(e);
             }
-
-            listenerExecutor = null;
         }
     }
 
