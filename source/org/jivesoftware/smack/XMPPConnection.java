@@ -132,9 +132,6 @@ public class XMPPConnection extends Connection {
      * falling back on non-SASL.  If username is null, login anonymously.
      */
     private void performLogin(String username, String password, String resource) throws XMPPException {
-        if (!isConnected()) {
-            throw new IllegalStateException("Not connected to server.");
-        }
         if (authenticated) {
             throw new IllegalStateException("Already logged in to server.");
         }
@@ -335,9 +332,6 @@ public class XMPPConnection extends Connection {
     }
 
     public void sendPacket(Packet packet) {
-        if (!isConnected()) {
-            throw new IllegalStateException("Not connected to server.");
-        }
         if (packet == null) {
             throw new NullPointerException("Packet is null.");
         }
