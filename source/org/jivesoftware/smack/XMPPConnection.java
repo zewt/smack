@@ -344,7 +344,7 @@ public class XMPPConnection extends Connection {
         packetWriter.sendPacket(packet);
     }
 
-    public void connect() throws XMPPException {
+    private void connectInternal() throws XMPPException {
         assertNotLocked();
 
         lock.lock();
@@ -389,6 +389,18 @@ public class XMPPConnection extends Connection {
         // listeners start receiving packets.
         for (ConnectionCreationListener listener: getConnectionCreationListeners()) {
             listener.connectionCreated(XMPPConnection.this);
+        }
+    }
+
+    public void connect() throws XMPPException {
+        assertNotLocked();
+        try {
+            // Handle the initial steps, up to sending connectionCreated.  Up until this point,
+            // the packet callbacks aren't yet set and it's our job to call notifyConnectionClosedOnError.
+            connectInternal();
+        } catch(XMPPException e) {
+            notifyConnectionClosedOnError(e);
+            throw e;
         }
 
         // Once we setPacketCallbacks, we'll immediately receive a callback with the features
@@ -508,7 +520,6 @@ public class XMPPConnection extends Connection {
 
     protected void notifyConnectionClosedOnError(XMPPException e) {
         assertNotLocked();
-        assertConnectCalled();
 
         for (ConnectionListener listener: getConnectionListeners()) {
             try {
