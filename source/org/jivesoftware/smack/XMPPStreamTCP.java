@@ -720,6 +720,7 @@ public class XMPPStreamTCP extends XMPPStream
         // starting them.
         if(socket == null) {
             threadExited = true;
+            cond.signalAll(); // always signal when changing threadExited
             return;
         }
 
