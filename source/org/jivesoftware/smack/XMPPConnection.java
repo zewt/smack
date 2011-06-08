@@ -68,8 +68,6 @@ public class XMPPConnection extends Connection {
 
     private boolean anonymous = false;
 
-    private boolean suppressConnectionErrors;
-
     final private PacketWriter packetWriter;
     final private PacketReader packetReader;
 
@@ -256,11 +254,14 @@ public class XMPPConnection extends Connection {
 
         ConnectionOpener openerRef;
         XMPPStream streamRef;
+        boolean wasConnected;
         
         lock.lock();
         try {
             openerRef = opener;
             streamRef = data_stream;
+            wasConnected = connected;
+            connected = false;
 
             permanentlyShutdown = true;
         } finally {
@@ -282,30 +283,19 @@ public class XMPPConnection extends Connection {
         packetWriter.shutdown();
 
         authenticated = false;
-        connected = false;
+
+        // If we're the one that cleared connected, it's our job to notify about the
+        // disconnection.
+        if(wasConnected)
+            notifyConnectionClosed();
     }
 
     public void disconnect(Presence unavailablePresence) {
         assertNotLocked();
         assertConnectCalled();
         
-        boolean wasConnected;
-
-        lock.lock();
-        try {
-            wasConnected = connected;
-            connected = false;
-
-            // Shutting down will cause I/O exceptions in the reader and writer threads;
-            // suppress them.
-            suppressConnectionErrors = true;
-        } finally {
-            lock.unlock();
-        }
-
         // Cleanly close down the connection.
-        if (wasConnected)
-            data_stream.gracefulDisconnect(unavailablePresence != null? unavailablePresence.toXML():null);
+        data_stream.gracefulDisconnect(unavailablePresence != null? unavailablePresence.toXML():null);
 
         shutdown();
 
@@ -313,13 +303,6 @@ public class XMPPConnection extends Connection {
             roster.cleanup();
             roster = null;
         }
-
-        suppressConnectionErrors = false;
-
-        // If we're the one that cleared connected, it's our job to notify about the
-        // disconnection.
-        if(wasConnected)
-            notifyConnectionClosed();
 
         // Clear packet listeners only on final disconnection.  Do this after calling
         // notifyConnectionClosed.  Some listeners unregister themselves (unnecessarily)
@@ -540,11 +523,7 @@ public class XMPPConnection extends Connection {
         lock.lock();
         boolean wasConnected;
         try {
-            if(suppressConnectionErrors)
-                return;
-
             // Only send one connection error.
-            suppressConnectionErrors = true;
             wasConnected = connected;
             connected = false;
         } finally {
