@@ -499,7 +499,7 @@ public class XMPPConnection extends Connection {
         }
     }
 
-    protected void notifyConnectionClosedOnError(Exception e) {
+    protected void notifyConnectionClosedOnError(XMPPException e) {
         assertNotLocked();
         assertConnectCalled();
 
@@ -520,7 +520,7 @@ public class XMPPConnection extends Connection {
      *
      * @param error the exception that caused the connection close event.
      */
-    protected void readerThreadException(Exception error) {
+    protected void readerThreadException(XMPPException error) {
         assertNotLocked();
         assertConnectCalled();
 
