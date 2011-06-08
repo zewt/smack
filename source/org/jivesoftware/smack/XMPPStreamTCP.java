@@ -149,7 +149,6 @@ public class XMPPStreamTCP extends XMPPStream
     public String getConnectionID() { return connectionID; }
 
     private PacketReaderThread packetReaderThread;
-    private Thread threadUnjoined = null;
 
     public XMPPStreamTCP(ConnectionConfiguration config)
     {
@@ -733,18 +732,12 @@ public class XMPPStreamTCP extends XMPPStream
             throw new RuntimeException("Unexpected I/O error disconnecting socket", e);
         }
 
-        // Unless we're running from the thread itself, wait for the thread to exit,
-        // so it isn't accessing anything we shut down.
-        if(packetReaderThread != Thread.currentThread() && packetReaderThread != threadUnjoined) {
+        // Wait for the thread to exit, unless we're inside the thread itself.
+        if(packetReaderThread != Thread.currentThread()) {
             while(!threadExited)
                 ThreadUtil.uninterruptibleWait(cond);
         }
-
-        if(packetReaderThread != null) {
-            // Stash the thread to be joined by disconnect() when we're not locked.
-            threadUnjoined = packetReaderThread;
-            packetReaderThread = null;
-        }
+        packetReaderThread = null;
 
         // Shut down the keepalive thread, if any.  Do this after closing the socket,
         // so it'll receive an IOException immediately if it's currently blocking to write,
@@ -774,24 +767,12 @@ public class XMPPStreamTCP extends XMPPStream
     public void disconnect() {
         assertNotLocked();
 
-        Thread threadToJoin = null;
-
         lock.lock();
         try {
             shutdown_stream();
-
-            // If packetReaderThread calls disconnect(), it'll shut everything down except for
-            // itself, since a thread can't join itself.  Join the thread now if necessary.
-            if(threadUnjoined != null && threadUnjoined != Thread.currentThread()) {
-                threadToJoin = threadUnjoined;
-                threadUnjoined = null;
-            }
         } finally {
             lock.unlock();
         }
-
-        if(threadToJoin != null)
-            ThreadUtil.uninterruptibleJoin(threadToJoin);
     }
 
     static boolean waitUntilTime(Condition cond, long waitUntil) {
