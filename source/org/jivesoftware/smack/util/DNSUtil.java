@@ -334,8 +334,8 @@ public class DNSUtil {
         private Thread lookupThread;
 
         /* The parameters to pass to Lookup(): */
-        private String name;
-        private int type;
+        private final String name;
+        private final int type;
 
         /* Results.  When any of these is non-null, or cancelled is true,
          * the operation is complete. */
@@ -344,6 +344,8 @@ public class DNSUtil {
         private boolean cancelled;
 
         public AsyncLookup(String name, int type) {
+            if(name == null)
+                throw new IllegalArgumentException("name must not be nnull");
             this.name = name;
             this.type = type;
         }
