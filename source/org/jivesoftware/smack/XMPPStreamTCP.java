@@ -362,13 +362,13 @@ public class XMPPStreamTCP extends XMPPStream
             // but setPacketCallbacks must not be called until connect() returns.
             if(callbacks != null) 
                 throw new IllegalStateException("callbacks should be cleared");
+
+            /* Start keepalives after TLS has been set up. */
+            startKeepAliveProcess();
         } catch(XMPPException e) {
             disconnect();
             throw e;
         }
-
-        /* Start keepalives after TLS has been set up. */
-        startKeepAliveProcess();
     }
 
     public void setPacketCallbacks(PacketCallback userCallbacks) {
@@ -1211,15 +1211,24 @@ public class XMPPStreamTCP extends XMPPStream
      * to the server.
      */
     private KeepAliveTask keepAlive;
-    private void startKeepAliveProcess() {
-        // Schedule a keep-alive task to run if the feature is enabled. will write
-        // out a space character each time it runs to keep the TCP/IP connection open.
-        int keepAliveInterval = SmackConfiguration.getKeepAliveInterval();
-        if (keepAliveInterval == 0)
-            return;
+    private void startKeepAliveProcess() throws XMPPException {
+        assertNotLocked();
         
-        KeepAliveTask task = new KeepAliveTask(keepAliveInterval);
-        keepAlive = task;
+        lock.lock();
+        try {
+            throwIfDisconnected();
+
+            // Schedule a keep-alive task to run if the feature is enabled. will write
+            // out a space character each time it runs to keep the TCP/IP connection open.
+            int keepAliveInterval = SmackConfiguration.getKeepAliveInterval();
+            if (keepAliveInterval == 0)
+                return;
+            
+            KeepAliveTask task = new KeepAliveTask(keepAliveInterval);
+            keepAlive = task;
+        } finally {
+            lock.unlock();
+        }
     }
 
     /**
