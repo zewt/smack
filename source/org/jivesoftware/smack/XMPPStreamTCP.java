@@ -49,6 +49,7 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import org.jivesoftware.smack.XMPPStream.ConnectData;
 import org.jivesoftware.smack.XMPPStream.PacketCallback;
+import org.jivesoftware.smack.XMPPStreamBOSH.ConnectDataBOSH;
 import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.util.DNSUtil;
 import org.jivesoftware.smack.util.ObservableReader;
@@ -56,6 +57,7 @@ import org.jivesoftware.smack.util.ObservableWriter;
 import org.jivesoftware.smack.util.ThreadUtil;
 import org.jivesoftware.smack.util.WriterListener;
 import org.jivesoftware.smack.util.XmlUtil;
+import org.jivesoftware.smack.util.DNSUtil.HostAddress;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.xmlpull.v1.XmlPullParser;
@@ -188,6 +190,26 @@ public class XMPPStreamTCP extends XMPPStream
         }
     };
 
+    public ConnectData getDefaultConnectData() {
+        assertNotLocked();
+
+        lock.lock();
+        try {
+            ConnectDataTCP data = new ConnectDataTCP();
+            data.addresses = new Vector<DNSUtil.HostAddress>();
+
+            String host = config.getHost();
+            int port = config.getPort();
+            if(host != null)
+                data.addresses.add(new HostAddress(host, port));
+            else
+                data.addresses.add(new HostAddress(config.getServiceName(), port));
+            return data;
+        } finally {
+            lock.unlock();
+        }
+    }
+    
     public ConnectData getConnectData() throws XMPPException {
         assertNotLocked();
 
@@ -200,11 +222,8 @@ public class XMPPStreamTCP extends XMPPStream
             int port = config.getPort();
 
             ConnectDataTCP data = new ConnectDataTCP();
-            if(host != null) {
-                data.addresses = new Vector<DNSUtil.HostAddress>();
-                data.addresses.add(new DNSUtil.HostAddress(host, port));
-                return data;
-            }
+            if(host != null)
+                return getDefaultConnectData();
 
             // If no host was specified, look up the XMPP service name.
             DNSUtil.XMPPDomainLookup lookup = new DNSUtil.XMPPDomainLookup(config.getServiceName(), true);

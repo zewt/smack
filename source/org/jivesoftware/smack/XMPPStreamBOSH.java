@@ -130,6 +130,20 @@ public class XMPPStreamBOSH extends XMPPStream
         }
     };
 
+    public ConnectData getDefaultConnectData() {
+        assertNotLocked();
+
+        lock.lock();
+        try {
+            ConnectDataBOSH data = new ConnectDataBOSH();
+            if(!this.uri.equals(ConnectionConfiguration.AUTO_DETECT_BOSH))
+                data.addresses.add(this.uri);
+            return data;
+        } finally {
+            lock.unlock();
+        }
+    }
+    
     public ConnectData getConnectData() throws XMPPException {
         assertNotLocked();
 
@@ -144,10 +158,8 @@ public class XMPPStreamBOSH extends XMPPStream
             if(this.uri == null)
                 return data;
 
-            if(!this.uri.equals(ConnectionConfiguration.AUTO_DETECT_BOSH)) {
-                data.addresses.add(this.uri);
-                return data;
-            }
+            if(!this.uri.equals(ConnectionConfiguration.AUTO_DETECT_BOSH))
+                return getDefaultConnectData();
 
             // This will return the same results each time, because the weight
             // shuffling is cached.

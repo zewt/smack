@@ -20,6 +20,15 @@ public abstract class XMPPStream
     public abstract ConnectData getConnectData() throws XMPPException;
 
     /**
+     * Retrieve the default connection data.  This should be called if getConnectData times
+     * out.
+     * <p>
+     * This is separated from getConnectData in order to allow defaults to be retrieved
+     * when service discovery is timing out.  This call will never fail.
+     */
+    public abstract ConnectData getDefaultConnectData();
+
+    /**
      * Begin establishing the connection.  Returns after the connection has been
      * established, or throws XMPPException.
      * <p>

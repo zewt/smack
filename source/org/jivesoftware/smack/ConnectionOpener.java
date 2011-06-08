@@ -83,11 +83,14 @@ class ConnectionOpener
         // Schedule a timeout.
         int waitTime = SmackConfiguration.getPacketReplyTimeout();
         TimeoutThread timeoutThread = new TimeoutThread("Connection timeout thread", waitTime, new Runnable() {
-            public void run() { cancelInternal(); }
+            public void run() { stream.disconnect(); }
         });
 
+        ConnectData defaultData = null;
         try {
             try {
+                defaultData = stream.getDefaultConnectData();
+
                 // It's safe to call this unlocked.  Other threads are not allowed to change stream.
                 return stream.getConnectData();
             } finally {
@@ -101,10 +104,12 @@ class ConnectionOpener
                 }
             }
         } catch(XMPPException e) {
-            if(timeoutThread.executed)
-                throw new XMPPException("Connection failed. No response from server.");
-            else
+            // Only throw the exception if we're cancelling due to the user calling cancel().
+            // For discovery errors and timeouts, always return the default data.
+            if(cancelling)
                 throw e;
+            
+            return defaultData;
         }
     }
 
@@ -147,7 +152,7 @@ class ConnectionOpener
         // Schedule a timeout.
         int waitTime = SmackConfiguration.getPacketReplyTimeout();
         TimeoutThread timeoutThread = new TimeoutThread("Connection timeout thread", waitTime, new Runnable() {
-            public void run() { cancelInternal(); }
+            public void run() { stream.disconnect(); }
         });
 
         try {
@@ -156,13 +161,17 @@ class ConnectionOpener
                 stream.initializeConnection(connectData, attempt);
             } finally {
                 timeoutThread.cancel();
+
+                // Throw a timeout exception if the timeout thread ran, whether or not it
+                // causes an exception itself.
+                if(timeoutThread.executed)
+                    throw new XMPPException("Connection failed. No response from server.");
             }
         } catch(XMPPException e) {
-            // On timeout, ignore the connection-closed exception and throw a cleaner one.
-            if(timeoutThread.executed)
-                throw new XMPPException("Connection failed. No response from server.");
-            else
+            if(!timeoutThread.executed)
                 throw e;
+            else
+                throw new XMPPException("Connection failed. No response from server.");
         }
     }
 
@@ -201,7 +210,7 @@ class ConnectionOpener
                 if(cancelling)
                     throw e;
 
-                continue;
+                throw new RuntimeException("lookupConnectionData can only fail due to cancellation");
             }
 
             // If no hosts were discovered for this transport, move on to the next.
@@ -282,30 +291,6 @@ class ConnectionOpener
         }
     }
 
-    /**
-     * Asynchronously cancel any current or future call to {@link #connect}.
-     * <p>
-     * The only difference between {@link #cancel} and {@code cancelInternal} is that
-     * {@code cancel} waits for the connect() call to complete.   This call is used
-     * from our timeout threads; we can't wait for connect() to complete from there,
-     * because connect() joins the timeout threads.
-     */
-    private void cancelInternal()
-    {
-        // This function must be able to deal with being called multiple times in
-        // parallel, as well.  The user can call this, and our TimeoutThreads can
-        // also call it.
-        assertNotLocked();
-        lock.lock();
-        try {
-            cancelling = true;
-            if(stream != null)
-                stream.disconnect();
-        } finally {
-            lock.unlock();
-        }
-    }
-    
     /** Asynchronously cancel any current or future call to {@link #connect}. */
     public void cancel()
     {
@@ -313,11 +298,14 @@ class ConnectionOpener
         // parallel, as well.  The user can call this, and our TimeoutThreads can
         // also call it.
         assertNotLocked();
-        cancelInternal();
 
-        // If connect() is running, wait for it to cancel.
         lock.lock();
         try {
+            cancelling = true;
+            if(stream != null)
+                stream.disconnect();
+
+            // If connect() is running, wait for it to cancel.
             while(running)
                 ThreadUtil.uninterruptibleWait(cond);
         } finally {
