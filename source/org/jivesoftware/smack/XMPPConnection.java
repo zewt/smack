@@ -551,10 +551,6 @@ public class XMPPConnection extends Connection {
             lock.unlock();
         }
 
-        // Print the stack trace to help catch the problem.  Include the current
-        // stack in the output.
-        new Exception(error).printStackTrace();
-
         // Shut down the data stream.  shutdown() must be called to complete shutdown;
         // we're running under the reader thread, which shutdown() shuts down, so we
         // can't do that from here.  It's the responsibility of the user.
@@ -562,8 +558,13 @@ public class XMPPConnection extends Connection {
 
         // If we're the one that cleared connected, it's our job to notify about the
         // disconnection.
-        if(wasConnected)
+        if(wasConnected) {
+            // Print the stack trace to help catch the problem.  Include the current
+            // stack in the output.
+            new Exception(error).printStackTrace();
+
             notifyConnectionClosedOnError(error);
+        }
     }
 
     /**
