@@ -37,22 +37,30 @@ public class ThreadUtil {
         while(true) {
             try {
                 thread.join();
+                break;
             } catch(InterruptedException e) {
                 // Defer interruptions until we're done.
                 interrupted = true;
                 continue;
             }
-            break;
         }
         if(interrupted)
             Thread.currentThread().interrupt();
     }
 
     static public void uninterruptibleWait(Condition obj) {
-        try {
-            obj.await();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+        boolean interrupted = false;
+        while(true) {
+            try {
+                obj.await();
+                break;
+            } catch (InterruptedException e) {
+                // Defer interruptions until we're done.
+                interrupted = true;
+                continue;
+            }
         }
+        if(interrupted)
+            Thread.currentThread().interrupt();
     }
 };
