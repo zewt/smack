@@ -16,7 +16,6 @@ import javax.net.SocketFactory;
 class DirectSocketFactory 
     extends SocketFactory
 {
-
     public DirectSocketFactory()
     {
     }
@@ -30,30 +29,27 @@ class DirectSocketFactory
         throws IOException, UnknownHostException
     {
         Socket newSocket = new Socket(Proxy.NO_PROXY);
-        newSocket.connect(new InetSocketAddress(host,port));
+        newSocket.connect(new InetSocketAddress(host, port));
         return newSocket;
     }
 
-    public Socket createSocket(String host ,int port, InetAddress localHost,
-                                int localPort)
+    public Socket createSocket(String host, int port, InetAddress localHost, int localPort)
         throws IOException, UnknownHostException
     {
-        return new Socket(host,port,localHost,localPort);
+        return new Socket(host, port, localHost, localPort);
     }
 
     public Socket createSocket(InetAddress host, int port)
         throws IOException
     {
         Socket newSocket = new Socket(Proxy.NO_PROXY);
-        newSocket.connect(new InetSocketAddress(host,port));
+        newSocket.connect(new InetSocketAddress(host, port));
         return newSocket;
     }
 
-    public Socket createSocket( InetAddress address, int port, 
-                                InetAddress localAddress, int localPort) 
+    public Socket createSocket(InetAddress address, int port, InetAddress localAddress, int localPort) 
         throws IOException
     {
-        return new Socket(address,port,localAddress,localPort);
+        return new Socket(address, port, localAddress, localPort);
     }
-
 }
