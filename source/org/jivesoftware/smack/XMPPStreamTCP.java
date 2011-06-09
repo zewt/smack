@@ -750,7 +750,7 @@ public class XMPPStreamTCP extends XMPPStream
         }
 
         // Wait for the thread to exit, unless we're inside the thread itself.
-        if(packetReaderThread != Thread.currentThread()) {
+        if(packetReaderThread != null && packetReaderThread != Thread.currentThread()) {
             while(!threadExited)
                 ThreadUtil.uninterruptibleWait(cond);
         }
