@@ -335,7 +335,7 @@ public class XMPPStreamTCP extends XMPPStream
 
             try {
                 socket = new Socket(Proxy.NO_PROXY);
-                socketConnector = config.getSocketConnectorFactory().createConnector(socket);
+                socketConnector = config.getProxyInfo().getSocketConnectorFactory().createConnector(socket);
                 
                 // Unlock while we connect to the server.  disconnect() may close the stream,
                 // cancelling the connection.

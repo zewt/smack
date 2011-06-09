@@ -25,7 +25,6 @@ import java.security.KeyStore;
 
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
 import org.jivesoftware.smack.proxy.ProxyInfo;
-import org.jivesoftware.smack.proxy.SocketConnectorFactory;
 
 /**
  * Configuration to use while establishing the connection to the server. It is possible to
@@ -76,8 +75,6 @@ public class ConnectionConfiguration implements Cloneable {
 
     // Flag that indicates if a reconnection should be attempted when abruptly disconnected
     private boolean reconnectionAllowed = true;
-    
-    private SocketConnectorFactory socketConnectorFactory;
     
     // Holds the authentication information for future reconnections
     private String username;
@@ -197,10 +194,6 @@ public class ConnectionConfiguration implements Cloneable {
         keystorePath = System.getProperty("javax.net.ssl.keyStore");
         keystoreType = "jks";
         pkcs11Library = "pkcs11.config";
-		
-		//Setting the SocketFactory according to proxy supplied
-        
-        socketConnectorFactory = proxy.getSocketConnectorFactory();
     }
 
     /**
@@ -577,14 +570,6 @@ public class ConnectionConfiguration implements Cloneable {
      */
     public void setCallbackHandler(CallbackHandler callbackHandler) {
         this.callbackHandler = callbackHandler;
-    }
-
-    /**
-     * Returns the {@link SocketConnector} used to connect the socket to the remote
-     * host.  This is used to connect to proxies.
-     */
-    public SocketConnectorFactory getSocketConnectorFactory() {
-        return socketConnectorFactory;
     }
 
     /**
