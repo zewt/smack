@@ -17,31 +17,15 @@
 package org.jivesoftware.smack.proxy;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 
-class DirectSocketFactory extends SocketConnectorFactory
-{
-    private static class DirectSocketConnector extends SocketConnector
-    {
-        private Socket socket;
-
-        public DirectSocketConnector(Socket socket) { this.socket = socket; }
-        
-        public void connectSocket(String host, int port) throws IOException {
-            socket.connect(new InetSocketAddress(host, port));
-        }
-        
-        public void cancel() {
-            try {
-                socket.close();
-            } catch(IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
+public abstract class SocketConnectorFactory {
+    public static abstract class SocketConnector {
+        abstract public void connectSocket(String host, int port) throws IOException;
+        abstract public void cancel();
     }
 
-    public SocketConnector createConnector(Socket socket) {
-        return new DirectSocketConnector(socket);
-    }
-}
+    abstract public SocketConnector createConnector(Socket socket);
+};

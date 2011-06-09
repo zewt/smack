@@ -20,12 +20,12 @@
 
 package org.jivesoftware.smack;
 
-import org.jivesoftware.smack.proxy.ProxyInfo;
-
-import javax.net.SocketFactory;
 import java.net.URI;
 import java.security.KeyStore;
+
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
+import org.jivesoftware.smack.proxy.ProxyInfo;
+import org.jivesoftware.smack.proxy.SocketConnectorFactory;
 
 /**
  * Configuration to use while establishing the connection to the server. It is possible to
@@ -77,8 +77,7 @@ public class ConnectionConfiguration implements Cloneable {
     // Flag that indicates if a reconnection should be attempted when abruptly disconnected
     private boolean reconnectionAllowed = true;
     
-    // Holds the socket factory that is used to generate the socket in the connection
-    private SocketFactory socketFactory;
+    private SocketConnectorFactory socketConnectorFactory;
     
     // Holds the authentication information for future reconnections
     private String username;
@@ -200,7 +199,8 @@ public class ConnectionConfiguration implements Cloneable {
         pkcs11Library = "pkcs11.config";
 		
 		//Setting the SocketFactory according to proxy supplied
-        socketFactory = proxy.getSocketFactory();
+        
+        socketConnectorFactory = proxy.getSocketConnectorFactory();
     }
 
     /**
@@ -520,20 +520,6 @@ public class ConnectionConfiguration implements Cloneable {
     }
     
     /**
-     * Sets the socket factory used to create new xmppConnection sockets.
-     * This is useful when connecting through SOCKS5 proxies.
-     *
-     * @param socketFactory used to create new sockets, or null to use the default
-     * SocketFactory.
-     */
-    public void setSocketFactory(SocketFactory socketFactory) {
-        if(socketFactory != null)
-            this.socketFactory = socketFactory;
-        else
-            this.socketFactory = ProxyInfo.forDefaultProxy().getSocketFactory();
-    }
-
-    /**
      * Sets if an initial available presence will be sent to the server. By default
      * an available presence will be sent to the server indicating that this presence
      * is not online and available to receive messages. If you want to log in without
@@ -594,13 +580,11 @@ public class ConnectionConfiguration implements Cloneable {
     }
 
     /**
-     * Returns the socket factory used to create new xmppConnection sockets.
-     * This is useful when connecting through SOCKS5 proxies.
-     * 
-     * @return socketFactory used to create new sockets.
+     * Returns the {@link SocketConnector} used to connect the socket to the remote
+     * host.  This is used to connect to proxies.
      */
-    public SocketFactory getSocketFactory() {
-        return this.socketFactory;
+    public SocketConnectorFactory getSocketConnectorFactory() {
+        return socketConnectorFactory;
     }
 
     /**

@@ -3,10 +3,10 @@ package org.jivesoftware.smack.proxy;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.net.UnknownHostException;
-import javax.net.SocketFactory;
+
+import org.jivesoftware.smack.proxy.SocketConnectorFactory.SocketConnector;
 
 /**
  * Socket factory for Socks5 proxy
@@ -14,51 +14,26 @@ import javax.net.SocketFactory;
  * @author Atul Aggarwal
  */
 public class Socks5ProxySocketFactory 
-    extends SocketFactory
+    extends SocketConnectorFactory
 {
     private ProxyInfo proxy;
-    
-    public Socks5ProxySocketFactory(ProxyInfo proxy)
-    {
+
+    public Socks5ProxySocketFactory(ProxyInfo proxy) { this.proxy = proxy; }
+    public SocketConnector createConnector(Socket socket) { return new Socks5SocketConnector(proxy, socket); }
+
+}
+
+class Socks5SocketConnector extends SocketConnector
+{
+    private Socket socket;
+    private ProxyInfo proxy;
+
+    public Socks5SocketConnector(ProxyInfo proxy, Socket socket) {
+        this.socket = socket;
         this.proxy = proxy;
     }
-
-    public Socket createSocket(String host, int port) 
-        throws IOException, UnknownHostException
-    {
-        return socks5ProxifiedSocket(host,port);
-    }
-
-    public Socket createSocket(String host ,int port, InetAddress localHost,
-                                int localPort)
-        throws IOException, UnknownHostException
-    {
-        
-        return socks5ProxifiedSocket(host,port);
-        
-    }
-
-    public Socket createSocket(InetAddress host, int port)
-        throws IOException
-    {
-        
-        return socks5ProxifiedSocket(host.getHostAddress(),port);
-        
-    }
-
-    public Socket createSocket( InetAddress address, int port, 
-                                InetAddress localAddress, int localPort) 
-        throws IOException
-    {
-        
-        return socks5ProxifiedSocket(address.getHostAddress(),port);
-        
-    }
     
-    private Socket socks5ProxifiedSocket(String host, int port) 
-        throws IOException
-    {
-        Socket socket = null;
+    public void connectSocket(String host, int port) throws IOException {
         InputStream in = null;
         OutputStream out = null;
         String proxy_host = proxy.getProxyAddress();
@@ -68,7 +43,8 @@ public class Socks5ProxySocketFactory
         
         try
         {
-            socket=new Socket(proxy_host, proxy_port);    
+            // XXX: this should be resolved async
+            socket.connect(new InetSocketAddress(proxy_host, proxy_port));
             in=socket.getInputStream();
             out=socket.getOutputStream();
 
@@ -311,8 +287,6 @@ public class Socks5ProxySocketFactory
                     break;
                 default:
             }
-            return socket;
-            
         }
         catch(RuntimeException e)
         {
@@ -340,6 +314,9 @@ public class Socks5ProxySocketFactory
         }
     }
     
+    public void cancel() {
+    }
+
     private void fill(InputStream in, byte[] buf, int len) 
       throws IOException
     {

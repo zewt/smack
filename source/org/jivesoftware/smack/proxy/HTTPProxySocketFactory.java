@@ -5,13 +5,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
 import java.net.HttpURLConnection;
-import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.net.UnknownHostException;
-import javax.net.SocketFactory;
-import org.jivesoftware.smack.util.Base64;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.jivesoftware.smack.proxy.SocketConnectorFactory.SocketConnector;
+import org.jivesoftware.smack.util.Base64;
 
 /**
  * Http Proxy Socket Factory which returns socket connected to Http Proxy
@@ -19,49 +19,29 @@ import java.util.regex.Pattern;
  * @author Atul Aggarwal
  */
 class HTTPProxySocketFactory 
-    extends SocketFactory
+    extends SocketConnectorFactory
 {
-
     private ProxyInfo proxy;
 
-    public HTTPProxySocketFactory(ProxyInfo proxy)
-    {
+    public HTTPProxySocketFactory(ProxyInfo proxy) { this.proxy = proxy; }
+    public SocketConnector createConnector(Socket socket) { return new HTTPProxySocketConnector(socket, proxy); }
+}
+
+class HTTPProxySocketConnector extends SocketConnector
+{
+    private Socket socket;
+    private final ProxyInfo proxy;
+
+    public HTTPProxySocketConnector(Socket socket, ProxyInfo proxy) {
+        this.socket = socket;
         this.proxy = proxy;
     }
-
-    public Socket createSocket(String host, int port) 
-        throws IOException, UnknownHostException
-    {
-        return httpProxifiedSocket(host, port);
-    }
-
-    public Socket createSocket(String host ,int port, InetAddress localHost,
-                                int localPort)
-        throws IOException, UnknownHostException
-    {
-        return httpProxifiedSocket(host, port);
-    }
-
-    public Socket createSocket(InetAddress host, int port)
-        throws IOException
-    {
-        return httpProxifiedSocket(host.getHostAddress(), port);
-        
-    }
-
-    public Socket createSocket( InetAddress address, int port, 
-                                InetAddress localAddress, int localPort) 
-        throws IOException
-    {
-        return httpProxifiedSocket(address.getHostAddress(), port);
-    }
-  
-    private Socket httpProxifiedSocket(String host, int port)
-        throws IOException 
-    {
+    public void connectSocket(String host, int port) throws IOException {
+        // XXX: this should be resolved async
         String proxyhost = proxy.getProxyAddress();
         int proxyPort = proxy.getProxyPort();
-        Socket socket = new Socket(proxyhost,proxyPort);
+        socket.connect(new InetSocketAddress(proxyhost, proxyPort));
+
         String hostport = "CONNECT " + host + ":" + port;
         String proxyLine;
         String username = proxy.getProxyUsername();
@@ -91,7 +71,7 @@ class HTTPProxySocketFactory
             {
                 throw new ProxyException(ProxyInfo.ProxyType.HTTP, "Recieved " +
                     "header of >1024 characters from "
-                    + proxyhost + ", cancelling connection");
+                    + socket.getRemoteSocketAddress().toString() + ", cancelling connection");
             }
             if (c == -1)
             {
@@ -119,7 +99,7 @@ class HTTPProxySocketFactory
         {
             throw new ProxyException(ProxyInfo.ProxyType.HTTP, "Never " +
                 "received blank line from " 
-                + proxyhost + ", cancelling connection");
+                + socket.getRemoteSocketAddress().toString() + ", cancelling connection");
         }
 
         String gotstr = got.toString();
@@ -130,14 +110,14 @@ class HTTPProxySocketFactory
         if (response == null)
         {
             throw new ProxyException(ProxyInfo.ProxyType.HTTP, "Empty proxy " +
-                "response from " + proxyhost + ", cancelling");
+                "response from " + socket.getRemoteSocketAddress().toString() + ", cancelling");
         }
         
         Matcher m = RESPONSE_PATTERN.matcher(response);
         if (!m.matches())
         {
             throw new ProxyException(ProxyInfo.ProxyType.HTTP , "Unexpected " +
-                "proxy response from " + proxyhost + ": " + response);
+                "proxy response from " + socket.getRemoteSocketAddress().toString() + ": " + response);
         }
         
         int code = Integer.parseInt(m.group(1));
@@ -146,8 +126,10 @@ class HTTPProxySocketFactory
         {
             throw new ProxyException(ProxyInfo.ProxyType.HTTP);
         }
-        
-        return socket;
+    }
+
+    // XXX
+    public void cancel() {
     }
 
     private static final Pattern RESPONSE_PATTERN

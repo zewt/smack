@@ -4,9 +4,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.net.UnknownHostException;
-import javax.net.SocketFactory;
+
+import org.jivesoftware.smack.proxy.SocketConnectorFactory.SocketConnector;
 
 /**
  * Socket factory for socks4 proxy 
@@ -14,47 +15,24 @@ import javax.net.SocketFactory;
  * @author Atul Aggarwal
  */
 public class Socks4ProxySocketFactory 
-    extends SocketFactory
+    extends SocketConnectorFactory
 {
     private ProxyInfo proxy;
-    
-    public Socks4ProxySocketFactory(ProxyInfo proxy)
-    {
+
+    public Socks4ProxySocketFactory(ProxyInfo proxy) { this.proxy = proxy; }
+    public SocketConnector createConnector(Socket socket) { return new Socks4SocketConnector(socket, proxy); }
+}
+
+class Socks4SocketConnector extends SocketConnector
+{
+    private Socket socket;
+    final private ProxyInfo proxy;
+
+    public Socks4SocketConnector(Socket socket, ProxyInfo proxy) {
+        this.socket = socket;
         this.proxy = proxy;
     }
-
-    public Socket createSocket(String host, int port) 
-        throws IOException, UnknownHostException
-    {
-        return socks4ProxifiedSocket(host,port);
-        
-    }
-
-    public Socket createSocket(String host ,int port, InetAddress localHost,
-                                int localPort)
-        throws IOException, UnknownHostException
-    {
-        return socks4ProxifiedSocket(host,port);
-    }
-
-    public Socket createSocket(InetAddress host, int port)
-        throws IOException
-    {
-        return socks4ProxifiedSocket(host.getHostAddress(),port);
-    }
-
-    public Socket createSocket( InetAddress address, int port, 
-                                InetAddress localAddress, int localPort) 
-        throws IOException
-    {
-        return socks4ProxifiedSocket(address.getHostAddress(),port);
-        
-    }
-    
-    private Socket socks4ProxifiedSocket(String host, int port) 
-        throws IOException
-    {
-        Socket socket = null;
+    public void connectSocket(String host, int port) throws IOException {
         InputStream in = null;
         OutputStream out = null;
         String proxy_host = proxy.getProxyAddress();
@@ -64,7 +42,9 @@ public class Socks4ProxySocketFactory
         
         try
         {
-            socket=new Socket(proxy_host, proxy_port);    
+            // XXX: this should be resolved async
+            socket.connect(new InetSocketAddress(proxy_host, proxy_port));
+
             in=socket.getInputStream();
             out=socket.getOutputStream();
             socket.setTcpNoDelay(true);
@@ -97,19 +77,12 @@ public class Socks4ProxySocketFactory
             buf[index++]=(byte)(port>>>8);
             buf[index++]=(byte)(port&0xff);
 
-            try
+            // XXX async
+            InetAddress addr=InetAddress.getByName(host);
+            byte[] byteAddress = addr.getAddress();
+            for (int i = 0; i < byteAddress.length; i++) 
             {
-                InetAddress addr=InetAddress.getByName(host);
-                byte[] byteAddress = addr.getAddress();
-                for (int i = 0; i < byteAddress.length; i++) 
-                {
-                    buf[index++]=byteAddress[i];
-                }
-            }
-            catch(UnknownHostException uhe)
-            {
-                throw new ProxyException(ProxyInfo.ProxyType.SOCKS4, 
-                    uhe.toString(), uhe);
+                buf[index++]=byteAddress[i];
             }
 
             if(user!=null)
@@ -178,7 +151,6 @@ public class Socks4ProxySocketFactory
             }
             byte[] temp = new byte[2];
             in.read(temp, 0, 2);
-            return socket;
         }
         catch(RuntimeException e)
         {
@@ -196,4 +168,8 @@ public class Socks4ProxySocketFactory
             throw new ProxyException(ProxyInfo.ProxyType.SOCKS4, e.toString());
         }
     }
-}
+    
+    // XXX
+    public void cancel() {
+    }
+}    

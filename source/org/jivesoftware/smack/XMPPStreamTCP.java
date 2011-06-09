@@ -32,8 +32,8 @@ import java.io.Writer;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
+import java.net.Proxy;
 import java.net.Socket;
-import java.net.UnknownHostException;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,17 +47,15 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
-import org.jivesoftware.smack.XMPPStream.ConnectData;
-import org.jivesoftware.smack.XMPPStream.PacketCallback;
-import org.jivesoftware.smack.XMPPStreamBOSH.ConnectDataBOSH;
 import org.jivesoftware.smack.packet.XMPPError;
+import org.jivesoftware.smack.proxy.SocketConnectorFactory.SocketConnector;
 import org.jivesoftware.smack.util.DNSUtil;
+import org.jivesoftware.smack.util.DNSUtil.HostAddress;
 import org.jivesoftware.smack.util.ObservableReader;
 import org.jivesoftware.smack.util.ObservableWriter;
 import org.jivesoftware.smack.util.ThreadUtil;
 import org.jivesoftware.smack.util.WriterListener;
 import org.jivesoftware.smack.util.XmlUtil;
-import org.jivesoftware.smack.util.DNSUtil.HostAddress;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.xmlpull.v1.XmlPullParser;
@@ -333,7 +331,19 @@ public class XMPPStreamTCP extends XMPPStream
                 throw new XMPPException("Connection cancelled");
 
             try {
-                socket = config.getSocketFactory().createSocket(ip, port);
+                socket = new Socket(Proxy.NO_PROXY);
+                
+                // Unlock while we connect to the server.  disconnect() may close the stream,
+                // cancelling the connection.
+                lock.unlock();
+                try {
+                    // Don't pass an InetAddress directly to new InetSocketAddress(); it causes an unwanted
+                    // reverse IP lookup, which is blocking and can't be cancelled.
+                    SocketConnector connector = config.getSocketConnectorFactory().createConnector(socket);
+                    connector.connectSocket(ip.getHostAddress(), port);
+                } finally {
+                    lock.lock();
+                }
 
                 initReaderAndWriter();
             } catch(IOException e) {

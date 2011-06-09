@@ -88,7 +88,7 @@ public class ProxyInfo
         return proxyPassword;
     }
     
-    public SocketFactory getSocketFactory()
+    public SocketConnectorFactory getSocketConnectorFactory()
     {
         if(proxyType == ProxyType.NONE)
         {
@@ -108,7 +108,7 @@ public class ProxyInfo
         }
         else
         {
-            return null;
+            return new DirectSocketFactory();
         }
     }
 }
