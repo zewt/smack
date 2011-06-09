@@ -47,7 +47,7 @@ import org.w3c.dom.Element;
 
 /**
  * Creates a socket connection to a XMPP server. This is the default connection
- * to a Jabber server and is specified in the XMPP Core (RFC 3920).
+ * to a Jabber server and is specified in the XMPP Core (RFC 6120).
  * 
  * @see Connection
  * @author Matt Tucker
