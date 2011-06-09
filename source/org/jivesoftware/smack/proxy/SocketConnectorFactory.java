@@ -21,11 +21,22 @@ import java.net.Socket;
 
 import org.jivesoftware.smack.XMPPException;
 
+/** A factory for instances of {@link SocketConnectorFactory.SocketConnector} attached to sockets. */ 
 public abstract class SocketConnectorFactory {
+    /**
+     * A SocketConnector connects a socket to a host.
+     */
     public static abstract class SocketConnector {
+        /** Connect the attached socket to the specified host and port. */
         abstract public void connectSocket(String host, int port) throws XMPPException, IOException;
+
+        /**
+         * Cancel the connection.  Any ongoing or future call to connectSocket should
+         * throw IOException.
+         */
         abstract public void cancel();
     }
 
+    /** Create a {@link SocketConnector} for the given {@link Socket}. */
     abstract public SocketConnector createConnector(Socket socket);
 };
