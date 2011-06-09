@@ -179,12 +179,10 @@ public class ConnectionConfiguration implements Cloneable {
     }
 
     private void init(String host, int port, String serviceName, ProxyInfo proxy) {
-        if(proxy == null)
-            proxy = ProxyInfo.forDefaultProxy();
         this.host = host;
         this.port = port;
         this.serviceName = serviceName;
-        this.proxy = proxy;
+        setProxyInfo(proxy);
 
         // By default, search for the certificate file.
         truststorePath = null;
@@ -247,6 +245,15 @@ public class ConnectionConfiguration implements Cloneable {
      */
     public ProxyInfo getProxyInfo() { return proxy; }
 
+    /**
+     * Set the {@link ProxyInfo} for this connection.
+     */
+    public void setProxyInfo(ProxyInfo proxy) {
+        if(proxy == null)
+            proxy = ProxyInfo.forDefaultProxy();
+        this.proxy = proxy;
+    }
+    
     /**
      * @return the parsed URI of the specified BOSH server, or null if none was specified.
      */
