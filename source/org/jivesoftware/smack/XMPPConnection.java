@@ -192,7 +192,7 @@ public class XMPPConnection extends Connection {
 
         // Set presence to online.
         if (config.isSendPresence()) {
-            packetWriter.sendPacket(new Presence(Presence.Type.available));
+            sendPacket(new Presence(Presence.Type.available));
         }
 
         // If debugging is enabled, change the the debug window title to include the
