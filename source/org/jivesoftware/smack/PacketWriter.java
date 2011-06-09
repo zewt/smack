@@ -95,15 +95,15 @@ class PacketWriter {
      * The caller must first shut down the data stream to ensure the thread will exit.
      */
     public void shutdown() {
+        Thread writerThreadRef;
         synchronized(this) {
+            writerThreadRef = writerThread;
             done = true;
             this.notifyAll();
         }
 
-        if(writerThread != null) {
-            ThreadUtil.uninterruptibleJoin(writerThread);
-            writerThread = null;
-        }
+        if(writerThreadRef != null)
+            ThreadUtil.uninterruptibleJoin(writerThreadRef);
     }
 
     /**
