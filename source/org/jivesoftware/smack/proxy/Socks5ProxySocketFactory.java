@@ -32,7 +32,7 @@ class Socks5SocketConnector extends CancellableSocketConnector
         this.proxy = proxy;
     }
     
-    public void connectSocket(String host, int port) throws XMPPException, IOException {
+    protected void connectSocketInternal(String host, int port) throws XMPPException, IOException {
         try
         {
             InetAddress proxyIp = lookupHostIP(proxy.getProxyAddress());
@@ -163,13 +163,6 @@ class Socks5SocketConnector extends CancellableSocketConnector
 
             if(!check)
             {
-                try
-                {
-                    socket.close();
-                }
-                catch(Exception eee)
-                {
-                }
                 throw new ProxyException(ProxyInfo.ProxyType.SOCKS5,
                     "fail in SOCKS5 proxy");
             }
@@ -256,13 +249,6 @@ class Socks5SocketConnector extends CancellableSocketConnector
 
             if(buf[1]!=0)
             {
-                try
-                {
-                    socket.close();
-                }
-                catch(Exception eee)
-                {
-                }
                 throw new ProxyException(ProxyInfo.ProxyType.SOCKS5, 
                     "server returns "+buf[1]);
             }

@@ -86,4 +86,25 @@ abstract class CancellableSocketConnector extends SocketConnector
             throw new RuntimeException(e);
         }
     }    
+
+    public void connectSocket(String host, int port) throws XMPPException, IOException {
+        // As a shortcut for implementations, ensure that the socket is always closed on exception.
+        // Derived classes should implement connectSocketInternal.
+        boolean success = false;
+        try {
+            connectSocketInternal(host, port);
+            success = true;
+        } finally {
+            if(!success) {
+                try {
+                    socket.close();
+                } catch(IOException e) {
+                    // Closing the socket should never actually fail.
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+    }
+    
+    abstract protected void connectSocketInternal(String host, int port) throws XMPPException, IOException;
 };

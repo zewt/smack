@@ -34,7 +34,7 @@ class DirectSocketConnector extends CancellableSocketConnector
 {
     public DirectSocketConnector(Socket socket) { super(socket); }
     
-    public void connectSocket(String host, int port) throws XMPPException, IOException {
+    protected void connectSocketInternal(String host, int port) throws XMPPException, IOException {
         InetAddress ip = lookupHostIP(host);
         
         // Don't pass the InetAddress directly to InetSocketAddress; it'll do a reverse IP

@@ -37,7 +37,7 @@ class HTTPProxySocketConnector extends CancellableSocketConnector
         this.proxy = proxy;
     }
 
-    public void connectSocket(String host, int port) throws XMPPException, IOException {
+    protected void connectSocketInternal(String host, int port) throws XMPPException, IOException {
         InetAddress proxyIp = lookupHostIP(proxy.getProxyAddress());
         String proxyIpString = proxyIp.getHostAddress();
         socket.connect(new InetSocketAddress(proxyIpString, proxy.getProxyPort()));

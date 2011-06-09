@@ -31,7 +31,8 @@ class Socks4SocketConnector extends CancellableSocketConnector
         super(socket);
         this.proxy = proxy;
     }
-    public void connectSocket(String host, int port) throws XMPPException, IOException {
+
+    protected void connectSocketInternal(String host, int port) throws XMPPException, IOException {
         try
         {
             InetAddress proxyIp = lookupHostIP(proxy.getProxyAddress());
@@ -132,13 +133,6 @@ class Socks4SocketConnector extends CancellableSocketConnector
             }
             if(buf[1]!=90)
             {
-                try
-                {
-                    socket.close();
-                }
-                catch(Exception eee)
-                {
-                }
                 String message="ProxySOCKS4: server returns CD "+buf[1];
                 throw new ProxyException(ProxyInfo.ProxyType.SOCKS4,message);
             }
