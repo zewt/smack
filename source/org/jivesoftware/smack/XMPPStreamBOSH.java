@@ -8,21 +8,16 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.cert.CertificateException;
 import java.util.Vector;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 import javax.net.ssl.SSLSocket;
 import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
 
 import org.jivesoftware.smack.ConnectionConfiguration.SecurityMode;
-import org.jivesoftware.smack.XMPPStream.ConnectData;
-import org.jivesoftware.smack.XMPPStream.PacketCallback;
-import org.jivesoftware.smack.XMPPStreamTCP.ConnectDataTCP;
 import org.jivesoftware.smack.packet.XMPPError;
+import org.jivesoftware.smack.proxy.SocketConnectorFactory;
 import org.jivesoftware.smack.util.DNSUtil;
 import org.jivesoftware.smack.util.ObservableReader;
 import org.jivesoftware.smack.util.ObservableWriter;
@@ -42,6 +37,7 @@ import com.kenai.jbosh.BOSHClientConnEvent;
 import com.kenai.jbosh.BOSHClientConnListener;
 import com.kenai.jbosh.BOSHClientRequestListener;
 import com.kenai.jbosh.BOSHClientResponseListener;
+import com.kenai.jbosh.BOSHClientSocketConnectorFactory;
 import com.kenai.jbosh.BOSHException;
 import com.kenai.jbosh.BOSHMessageEvent;
 import com.kenai.jbosh.BodyQName;
@@ -204,50 +200,34 @@ public class XMPPStreamBOSH extends XMPPStream
     }
 
     /**
-     * Look up the specified hostname.  An asynchronous call to disconnect() will
-     * abort the lookup.
-     * <p>
-     * @param host
-     * @throws XMPPException
+     * An adaptor to convert our SocketConnectorFactory to jbosh's JBOSHSocketConnectorFactory.
+     * These have essentially the same interface. 
      */
-    private InetAddress lookupHostIP(String host) throws XMPPException {
-        assertNotLocked();
-
-        DNSUtil.AddressLookup lookup;
-        lock.lock();
-        try {
-            // This is called before the socket is open, so we can't call throwIfDisconnected().
-            // If threadExited is true, then disconnect() was called before we got this far.
-            // Exit without starting.
-            if(connectionClosed)
-                throw new XMPPException("Connection cancelled");
-
-            lookup = new DNSUtil.AddressLookup(host);
-            initialLookup = lookup;
-        } finally {
-            lock.unlock();
+    static private class JBOSHSocketConnectorFactory extends BOSHClientSocketConnectorFactory {
+        final SocketConnectorFactory actualConnectorFactory;
+        JBOSHSocketConnectorFactory(SocketConnectorFactory actualConnectorFactory) {
+            this.actualConnectorFactory = actualConnectorFactory;
         }
 
-        // Look up the host.
-        Vector<InetAddress> ips = lookup.run();
+        public SocketConnector createConnector(final Socket socket) {
+            final SocketConnectorFactory.SocketConnector socketConnector = actualConnectorFactory.createConnector(socket); 
+            return new SocketConnector() {
+                public void connectSocket(String host, int port) throws IOException {
+                    try {
+                        socketConnector.connectSocket(host, port);
+                    } catch(XMPPException e) {
+                        IOException io = new IOException();
+                        io.initCause(e);
+                        throw io;
+                    }
+                }
 
-        lock.lock();
-        try {
-            initialLookup = null;
-
-            if(ips == null)
-                throw new XMPPException("Connection cancelled");
-
-            if(ips.size() == 0)
-                throw new XMPPException("Couldn't resolve host: " + host);
-
-            // Although the address might have multiple A records, we only try the first.  DNS-
-            // based load balancing for BOSH should be done using TXT records, not A records.
-            return ips.get(0);
-        } finally {
-            lock.unlock();
+                public void cancel() {
+                    socketConnector.cancel();
+                }
+            };
         }
-    }
+    };
 
     public void initializeConnection(ConnectData data, int attempt) throws XMPPException
     {
@@ -274,9 +254,6 @@ public class XMPPStreamBOSH extends XMPPStream
             throw new XMPPException("Discovered BOSH server is not HTTPS, but security required by connection configuration.",
                     XMPPError.Condition.forbidden);
 
-        // Look up the BOSH server's IP.  This will throw IOException if disconnect() is called.
-        InetAddress ip = lookupHostIP(uri.getHost());
-
         SetupPacketCallback setupCallback;
         final XMPPSSLSocketFactory xmppSocketFactory = new XMPPSSLSocketFactory(config, config.getServiceName());
 
@@ -287,8 +264,11 @@ public class XMPPStreamBOSH extends XMPPStream
                 throw new XMPPException("Connection cancelled");
 
             BOSHClientConfig.Builder cfgBuilder = BOSHClientConfig.Builder.create(uri, config.getServiceName());
-            cfgBuilder.setSocketFactory(config.getProxyInfo().getSocketFactory());
-            cfgBuilder.setInetAddress(ip);
+
+            // Give jbosh our SocketConnectorFactory, so it uses our proxy support and DNS cancellation.
+            SocketConnectorFactory connectorFactory = config.getProxyInfo().getSocketConnectorFactory();
+            JBOSHSocketConnectorFactory boshConnectorFactory = new JBOSHSocketConnectorFactory(connectorFactory);
+            cfgBuilder.setSocketConnectorFactory(boshConnectorFactory);
 
             cfgBuilder.setSSLConnector(new com.kenai.jbosh.SSLConnector() {
                 public SSLSocket attachSSLConnection(Socket socket, String host, int port) throws IOException {
