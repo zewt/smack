@@ -33,19 +33,14 @@ class Socks5SocketConnector extends CancellableSocketConnector
     }
     
     public void connectSocket(String host, int port) throws XMPPException, IOException {
-        InputStream in = null;
-        OutputStream out = null;
-        String user = proxy.getProxyUsername();
-        String passwd = proxy.getProxyPassword();
-        
         try
         {
             InetAddress proxyIp = lookupHostIP(proxy.getProxyAddress());
             String proxyIpString = proxyIp.getHostAddress();
             socket.connect(new InetSocketAddress(proxyIpString, proxy.getProxyPort()));
 
-            in=socket.getInputStream();
-            out=socket.getOutputStream();
+            InputStream in = socket.getInputStream();
+            OutputStream out = socket.getOutputStream();
 
             socket.setTcpNoDelay(true);
 
@@ -101,6 +96,9 @@ class Socks5SocketConnector extends CancellableSocketConnector
                     check=true;
                     break;
                 case 2:                // USERNAME/PASSWORD
+                {
+                    String user = proxy.getProxyUsername();
+                    String passwd = proxy.getProxyPassword();
                     if(user==null || passwd==null)
                     {
                         break;
@@ -159,6 +157,7 @@ class Socks5SocketConnector extends CancellableSocketConnector
                         check=true;
                     }
                     break;
+                }
                 default:
             }
 

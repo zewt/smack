@@ -32,19 +32,14 @@ class Socks4SocketConnector extends CancellableSocketConnector
         this.proxy = proxy;
     }
     public void connectSocket(String host, int port) throws XMPPException, IOException {
-        InputStream in = null;
-        OutputStream out = null;
-        String user = proxy.getProxyUsername();
-        String passwd = proxy.getProxyPassword();
-        
         try
         {
             InetAddress proxyIp = lookupHostIP(proxy.getProxyAddress());
             String proxyIpString = proxyIp.getHostAddress();
             socket.connect(new InetSocketAddress(proxyIpString, proxy.getProxyPort()));
 
-            in=socket.getInputStream();
-            out=socket.getOutputStream();
+            InputStream in = socket.getInputStream();
+            OutputStream out = socket.getOutputStream();
             socket.setTcpNoDelay(true);
             
             byte[] buf=new byte[1024];
@@ -82,6 +77,7 @@ class Socks4SocketConnector extends CancellableSocketConnector
                 buf[index++]=byteAddress[i];
             }
 
+            String user = proxy.getProxyUsername();
             if(user!=null)
             {
                 System.arraycopy(user.getBytes(), 0, buf, index, user.length());
