@@ -33,19 +33,17 @@ class Socks5SocketConnector extends CancellableSocketConnector
     }
     
     protected void connectSocketInternal(String host, int port) throws XMPPException, IOException {
-        try
-        {
-            InetAddress proxyIp = lookupHostIP(proxy.getProxyAddress());
-            String proxyIpString = proxyIp.getHostAddress();
-            socket.connect(new InetSocketAddress(proxyIpString, proxy.getProxyPort()));
+        InetAddress proxyIp = lookupHostIP(proxy.getProxyAddress());
+        String proxyIpString = proxyIp.getHostAddress();
+        socket.connect(new InetSocketAddress(proxyIpString, proxy.getProxyPort()));
 
-            InputStream in = socket.getInputStream();
-            OutputStream out = socket.getOutputStream();
+        InputStream in = socket.getInputStream();
+        OutputStream out = socket.getOutputStream();
 
-            socket.setTcpNoDelay(true);
+        socket.setTcpNoDelay(true);
 
-            byte[] buf=new byte[1024];
-            int index=0;
+        byte[] buf=new byte[1024];
+        int index=0;
 
 /*
                    +----+----------+----------+
@@ -68,13 +66,13 @@ class Socks5SocketConnector extends CancellableSocketConnector
           o  X'FF' NO ACCEPTABLE METHODS
 */
 
-            buf[index++]=5;
+        buf[index++]=5;
 
-            buf[index++]=2;
-            buf[index++]=0;           // NO AUTHENTICATION REQUIRED
-            buf[index++]=2;           // USERNAME/PASSWORD
+        buf[index++]=2;
+        buf[index++]=0;           // NO AUTHENTICATION REQUIRED
+        buf[index++]=2;           // USERNAME/PASSWORD
 
-            out.write(buf, 0, index);
+        out.write(buf, 0, index);
 
 /*
     The server selects from one of the methods given in METHODS, and
@@ -87,22 +85,22 @@ class Socks5SocketConnector extends CancellableSocketConnector
                          +----+--------+
 */
       //in.read(buf, 0, 2);
-            fill(in, buf, 2);
+        fill(in, buf, 2);
 
-            boolean check=false;
-            switch((buf[1])&0xff)
+        boolean check=false;
+        switch((buf[1])&0xff)
+        {
+        case 0:                // NO AUTHENTICATION REQUIRED
+            check=true;
+            break;
+        case 2:                // USERNAME/PASSWORD
+        {
+            String user = proxy.getProxyUsername();
+            String passwd = proxy.getProxyPassword();
+            if(user==null || passwd==null)
             {
-                case 0:                // NO AUTHENTICATION REQUIRED
-                    check=true;
-                    break;
-                case 2:                // USERNAME/PASSWORD
-                {
-                    String user = proxy.getProxyUsername();
-                    String passwd = proxy.getProxyPassword();
-                    if(user==null || passwd==null)
-                    {
-                        break;
-                    }
+                break;
+            }
 
 /*
    Once the SOCKS V5 server has started, and the client has selected the
@@ -123,18 +121,18 @@ class Socks5SocketConnector extends CancellableSocketConnector
    PASSWD field that follows. The PASSWD field contains the password
    association with the given UNAME.
 */
-                    index=0;
-                    buf[index++]=1;
-                    buf[index++]=(byte)(user.length());
-                    System.arraycopy(user.getBytes(), 0, buf, index, 
-                        user.length());
-                    index+=user.length();
-                    buf[index++]=(byte)(passwd.length());
-                    System.arraycopy(passwd.getBytes(), 0, buf, index, 
-                        passwd.length());
-                    index+=passwd.length();
+            index=0;
+            buf[index++]=1;
+            buf[index++]=(byte)(user.length());
+            System.arraycopy(user.getBytes(), 0, buf, index, 
+                user.length());
+            index+=user.length();
+            buf[index++]=(byte)(passwd.length());
+            System.arraycopy(passwd.getBytes(), 0, buf, index, 
+                passwd.length());
+            index+=passwd.length();
 
-                    out.write(buf, 0, index);
+            out.write(buf, 0, index);
 
 /*
    The server verifies the supplied UNAME and PASSWD, and sends the
@@ -150,22 +148,22 @@ class Socks5SocketConnector extends CancellableSocketConnector
    `failure' (STATUS value other than X'00') status, it MUST close the
    connection.
 */
-                    //in.read(buf, 0, 2);
-                    fill(in, buf, 2);
-                    if(buf[1]==0)
-                    {
-                        check=true;
-                    }
-                    break;
-                }
-                default:
-            }
-
-            if(!check)
+            //in.read(buf, 0, 2);
+            fill(in, buf, 2);
+            if(buf[1]==0)
             {
-                throw new ProxyException(ProxyInfo.ProxyType.SOCKS5,
-                    "fail in SOCKS5 proxy");
+                check=true;
             }
+            break;
+        }
+        default:
+        }
+
+        if(!check)
+        {
+            throw new ProxyException(ProxyInfo.ProxyType.SOCKS5,
+                "fail in SOCKS5 proxy");
+        }
 
 /*
       The SOCKS request is formed as follows:
@@ -193,21 +191,21 @@ class Socks5SocketConnector extends CancellableSocketConnector
          order
 */
      
-            index=0;
-            buf[index++]=5;
-            buf[index++]=1;       // CONNECT
-            buf[index++]=0;
+        index=0;
+        buf[index++]=5;
+        buf[index++]=1;       // CONNECT
+        buf[index++]=0;
 
-            byte[] hostb=host.getBytes();
-            int len=hostb.length;
-            buf[index++]=3;      // DOMAINNAME
-            buf[index++]=(byte)(len);
-            System.arraycopy(hostb, 0, buf, index, len);
-            index+=len;
-            buf[index++]=(byte)(port>>>8);
-            buf[index++]=(byte)(port&0xff);
+        byte[] hostb=host.getBytes();
+        int len=hostb.length;
+        buf[index++]=3;      // DOMAINNAME
+        buf[index++]=(byte)(len);
+        System.arraycopy(hostb, 0, buf, index, len);
+        index+=len;
+        buf[index++]=(byte)(port>>>8);
+        buf[index++]=(byte)(port&0xff);
 
-            out.write(buf, 0, index);
+        out.write(buf, 0, index);
 
 /*
    The SOCKS request information is sent by the client as soon as it has
@@ -245,36 +243,31 @@ class Socks5SocketConnector extends CancellableSocketConnector
 */
 
       //in.read(buf, 0, 4);
-            fill(in, buf, 4);
+        fill(in, buf, 4);
 
-            if(buf[1]!=0)
-            {
-                throw new ProxyException(ProxyInfo.ProxyType.SOCKS5, 
-                    "server returns "+buf[1]);
-            }
-
-            switch(buf[3]&0xff)
-            {
-                case 1:
-                    //in.read(buf, 0, 6);
-                    fill(in, buf, 6);
-                    break;
-                case 3:
-                    //in.read(buf, 0, 1);
-                    fill(in, buf, 1);
-                    //in.read(buf, 0, buf[0]+2);
-                    fill(in, buf, (buf[0]&0xff)+2);
-                    break;
-                case 4:
-                    //in.read(buf, 0, 18);
-                    fill(in, buf, 18);
-                    break;
-                default:
-            }
-        }
-        catch(IOException e)
+        if(buf[1]!=0)
         {
-            throw e;
+            throw new ProxyException(ProxyInfo.ProxyType.SOCKS5, 
+                "server returns "+buf[1]);
+        }
+
+        switch(buf[3]&0xff)
+        {
+        case 1:
+            //in.read(buf, 0, 6);
+            fill(in, buf, 6);
+            break;
+        case 3:
+            //in.read(buf, 0, 1);
+            fill(in, buf, 1);
+            //in.read(buf, 0, buf[0]+2);
+            fill(in, buf, (buf[0]&0xff)+2);
+            break;
+        case 4:
+            //in.read(buf, 0, 18);
+            fill(in, buf, 18);
+            break;
+        default:
         }
     }
 

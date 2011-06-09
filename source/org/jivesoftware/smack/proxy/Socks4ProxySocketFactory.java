@@ -33,18 +33,16 @@ class Socks4SocketConnector extends CancellableSocketConnector
     }
 
     protected void connectSocketInternal(String host, int port) throws XMPPException, IOException {
-        try
-        {
-            InetAddress proxyIp = lookupHostIP(proxy.getProxyAddress());
-            String proxyIpString = proxyIp.getHostAddress();
-            socket.connect(new InetSocketAddress(proxyIpString, proxy.getProxyPort()));
+        InetAddress proxyIp = lookupHostIP(proxy.getProxyAddress());
+        String proxyIpString = proxyIp.getHostAddress();
+        socket.connect(new InetSocketAddress(proxyIpString, proxy.getProxyPort()));
 
-            InputStream in = socket.getInputStream();
-            OutputStream out = socket.getOutputStream();
-            socket.setTcpNoDelay(true);
-            
-            byte[] buf=new byte[1024];
-            int index=0;
+        InputStream in = socket.getInputStream();
+        OutputStream out = socket.getOutputStream();
+        socket.setTcpNoDelay(true);
+        
+        byte[] buf=new byte[1024];
+        int index=0;
 
     /*
     1) CONNECT
@@ -64,28 +62,28 @@ class Socks4SocketConnector extends CancellableSocketConnector
     of all zero bits.
     */
 
-            index=0;
-            buf[index++]=4;
-            buf[index++]=1;
+        index=0;
+        buf[index++]=4;
+        buf[index++]=1;
 
-            buf[index++]=(byte)(port>>>8);
-            buf[index++]=(byte)(port&0xff);
+        buf[index++]=(byte)(port>>>8);
+        buf[index++]=(byte)(port&0xff);
 
-            InetAddress addr = lookupHostIP(host);
-            byte[] byteAddress = addr.getAddress();
-            for (int i = 0; i < byteAddress.length; i++) 
-            {
-                buf[index++]=byteAddress[i];
-            }
+        InetAddress addr = lookupHostIP(host);
+        byte[] byteAddress = addr.getAddress();
+        for (int i = 0; i < byteAddress.length; i++) 
+        {
+            buf[index++]=byteAddress[i];
+        }
 
-            String user = proxy.getProxyUsername();
-            if(user!=null)
-            {
-                System.arraycopy(user.getBytes(), 0, buf, index, user.length());
-                index+=user.length();
-            }
-            buf[index++]=0;
-            out.write(buf, 0, index);
+        String user = proxy.getProxyUsername();
+        if(user!=null)
+        {
+            System.arraycopy(user.getBytes(), 0, buf, index, user.length());
+            index+=user.length();
+        }
+        buf[index++]=0;
+        out.write(buf, 0, index);
 
     /*
     The SOCKS server checks to see whether such a request should be granted
@@ -114,34 +112,29 @@ class Socks4SocketConnector extends CancellableSocketConnector
     The remaining fields are ignored.
     */
 
-            int len=6;
-            int s=0;
-            while(s<len)
-            {
-                int i=in.read(buf, s, len-s);
-                if(i<=0)
-                {
-                    throw new ProxyException(ProxyInfo.ProxyType.SOCKS4, 
-                        "stream is closed");
-                }
-                s+=i;
-            }
-            if(buf[0]!=0)
+        int len=6;
+        int s=0;
+        while(s<len)
+        {
+            int i=in.read(buf, s, len-s);
+            if(i<=0)
             {
                 throw new ProxyException(ProxyInfo.ProxyType.SOCKS4, 
-                    "server returns VN "+buf[0]);
+                    "stream is closed");
             }
-            if(buf[1]!=90)
-            {
-                String message="ProxySOCKS4: server returns CD "+buf[1];
-                throw new ProxyException(ProxyInfo.ProxyType.SOCKS4,message);
-            }
-            byte[] temp = new byte[2];
-            in.read(temp, 0, 2);
+            s+=i;
         }
-        catch(IOException e)
+        if(buf[0]!=0)
         {
-            throw e;
+            throw new ProxyException(ProxyInfo.ProxyType.SOCKS4, 
+                "server returns VN "+buf[0]);
         }
+        if(buf[1]!=90)
+        {
+            String message="ProxySOCKS4: server returns CD "+buf[1];
+            throw new ProxyException(ProxyInfo.ProxyType.SOCKS4,message);
+        }
+        byte[] temp = new byte[2];
+        in.read(temp, 0, 2);
     }
 }    
