@@ -3,10 +3,11 @@ package org.jivesoftware.smack.proxy;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 
-import org.jivesoftware.smack.proxy.SocketConnectorFactory.SocketConnector;
+import org.jivesoftware.smack.XMPPException;
 
 /**
  * Socket factory for Socks5 proxy
@@ -16,35 +17,33 @@ import org.jivesoftware.smack.proxy.SocketConnectorFactory.SocketConnector;
 public class Socks5ProxySocketFactory 
     extends SocketConnectorFactory
 {
-    private ProxyInfo proxy;
+    final private ProxyInfo proxy;
 
     public Socks5ProxySocketFactory(ProxyInfo proxy) { this.proxy = proxy; }
     public SocketConnector createConnector(Socket socket) { return new Socks5SocketConnector(proxy, socket); }
-
 }
 
-class Socks5SocketConnector extends SocketConnector
+class Socks5SocketConnector extends CancellableSocketConnector
 {
-    private Socket socket;
-    private ProxyInfo proxy;
+    final private ProxyInfo proxy;
 
     public Socks5SocketConnector(ProxyInfo proxy, Socket socket) {
-        this.socket = socket;
+        super(socket);
         this.proxy = proxy;
     }
     
-    public void connectSocket(String host, int port) throws IOException {
+    public void connectSocket(String host, int port) throws XMPPException, IOException {
         InputStream in = null;
         OutputStream out = null;
-        String proxy_host = proxy.getProxyAddress();
-        int proxy_port = proxy.getProxyPort();
         String user = proxy.getProxyUsername();
         String passwd = proxy.getProxyPassword();
         
         try
         {
-            // XXX: this should be resolved async
-            socket.connect(new InetSocketAddress(proxy_host, proxy_port));
+            InetAddress proxyIp = lookupHostIP(proxy.getProxyAddress());
+            String proxyIpString = proxyIp.getHostAddress();
+            socket.connect(new InetSocketAddress(proxyIpString, proxy.getProxyPort()));
+
             in=socket.getInputStream();
             out=socket.getOutputStream();
 
@@ -288,33 +287,10 @@ class Socks5SocketConnector extends SocketConnector
                 default:
             }
         }
-        catch(RuntimeException e)
+        catch(IOException e)
         {
             throw e;
         }
-        catch(Exception e)
-        {
-            try
-            {
-                if(socket!=null)
-                {
-                    socket.close(); 
-                }
-            }
-            catch(Exception eee)
-            {
-            }
-            String message="ProxySOCKS5: "+e.toString();
-            if(e instanceof Throwable)
-            {
-                throw new ProxyException(ProxyInfo.ProxyType.SOCKS5,message, 
-                    (Throwable)e);
-            }
-            throw new IOException(message);
-        }
-    }
-    
-    public void cancel() {
     }
 
     private void fill(InputStream in, byte[] buf, int len) 

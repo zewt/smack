@@ -5,12 +5,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
 import java.net.HttpURLConnection;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.jivesoftware.smack.proxy.SocketConnectorFactory.SocketConnector;
+import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.util.Base64;
 
 /**
@@ -21,26 +22,25 @@ import org.jivesoftware.smack.util.Base64;
 class HTTPProxySocketFactory 
     extends SocketConnectorFactory
 {
-    private ProxyInfo proxy;
+    final private ProxyInfo proxy;
 
     public HTTPProxySocketFactory(ProxyInfo proxy) { this.proxy = proxy; }
     public SocketConnector createConnector(Socket socket) { return new HTTPProxySocketConnector(socket, proxy); }
 }
 
-class HTTPProxySocketConnector extends SocketConnector
+class HTTPProxySocketConnector extends CancellableSocketConnector
 {
-    private Socket socket;
-    private final ProxyInfo proxy;
+    final private ProxyInfo proxy;
 
     public HTTPProxySocketConnector(Socket socket, ProxyInfo proxy) {
-        this.socket = socket;
+        super(socket);
         this.proxy = proxy;
     }
-    public void connectSocket(String host, int port) throws IOException {
-        // XXX: this should be resolved async
-        String proxyhost = proxy.getProxyAddress();
-        int proxyPort = proxy.getProxyPort();
-        socket.connect(new InetSocketAddress(proxyhost, proxyPort));
+
+    public void connectSocket(String host, int port) throws XMPPException, IOException {
+        InetAddress proxyIp = lookupHostIP(proxy.getProxyAddress());
+        String proxyIpString = proxyIp.getHostAddress();
+        socket.connect(new InetSocketAddress(proxyIpString, proxy.getProxyPort()));
 
         String hostport = "CONNECT " + host + ":" + port;
         String proxyLine;
@@ -126,10 +126,6 @@ class HTTPProxySocketConnector extends SocketConnector
         {
             throw new ProxyException(ProxyInfo.ProxyType.HTTP);
         }
-    }
-
-    // XXX
-    public void cancel() {
     }
 
     private static final Pattern RESPONSE_PATTERN

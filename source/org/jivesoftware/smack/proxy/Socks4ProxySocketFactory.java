@@ -7,7 +7,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 
-import org.jivesoftware.smack.proxy.SocketConnectorFactory.SocketConnector;
+import org.jivesoftware.smack.XMPPException;
 
 /**
  * Socket factory for socks4 proxy 
@@ -17,33 +17,31 @@ import org.jivesoftware.smack.proxy.SocketConnectorFactory.SocketConnector;
 public class Socks4ProxySocketFactory 
     extends SocketConnectorFactory
 {
-    private ProxyInfo proxy;
+    final private ProxyInfo proxy;
 
     public Socks4ProxySocketFactory(ProxyInfo proxy) { this.proxy = proxy; }
     public SocketConnector createConnector(Socket socket) { return new Socks4SocketConnector(socket, proxy); }
 }
 
-class Socks4SocketConnector extends SocketConnector
+class Socks4SocketConnector extends CancellableSocketConnector
 {
-    private Socket socket;
     final private ProxyInfo proxy;
 
     public Socks4SocketConnector(Socket socket, ProxyInfo proxy) {
-        this.socket = socket;
+        super(socket);
         this.proxy = proxy;
     }
-    public void connectSocket(String host, int port) throws IOException {
+    public void connectSocket(String host, int port) throws XMPPException, IOException {
         InputStream in = null;
         OutputStream out = null;
-        String proxy_host = proxy.getProxyAddress();
-        int proxy_port = proxy.getProxyPort();
         String user = proxy.getProxyUsername();
         String passwd = proxy.getProxyPassword();
         
         try
         {
-            // XXX: this should be resolved async
-            socket.connect(new InetSocketAddress(proxy_host, proxy_port));
+            InetAddress proxyIp = lookupHostIP(proxy.getProxyAddress());
+            String proxyIpString = proxyIp.getHostAddress();
+            socket.connect(new InetSocketAddress(proxyIpString, proxy.getProxyPort()));
 
             in=socket.getInputStream();
             out=socket.getOutputStream();
@@ -77,8 +75,7 @@ class Socks4SocketConnector extends SocketConnector
             buf[index++]=(byte)(port>>>8);
             buf[index++]=(byte)(port&0xff);
 
-            // XXX async
-            InetAddress addr=InetAddress.getByName(host);
+            InetAddress addr = lookupHostIP(host);
             byte[] byteAddress = addr.getAddress();
             for (int i = 0; i < byteAddress.length; i++) 
             {
@@ -152,24 +149,9 @@ class Socks4SocketConnector extends SocketConnector
             byte[] temp = new byte[2];
             in.read(temp, 0, 2);
         }
-        catch(RuntimeException e)
+        catch(IOException e)
         {
             throw e;
         }
-        catch(Exception e)
-        {
-            try
-            {
-                if(socket!=null)socket.close(); 
-            }
-            catch(Exception eee)
-            {
-            }
-            throw new ProxyException(ProxyInfo.ProxyType.SOCKS4, e.toString());
-        }
-    }
-    
-    // XXX
-    public void cancel() {
     }
 }    

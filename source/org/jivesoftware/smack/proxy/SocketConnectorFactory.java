@@ -17,13 +17,13 @@
 package org.jivesoftware.smack.proxy;
 
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.Socket;
+
+import org.jivesoftware.smack.XMPPException;
 
 public abstract class SocketConnectorFactory {
     public static abstract class SocketConnector {
-        abstract public void connectSocket(String host, int port) throws IOException;
+        abstract public void connectSocket(String host, int port) throws XMPPException, IOException;
         abstract public void cancel();
     }
 

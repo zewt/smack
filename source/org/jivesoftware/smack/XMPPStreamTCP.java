@@ -173,11 +173,17 @@ public class XMPPStreamTCP extends XMPPStream
     }
 
     /**
-     * This class performs the initial DNS lookups.  This is only set during
+     * This class performs the initial SRV lookup.  This is only set during
      * initializeConnection while performing the lookup.  Other threads may access
      * this while locked in order to cancel the lookup, but must not clear it.
      */
     DNSUtil.CancellableLookup initialLookup;
+    
+    /**
+     * This class performs the socket connection, and handles cancellation.  Like
+     * {@link #initialLookup}, this is cancelled asynchronously by {@link #disconnect()}.
+     */
+    private SocketConnector socketConnector;
 
     class ConnectDataTCP extends ConnectData {
         Vector<DNSUtil.HostAddress> addresses;
@@ -318,9 +324,6 @@ public class XMPPStreamTCP extends XMPPStream
         String host = dataTCP.addresses.get(attempt).getHost();
         int port = dataTCP.addresses.get(attempt).getPort();
 
-        // Look up the host.  This may be cancelled.
-        InetAddress ip = lookupHostIP(host);
-
         SetupPacketCallback setupCallbacks;
 
         lock.lock();
@@ -332,17 +335,16 @@ public class XMPPStreamTCP extends XMPPStream
 
             try {
                 socket = new Socket(Proxy.NO_PROXY);
+                socketConnector = config.getSocketConnectorFactory().createConnector(socket);
                 
                 // Unlock while we connect to the server.  disconnect() may close the stream,
                 // cancelling the connection.
                 lock.unlock();
                 try {
-                    // Don't pass an InetAddress directly to new InetSocketAddress(); it causes an unwanted
-                    // reverse IP lookup, which is blocking and can't be cancelled.
-                    SocketConnector connector = config.getSocketConnectorFactory().createConnector(socket);
-                    connector.connectSocket(ip.getHostAddress(), port);
+                    socketConnector.connectSocket(host, port);
                 } finally {
                     lock.lock();
+                    socketConnector = null;
                 }
 
                 initReaderAndWriter();
@@ -722,6 +724,11 @@ public class XMPPStreamTCP extends XMPPStream
             // initializeConnection() is performing a DNS lookup.  Cancel it, but
             // don't clear the reference.
             initialLookup.cancel();
+        }
+
+        if(socketConnector != null) {
+            // Cancel any ongoing connection; don't clear the reference.
+            socketConnector.cancel();
         }
 
         // If socket isn't set, then initializeConnection hasn't yet set up the
