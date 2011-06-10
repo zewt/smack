@@ -751,10 +751,18 @@ public class XMPPStreamTCP extends XMPPStream
 
         // Shut down the keepalive thread, if any.  Do this after closing the socket,
         // so it'll receive an IOException immediately if it's currently blocking to write,
-        // guaranteeing it'll exit quickly.
-        if(this.keepAlive != null) {
-            this.keepAlive.close();
-            this.keepAlive = null;
+        // guaranteeing it'll exit quickly.  Don't hold the lock while we do this, since
+        // we're joining a thread that calls into us.
+        KeepAliveTask keepAliveRef = keepAlive;
+        keepAlive = null;
+        
+        lock.unlock();
+        try {
+            assertNotLocked();
+            if(keepAliveRef != null)
+                keepAliveRef.close();
+        } finally {
+            lock.lock();
         }
 
         this.socket = null;
