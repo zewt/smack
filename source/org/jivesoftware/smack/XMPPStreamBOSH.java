@@ -520,6 +520,8 @@ public class XMPPStreamBOSH extends XMPPStream
 
             // Set connectionClosed now, so if ResponseListener is waiting for callbacks, it'll
             // stop waiting.  Otherwise, boshClientCopy.close() won't be able to join its thread.
+            // This also needs to be set for ConnectionListener.connectionEvent to know that the
+            // disconnection event is expected.
             connectionClosed = true;
             cond.signalAll();
         } finally {
@@ -650,25 +652,17 @@ public class XMPPStreamBOSH extends XMPPStream
         {
             assertNotLocked();
 
-            Throwable be = connEvent.getCause();
-
-            // This is a hack: when the session is forcibly closed by calling
-            // bosh_client.close(), jbosh triggers an error, but that shouldn't
-            // actually be treated as one.  jbosh should use a separate exception
-            // class for this, so we can distinguish this case sanely, or just
-            // send this case as a disconnection instead of disconnection error.
-            boolean ignoredError = be != null && be.getMessage().equals("Session explicitly closed by caller");
-
             if(connEvent.isError()) {
                 PacketCallback currentCallback = getCallbacks();
 
                 // Never ignore errors during setup, or SetupPacketCallback.waitForCompletion
-                // will never return.
+                // will never return.  Don't report errors if the connection is already closed.
+                boolean reportError = !connectionClosed;
                 if(currentCallback instanceof SetupPacketCallback)
-                    ignoredError = false;
+                    reportError = true;
                 
-                if(currentCallback != null && !ignoredError)
-                    currentCallback.onError(new XMPPException(be));
+                if(currentCallback != null && reportError)
+                    currentCallback.onError(new XMPPException(connEvent.getCause()));
             }
 
             if(!connEvent.isConnected() && !connectionClosed) {
