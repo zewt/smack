@@ -258,7 +258,10 @@ class ConnectionOpener
 
         // We didn't connect.  Report the first failure other than remote_server_not_found
         // as the error.
-        throw firstFailure;
+        if(firstFailure != null)
+            throw firstFailure;
+
+        throw new XMPPException("Couldn't find a server to connect to");
     }
     
     /**
