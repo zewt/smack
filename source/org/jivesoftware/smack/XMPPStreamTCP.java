@@ -209,6 +209,8 @@ public class XMPPStreamTCP extends XMPPStream
 
             String host = config.getHost();
             int port = config.getPort();
+            if(port == -1)
+                port = 5222;
             if(host != null)
                 data.addresses.add(new HostAddress(host, port));
             else
