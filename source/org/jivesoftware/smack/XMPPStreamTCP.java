@@ -273,53 +273,6 @@ public class XMPPStreamTCP extends XMPPStream
     }
 
     /**
-     * Look up the specified hostname.  An asynchronous call to disconnect() will
-     * abort the lookup.
-     * <p>
-     * @param host
-     * @return
-     * @throws XMPPException
-     */
-    private InetAddress lookupHostIP(String host) throws XMPPException {
-        assertNotLocked();
-
-        DNSUtil.AddressLookup lookup;
-        lock.lock();
-        try {
-            // This is called before the socket is open, so we can't call throwIfDisconnected().
-            // If threadExited is true, then disconnect() was called before we got this far.
-            // Exit without starting.
-            if(threadExited)
-                throw new XMPPException("Connection cancelled");
-
-            lookup = new DNSUtil.AddressLookup(host);
-            initialLookup = lookup;
-        } finally {
-            lock.unlock();
-        }
-
-        // Look up the host.
-        Vector<InetAddress> ips = lookup.run();
-
-        lock.lock();
-        try {
-            initialLookup = null;
-
-            if(ips == null)
-                throw new XMPPException("Connection cancelled");
-
-            if(ips.size() == 0)
-                throw new XMPPException("Couldn't resolve host: " + host);
-
-            // Although the address might have multiple A records, we only try the first.  DNS-
-            // based load balancing for XMPP should be done using SRV records, not A records.
-            return ips.get(0);
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    /**
      * Begin the initial connection to the server.  Returns when the connection
      * is established.
      */
