@@ -25,7 +25,7 @@ import java.util.concurrent.locks.Condition;
 public class ThreadUtil {
     /**
      * Join a thread without observing interrupts.
-     * 
+     * <p>
      * If an InterruptedException occurs while joining the thread, it will be deferred
      * until the join completes.  This allows reliably joining a thread that's expected
      * to exit immediately without race conditions due to thread interruption.  
@@ -48,11 +48,37 @@ public class ThreadUtil {
             Thread.currentThread().interrupt();
     }
 
+    /**
+     * Wait for a {@link Condition} to be signalled without observing interrupts.
+     * <p>
+     * See {@link #uninterruptibleJoin} for interrupt behavior.
+     */
     static public void uninterruptibleWait(Condition obj) {
         boolean interrupted = false;
         while(true) {
             try {
                 obj.await();
+                break;
+            } catch (InterruptedException e) {
+                // Defer interruptions until we're done.
+                interrupted = true;
+                continue;
+            }
+        }
+        if(interrupted)
+            Thread.currentThread().interrupt();
+    }
+
+    /**
+     * Wait for an object's monitor to be notified without observing interrupts.
+     * <p>
+     * See {@link #uninterruptibleJoin} for interrupt behavior.
+     */
+    static public void uninterruptibleMonitorWait(Object obj) {
+        boolean interrupted = false;
+        while(true) {
+            try {
+                obj.wait();
                 break;
             } catch (InterruptedException e) {
                 // Defer interruptions until we're done.
