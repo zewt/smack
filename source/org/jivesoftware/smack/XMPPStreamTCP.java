@@ -97,7 +97,8 @@ public class XMPPStreamTCP extends XMPPStream
     private final ReentrantLock lock = new ReentrantLock();
     private final Condition cond = lock.newCondition();
 
-    private ScheduledExecutorService schedExec = Executors.newSingleThreadScheduledExecutor();
+    private ScheduledExecutorService schedExec;
+    private boolean schedExecOwned = false;
     
     private ConnectionConfiguration config;
     private String originalServiceName;
@@ -157,6 +158,11 @@ public class XMPPStreamTCP extends XMPPStream
     public XMPPStreamTCP(ConnectionConfiguration config)
     {
         this.config = config;
+        schedExec = config.getExecutorService();
+        if(schedExec == null) {
+            Executors.newSingleThreadScheduledExecutor();
+            schedExecOwned = true;
+        }
         
         try {
             parser = XmlPullParserFactory.newInstance().newPullParser();
@@ -775,6 +781,12 @@ public class XMPPStreamTCP extends XMPPStream
         if (writer != null) {
             try { writer.close(); } catch (IOException ignore) { /* ignore */ }
             writer = null;
+        }
+
+        // If we created the executor, shut it down.
+        if(schedExecOwned) {
+            schedExec.shutdown();
+            schedExec = null;
         }
     }
 

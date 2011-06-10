@@ -22,6 +22,7 @@ package org.jivesoftware.smack;
 
 import java.net.URI;
 import java.security.KeyStore;
+import java.util.concurrent.ScheduledExecutorService;
 
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
 import org.jivesoftware.smack.proxy.ProxyInfo;
@@ -86,6 +87,8 @@ public class ConnectionConfiguration implements Cloneable {
 	
 	// Holds the proxy information (such as proxyhost, proxyport, username, password etc)
     protected ProxyInfo proxy;
+
+    private ScheduledExecutorService executorService;
 
     /**
      * Creates a new ConnectionConfiguration for the specified service name.
@@ -646,5 +649,13 @@ public class ConnectionConfiguration implements Cloneable {
         this.username = username;
         this.password = password;
         this.resource = resource;
+    }
+
+    public ScheduledExecutorService getExecutorService() {
+        return executorService;
+    }
+    
+    public void setExecutorService(ScheduledExecutorService executorService) {
+        this.executorService = executorService;
     }
 }
