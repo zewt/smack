@@ -38,6 +38,10 @@ import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Vector;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -93,6 +97,8 @@ public class XMPPStreamTCP extends XMPPStream
     private final ReentrantLock lock = new ReentrantLock();
     private final Condition cond = lock.newCondition();
 
+    private ScheduledExecutorService schedExec = Executors.newSingleThreadScheduledExecutor();
+    
     private ConnectionConfiguration config;
     private String originalServiceName;
 
@@ -1252,75 +1258,85 @@ public class XMPPStreamTCP extends XMPPStream
      * A TimerTask that keeps connections to the server alive by sending a space
      * character on an interval.
      */
-    private class KeepAliveTask implements Runnable {
-        private int delay;
-        private Thread thread;
+    private class KeepAliveTask {
+        private final int delay;
         private boolean done = false;
+        private ScheduledFuture keepaliveFuture;
+        private long lastActive = System.currentTimeMillis();
+
+        private final WriterListener listener = new WriterListener() {
+            public void write(String str) {
+                lastActive = System.currentTimeMillis();
+            }
+        };        
 
         public KeepAliveTask(int delay) {
             this.delay = delay;
-            
-            Thread keepAliveThread = new Thread(this);
-            keepAliveThread.setDaemon(true);
-            keepAliveThread.setName("Smack Keepalive");
-            keepAliveThread.start();
-            this.thread = keepAliveThread;
+
+            // Add a write listener to track the time of the most recent write.  This is used
+            // to only send heartbeats when the connection is idle.
+            keepaliveMonitorWriteEvent.addWriterListener(listener);
+
+            scheduleKeepalive();
         }
 
         /**
          * Close the keepalive thread. 
          */
         public void close() {
-            synchronized (this) {
+            // Ensure that no new keepaliveFuture will be set.
+            synchronized(this) {
                 done = true;
-                thread.interrupt();
             }
 
-            ThreadUtil.uninterruptibleJoin(thread);
+            if(keepaliveFuture != null) {
+                if(!keepaliveFuture.cancel(false)) {
+                    try {
+                        // If keepaliveFuture is already running, wait for it to finish.
+                        keepaliveFuture.get();
+                    } catch(InterruptedException e) {
+                        throw new RuntimeException(e);
+                    } catch(ExecutionException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+                keepaliveFuture = null;
+            }
+            
+            keepaliveMonitorWriteEvent.removeWriterListener(listener);
         }
 
-        long lastActive = System.currentTimeMillis();
-        public void run() {
-            // Add a write listener to track the time of the most recent write.  This is used
-            // to only send heartbeats when the connection is idle.
-            long lastActive[] = {System.currentTimeMillis()};
-            WriterListener listener = new WriterListener() {
-                public void write(String str) {
-                    KeepAliveTask.this.lastActive = System.currentTimeMillis();
-                }
-            };
-            keepaliveMonitorWriteEvent.addWriterListener(listener);
-            
-            while (true) {
+        private long getMsUntilKeepalive() {
+            long timeSinceKeepalive = System.currentTimeMillis() - KeepAliveTask.this.lastActive;
+            return delay - timeSinceKeepalive;
+        }
+
+        private Runnable sendKeepAlive = new Runnable() {
+            public void run() { 
                 // Send heartbeat if no packet has been sent to the server for a given time
-                if (System.currentTimeMillis() - KeepAliveTask.this.lastActive >= delay) {
-                    try {
+                try {
+                    if (getMsUntilKeepalive() <= 0) {
+                        android.util.Log.w("XMPP", "Sending keepalive");
                         writePacket(" ");
                     }
-                    catch (XMPPException e) {
-                        // Do nothing, and assume that whatever caused an error
-                        // here will cause one in the main code path, too.  This
-                        // will also happen if the write blocked and XMPPStreamTCP.disconnect
-                        // closed the socket.
-                    }
+                }
+                catch (XMPPException e) {
+                    // Do nothing, and assume that whatever caused an error
+                    // here will cause one in the main code path, too.  This
+                    // will also happen if the write blocked and XMPPStreamTCP.disconnect
+                    // closed the socket.
                 }
 
-                try {
-                    synchronized (this) {
-                        if (done)
-                            break;
-                        
-                        // Sleep until we should write the next keep-alive.
-                        wait(delay);
-                    }
-                }
-                catch (InterruptedException ie) {
-                    // close() interrupted us to shut down the thread.
-                    break;
-                }
+                scheduleKeepalive();
             }
+        };
 
-            keepaliveMonitorWriteEvent.removeWriterListener(listener);
+        private synchronized void scheduleKeepalive() {
+            if(done)
+                return;
+
+            keepaliveFuture = schedExec.schedule(sendKeepAlive,
+                    getMsUntilKeepalive() + 50, TimeUnit.MILLISECONDS);
         }
     }
 };
