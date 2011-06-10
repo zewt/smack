@@ -265,6 +265,9 @@ public class XMPPStreamBOSH extends XMPPStream
 
             BOSHClientConfig.Builder cfgBuilder = BOSHClientConfig.Builder.create(uri, config.getServiceName());
 
+            // If we've been given a ScheduledExecutorService, use it for jbosh scheduling as well.
+            cfgBuilder.setExecutorService(config.getExecutorService());
+
             // Give jbosh our SocketConnectorFactory, so it uses our proxy support and DNS cancellation.
             SocketConnectorFactory connectorFactory = config.getProxyInfo().getSocketConnectorFactory();
             JBOSHSocketConnectorFactory boshConnectorFactory = new JBOSHSocketConnectorFactory(connectorFactory);
