@@ -265,6 +265,13 @@ public class XMPPStreamBOSH extends XMPPStream
 
             BOSHClientConfig.Builder cfgBuilder = BOSHClientConfig.Builder.create(uri, config.getServiceName());
 
+            // The BOSH wait time is its keepalive time.  BOSH doesn't support disabling keepalive;
+            // if no keepalives are requested, use one hour.
+            int keepAliveInterval = SmackConfiguration.getKeepAliveInterval();
+            if(keepAliveInterval == -1)
+                keepAliveInterval = 60*60*1000;
+            cfgBuilder.setWaitTime(keepAliveInterval / 1000);
+
             // If we've been given a ScheduledExecutorService, use it for jbosh scheduling as well.
             cfgBuilder.setExecutorService(config.getExecutorService());
 
