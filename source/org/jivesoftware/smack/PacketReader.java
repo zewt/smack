@@ -61,19 +61,6 @@ class PacketReader {
             }
         });
     }
-
-    class ReaderPacketCallbacks extends PacketCallback {
-        public void onPacket(Element packet) {
-            parsePacket(packet);
-        }
-        public void onError(XMPPException error) {
-            handleError(error);
-        }
-    };
-
-    public ReaderPacketCallbacks getPacketCallbacks() {
-        return new ReaderPacketCallbacks();
-    }
     
     /**
      * Shuts the packet reader down.
@@ -103,7 +90,7 @@ class PacketReader {
      *
      * @param thread the thread that is being used by the reader to parse incoming packets.
      */
-    private void parsePacket(Element packet) {
+    void parsePacket(Element packet) {
         try {
             /* Convert the stanza to an XmlPullParser. */
             XmlPullParser parser = new XmlPullParserDom(packet, true);
@@ -142,24 +129,10 @@ class PacketReader {
                 listenerExecutor.submit(new ListenerNotification(receivedPacket));
             }
         } catch (XMPPException e) {
-            handleError(e);
+            connection.handleError(e);
         } catch (Exception e) {
             e.printStackTrace();
-            handleError(new XMPPException(e));
-        }
-    }
-
-    private void handleError(XMPPException e) {
-        connection.readerThreadException(e);
-
-        // Wake up any thread waiting for a packet collector, so they notice
-        // that we're disconnected.  This must be done after notifying connection,
-        // so connection.isConnected returns false.
-        if(connection.isConnected())
-            throw new AssertionError("Should be disconnected");
-
-        for (PacketCollector collector: connection.getPacketCollectors()) {
-            collector.connectionLost();
+            connection.handleError(new XMPPException(e));
         }
     }
 

@@ -20,7 +20,7 @@
 
 package org.jivesoftware.smack;
 
-import org.jivesoftware.smack.PacketReader.ReaderPacketCallbacks;
+import org.jivesoftware.smack.XMPPStream.PacketCallback;
 import org.jivesoftware.smack.debugger.SmackDebugger;
 import org.jivesoftware.smack.filter.PacketFilter;
 import org.jivesoftware.smack.filter.ReceivedPacketFilter;
@@ -390,7 +390,7 @@ public class XMPPConnection extends Connection {
             this.createPacketCollector(new ReceivedPacketFilter("features", "http://etherx.jabber.org/streams"),
                 ReceivedPacket.class);
         try {
-            data_stream.setPacketCallbacks(packetReader.getPacketCallbacks());
+            data_stream.setPacketCallbacks(new ConnectionPacketCallbacks());
 
             // A <features/> packet has been received.  Read it; we'll need it for login.
             initialFeatures = coll.getResult(0);
@@ -546,6 +546,33 @@ public class XMPPConnection extends Connection {
         }
     }
 
+
+    void handleError(XMPPException e) {
+        // XXX rename/merge
+        readerThreadException(e);
+
+        // Wake up any thread waiting for a packet collector, so they notice
+        // that we're disconnected.  This must be done after notifying connection,
+        // so connection.isConnected returns false.
+        if(isConnected())
+            throw new AssertionError("Should be disconnected");
+
+        for(PacketCollector collector: getPacketCollectors())
+            collector.connectionLost();
+    }
+    
+    // XXX cleanup
+    class ConnectionPacketCallbacks extends PacketCallback {
+        public void onPacket(Element packet) {
+            packetReader.parsePacket(packet);
+        }
+
+        public void onError(XMPPException error) {
+            handleError(error);
+        }
+    };
+    
+    
     /**
      * Most of the API can only be called after a successful call to {@link #connect}.
      * Verify that this is the case, throwing IllegalStateException if not.
