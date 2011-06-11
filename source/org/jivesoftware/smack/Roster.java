@@ -113,7 +113,7 @@ public class Roster {
         connection.addPacketListener(presencePacketListener, presenceFilter);
         
         // Listen for connection events
-        final ConnectionListener connectionListener = new AbstractConnectionListener() {
+        final ConnectionListener connectionListener = new ConnectionListener() {
             
             public void connectionClosed() {
                 // Changes the presence available contacts to unavailable

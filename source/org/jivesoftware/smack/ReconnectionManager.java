@@ -16,7 +16,7 @@ import java.util.Random;
  *
  * @author Francisco Vives
  */
-public class ReconnectionManager implements ConnectionListener {
+public class ReconnectionManager extends ConnectionListener {
 
     // Holds the connection to the server
     private Connection connection;
@@ -189,20 +189,4 @@ public class ReconnectionManager implements ConnectionListener {
             this.reconnect();
         }
     }
-
-    public void reconnectingIn(int seconds) {
-        // ignore
-    }
-
-    public void reconnectionFailed(Exception e) {
-        // ignore
-    }
-
-    /**
-     * The connection has successfull gotten connected.
-     */
-    public void reconnectionSuccessful() {
-        // ignore
-    }
-
 }

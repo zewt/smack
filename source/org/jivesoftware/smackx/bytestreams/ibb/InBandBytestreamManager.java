@@ -21,9 +21,9 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.jivesoftware.smack.AbstractConnectionListener;
 import org.jivesoftware.smack.Connection;
 import org.jivesoftware.smack.ConnectionCreationListener;
+import org.jivesoftware.smack.ConnectionListener;
 import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.packet.IQ;
 import org.jivesoftware.smack.packet.XMPPError;
@@ -100,7 +100,7 @@ public class InBandBytestreamManager implements BytestreamManager {
                 manager = InBandBytestreamManager.getByteStreamManager(connection);
 
                 // register shutdown listener
-                connection.addConnectionListener(new AbstractConnectionListener() {
+                connection.addConnectionListener(new ConnectionListener() {
 
                     public void connectionClosed() {
                         manager.disableService();

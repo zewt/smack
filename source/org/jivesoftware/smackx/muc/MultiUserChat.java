@@ -2552,7 +2552,7 @@ public class MultiUserChat {
      *
      * @author Gaston Dombiak
      */
-    private static class InvitationsMonitor implements ConnectionListener {
+    private static class InvitationsMonitor extends ConnectionListener {
         // We use a WeakHashMap so that the GC can collect the monitor when the
         // connection is no longer referenced by any object.
         private final static Map<Connection, WeakReference<InvitationsMonitor>> monitors =
@@ -2655,22 +2655,6 @@ public class MultiUserChat {
 
         public void connectionClosed() {
             cancel();
-        }
-
-        public void connectionClosedOnError(Exception e) {
-            // ignore              
-        }
-
-        public void reconnectingIn(int seconds) {
-            // ignore
-        }
-
-        public void reconnectionSuccessful() {
-            // ignore
-        }
-
-        public void reconnectionFailed(Exception e) {
-            // ignore
         }
 
         /**
