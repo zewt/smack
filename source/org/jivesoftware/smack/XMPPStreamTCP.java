@@ -451,6 +451,10 @@ public class XMPPStreamTCP extends XMPPStream
             }
         }
 
+        public void onRecoverableError(XMPPException error, int errorCount) {
+            onError(error);
+        }
+
         /** Return true if setup is complete. */
         public boolean isComplete() {
             return complete;
@@ -1193,6 +1197,17 @@ public class XMPPStreamTCP extends XMPPStream
         writePacket(stream.toString());
     }
 
+    /**
+     * XMPP does not support transparent stream reconnections.  This implementation
+     * never calls onRecoverableError, so reconnection is never possible.
+     */
+    public void recoverConnection() throws XMPPException {
+        // Note that XEP-0198 Stream Management allows reestablishing a session, but it's
+        // not transparent; it requires reauthentication, so it can't be implemented at
+        // the transport level.
+        throw new XMPPException("Can't reconnect TCP sessions");
+    }
+    
     /**
      * Starts the keepalive process. A white space (aka heartbeat) is going to be
      * sent to the server every 30 seconds (by default) since the last stanza was sent

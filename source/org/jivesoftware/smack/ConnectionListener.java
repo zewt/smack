@@ -44,6 +44,16 @@ public class ConnectionListener {
      * @param e the exception.
      */
     public void connectionClosedOnError(Exception e) { }
+ 
+    /**
+     * The connection has been lost, but can be recovered.  Call {@link Connection#recoverConnection()}
+     * to attempt to recover the connection.
+     * <p>
+     * This form of connection loss is transparent; packets can still be buffered
+     * for sending and {@link Connection#isConnected()} will return true.  If
+     * recovery is not wanted, call {@link Connection#shutdown()}.
+     */
+    public void connectionClosedRecoverably(Exception e, int errorCount) { }
     
     /**
      * The connection will retry to reconnect in the specified number of seconds.

@@ -546,6 +546,12 @@ public class XMPPConnection extends Connection {
         }
     }
 
+    public void recoverConnection() throws XMPPException {
+        assertNotLocked();
+        assertConnectCalled();
+        
+        data_stream.recoverConnection();
+    }
 
     void handleError(XMPPException e) {
         // XXX rename/merge
@@ -569,6 +575,14 @@ public class XMPPConnection extends Connection {
 
         public void onError(XMPPException error) {
             handleError(error);
+        }
+        
+        public void onRecoverableError(XMPPException error, int errorCount) {
+            assertNotLocked();
+            assertConnectCalled();
+            
+            for (ConnectionListener listener: getConnectionListeners())
+                listener.connectionClosedRecoverably(error, errorCount);
         }
     };
     

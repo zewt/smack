@@ -293,6 +293,27 @@ public abstract class Connection {
     public abstract void connect() throws XMPPException;
 
     /**
+     * Attempt to recover from a disconnection.
+     * <p>
+     * This is called after a {@link ConnectionListener#connectionClosedRecoverably} callback
+     * is received to recover the connection.  This is only used for BOSH, which allows
+     * fast, transparent reconnection.
+     * <p>
+     * If the connection can not be recovered because connectionClosedRecoverably was not
+     * received, or because {@link #shutdown} has been called, XMPPException is thrown.
+     * <p>
+     * Otherwise, a recovery attempt is made.  On success, returns normally.  If a recovery
+     * error occurs, but further recovery attempts are possible,
+     * {@link ConnectionListener#connectionClosedRecoverably} is called again and this function
+     * returns normally.
+     * <p>
+     * If a fatal recovery error occurs, throws XMPPException.  This can happen if the server
+     * no longer has a record of the existing connection, or if the server is no longer valid
+     * for the service.  A new connection must be established.
+     */
+    public abstract void recoverConnection() throws XMPPException;
+    
+    /**
      * Logs in to the server using the strongest authentication mode supported by
      * the server, then sets presence to available. If the server supports SASL authentication 
      * then the user will be authenticated using SASL if not Non-SASL authentication will 

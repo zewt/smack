@@ -87,7 +87,31 @@ public abstract class XMPPStream
 
         /** onError is called when the connection has been lost. */
         public abstract void onError(XMPPException error);
+
+        /** onRecoverableError is called when the connection is lost, but can be
+         *  recovered.  errorCount is the number of consecutive recoverable errors,
+         *  increasing after each failed call to reconnect(). */
+        public abstract void onRecoverableError(XMPPException error, int errorCount);
     };
+
+    /**
+     * Attempt to recover the connection.  This is called after {@link PacketCallback#onRecoverableError}
+     * is received.
+     * <p>
+     * If the connection is already established, or if a recovery attempt is already in progress,
+     * does nothing.
+     * <p>
+     * Throws XMPPException if the connection can not be recovered: if onRecoverableError has not
+     * been called, or if {@link disconnect} has been called.
+     * <p>
+     * Otherwise, the recovery process begins asynchronously and the connection is considered
+     * reconnected.  If connection recovery fails, onRecoverableError will be called again
+     * with the errorCount parameter increased by one.
+     * <p>
+     *  
+     * need to set the connection status back to CONNECTED; receiving a packet isn't explicit enough
+     */
+    public abstract void recoverConnection() throws XMPPException;
 
     /**
      * Returns the current connection ID, or null if the connection hasn't
