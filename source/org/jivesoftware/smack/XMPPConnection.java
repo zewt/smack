@@ -482,31 +482,15 @@ public class XMPPConnection extends Connection {
         assertNotLocked();
         assertConnectCalled();
 
-        for (ConnectionListener listener: getConnectionListeners()) {
-            try {
-                listener.connectionClosed();
-            }
-            catch (Exception e) {
-                // Catch and print any exception so we can recover
-                // from a faulty listener and finish the shutdown process
-                e.printStackTrace();
-            }
-        }
+        for (ConnectionListener listener: getConnectionListeners())
+            listener.connectionClosed();
     }
 
     protected void notifyConnectionClosedOnError(XMPPException e) {
         assertNotLocked();
 
-        for (ConnectionListener listener: getConnectionListeners()) {
-            try {
-                listener.connectionClosedOnError(e);
-            }
-            catch (Exception e2) {
-                // Catch and print any exception so we can recover
-                // from a faulty listener
-                e2.printStackTrace();
-            }
-        }
+        for (ConnectionListener listener: getConnectionListeners())
+            listener.connectionClosedOnError(e);
     }
     
     public void recoverConnection() {
