@@ -451,9 +451,11 @@ public class XMPPStreamTCP extends XMPPStream
             }
         }
 
-        public void onRecoverableError(XMPPException error, int errorCount) {
+        public void onRecoverableError(XMPPException error) {
             onError(error);
         }
+
+        public void onRecovered() { throw new RuntimeException(); }
 
         /** Return true if setup is complete. */
         public boolean isComplete() {
@@ -1197,15 +1199,11 @@ public class XMPPStreamTCP extends XMPPStream
         writePacket(stream.toString());
     }
 
-    /**
-     * XMPP does not support transparent stream reconnections.  This implementation
-     * never calls onRecoverableError, so reconnection is never possible.
-     */
-    public void recoverConnection() throws XMPPException {
-        // Note that XEP-0198 Stream Management allows reestablishing a session, but it's
-        // not transparent; it requires reauthentication, so it can't be implemented at
-        // the transport level.
-        throw new XMPPException("Can't reconnect TCP sessions");
+    public void recoverConnection() {
+        // We don't support any form of session recovery over a plain TCP connection.
+        // XEP-0198 Stream Management allows this, but it's not transparent; it requires
+        // reauthentication, so it can't be implemented at the transport level.
+        throw new RuntimeException("Can't reconnect TCP sessions");
     }
     
     /**

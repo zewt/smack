@@ -546,7 +546,7 @@ public class XMPPConnection extends Connection {
         }
     }
 
-    public void recoverConnection() throws XMPPException {
+    public void recoverConnection() {
         assertNotLocked();
         assertConnectCalled();
         
@@ -577,12 +577,20 @@ public class XMPPConnection extends Connection {
             handleError(error);
         }
         
-        public void onRecoverableError(XMPPException error, int errorCount) {
+        public void onRecoverableError(XMPPException error) {
             assertNotLocked();
             assertConnectCalled();
             
             for (ConnectionListener listener: getConnectionListeners())
-                listener.connectionClosedRecoverably(error, errorCount);
+                listener.connectionClosedRecoverably(error);
+        }
+        
+        public void onRecovered() {
+            assertNotLocked();
+            assertConnectCalled();
+            
+            for (ConnectionListener listener: getConnectionListeners())
+                listener.connectionRecovered();
         }
     };
     

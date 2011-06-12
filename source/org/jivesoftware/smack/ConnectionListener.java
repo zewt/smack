@@ -53,7 +53,13 @@ public class ConnectionListener {
      * for sending and {@link Connection#isConnected()} will return true.  If
      * recovery is not wanted, call {@link Connection#shutdown()}.
      */
-    public void connectionClosedRecoverably(Exception e, int errorCount) { }
+    public void connectionClosedRecoverably(Exception e) { }
+    
+    /**
+     * Due to an earlier call to {@link Connection#recoverConnection()}, the connection has been
+     * successfully recovered. 
+     */
+    public void connectionRecovered() { }
     
     /**
      * The connection will retry to reconnect in the specified number of seconds.

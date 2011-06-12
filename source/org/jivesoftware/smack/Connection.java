@@ -293,25 +293,26 @@ public abstract class Connection {
     public abstract void connect() throws XMPPException;
 
     /**
-     * Attempt to recover from a disconnection.
+     * Attempt to recover the connection.
      * <p>
-     * This is called after a {@link ConnectionListener#connectionClosedRecoverably} callback
-     * is received to recover the connection.  This is only used for BOSH, which allows
-     * fast, transparent reconnection.
+     * This is called to recover the connection after a {@link ConnectionListener#connectionClosedRecoverably}
+     * callback is received.  This is only useful for BOSH, which allows transparent reconnection.
      * <p>
-     * If the connection can not be recovered because connectionClosedRecoverably was not
-     * received, or because {@link #shutdown} has been called, XMPPException is thrown.
+     * This may be called at any time, to force the connection to be closed and reestablished.  This
+     * may be used to reassert the connection after a network connectivity change, without waiting
+     * for connections to time out.
      * <p>
-     * Otherwise, a recovery attempt is made.  On success, returns normally.  If a recovery
-     * error occurs, but further recovery attempts are possible,
-     * {@link ConnectionListener#connectionClosedRecoverably} is called again and this function
-     * returns normally.
+     * If the connection is already established or has been closed with a call to {@link #shutdown},
+     * does nothing.
      * <p>
-     * If a fatal recovery error occurs, throws XMPPException.  This can happen if the server
-     * no longer has a record of the existing connection, or if the server is no longer valid
-     * for the service.  A new connection must be established.
+     * Otherwise, returns immediately and a recovery attempt is made asynchronously.  On
+     * completion, {@link PacketCallback#onRecovered}, {@link PacketCallback#onError} or
+     * {@link PacketCallback#onRecoverableError} will be called.
+     * <p>
+     * If {@link #shutdown} is called while a recovery attempt is in progress, the callback
+     * may not be invoked.
      */
-    public abstract void recoverConnection() throws XMPPException;
+    public abstract void recoverConnection();
     
     /**
      * Logs in to the server using the strongest authentication mode supported by

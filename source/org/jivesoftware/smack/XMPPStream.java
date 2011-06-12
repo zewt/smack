@@ -89,9 +89,11 @@ public abstract class XMPPStream
         public abstract void onError(XMPPException error);
 
         /** onRecoverableError is called when the connection is lost, but can be
-         *  recovered.  errorCount is the number of consecutive recoverable errors,
-         *  increasing after each failed call to reconnect(). */
-        public abstract void onRecoverableError(XMPPException error, int errorCount);
+         *  recovered. */
+        public abstract void onRecoverableError(XMPPException error);
+        
+        /** A recovery attempt started with recoverConnection has completed successfully. */
+        public abstract void onRecovered();
     };
 
     /**
@@ -101,17 +103,16 @@ public abstract class XMPPStream
      * If the connection is already established, or if a recovery attempt is already in progress,
      * does nothing.
      * <p>
-     * Throws XMPPException if the connection can not be recovered: if onRecoverableError has not
-     * been called, or if {@link disconnect} has been called.
+     * Otherwise, begins an asynchronous recovery attempt.  One of {@link PacketCallback#onRecovered},
+     * {@link PacketCallback#onError} or {@link PacketCallback#onRecoverableError} will be called
+     * when the recovery attempt completes.
      * <p>
-     * Otherwise, the recovery process begins asynchronously and the connection is considered
-     * reconnected.  If connection recovery fails, onRecoverableError will be called again
-     * with the errorCount parameter increased by one.
-     * <p>
-     *  
-     * need to set the connection status back to CONNECTED; receiving a packet isn't explicit enough
+     * This may only be called after onRecoverableError has been called at least once; otherwise
+     * a RuntimeException may be thrown.  However, once a transport has indicated its support for
+     * recovery by calling onRecoverableError, this may be called at any time.  If the connection
+     * is shut down or already connected, this does nothing.
      */
-    public abstract void recoverConnection() throws XMPPException;
+    public abstract void recoverConnection();
 
     /**
      * Returns the current connection ID, or null if the connection hasn't

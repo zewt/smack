@@ -98,14 +98,9 @@ public class XMPPStreamBOSH extends XMPPStream
     String authID;
     public String getConnectionID() { return authID; }
 
-    /** The number of reconnection attempts that have been made since the last successful
-     *  reconnection. */
-    private int reconnectionAttempts;
-    
-    /** If true, a recoverConnection call is waiting for a recovery attempt to complete.
-     *  {@link #cond} must be signalled when this changes from true to false. */
-    private boolean recoveryInProgress = false;
-    
+    /** The thread performing connection recovery, if any. */
+    private RecoveryTask recoveryTask = null;
+
     public void setReadWriteEvents(ObservableReader.ReadEvent readEvent, ObservableWriter.WriteEvent writeEvent) {
         this.writeEvent = writeEvent;
         this.readEvent = readEvent;
@@ -154,17 +149,6 @@ public class XMPPStreamBOSH extends XMPPStream
         try {
             if(bosh_client != null)
                 throw new RuntimeException("The connection has already been initialized");
-
-            return getConnectDataInternal();
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    public ConnectDataBOSH getConnectDataInternal() throws XMPPException {
-        assertLocked();
-
-        try {
             if(this.uri == null)
                 throw new XMPPException("BOSH is disabled");
             if(connectionClosed)
@@ -212,6 +196,7 @@ public class XMPPStreamBOSH extends XMPPStream
 
             return data;
         } finally {
+            lock.unlock();
         }
     }
 
@@ -429,9 +414,12 @@ public class XMPPStreamBOSH extends XMPPStream
             }
         }
 
-        public void onRecoverableError(XMPPException error, int errorCount) {
+        public void onRecoverableError(XMPPException error) {
             onError(error);
         }
+
+        // Connections are never recovered while still being set up.
+        public void onRecovered() { throw new RuntimeException(); }
 
         /** Wait until stream negotiation is complete. */
         public void waitForCompletion() throws XMPPException {
@@ -527,6 +515,7 @@ public class XMPPStreamBOSH extends XMPPStream
         assertNotLocked();
 
         BOSHClient boshClientCopy;
+        RecoveryTask recoveryTaskRef;
         lock.lock();
 
         try {
@@ -537,17 +526,16 @@ public class XMPPStreamBOSH extends XMPPStream
             }
 
             boshClientCopy = bosh_client;
+            recoveryTaskRef = recoveryTask;
 
             // Set connectionClosed now, so if ResponseListener is waiting for callbacks, it'll
             // stop waiting.  Otherwise, boshClientCopy.close() won't be able to join its thread.
             // This also needs to be set for ConnectionListener.connectionEvent to know that the
             // disconnection event is expected.
             connectionClosed = true;
-            cond.signalAll();
 
-            // If a recoverConnection() call is in progress, it will stop now. Wait for it to return.
-            while(recoveryInProgress)
-                ThreadUtil.uninterruptibleWait(cond);
+            // Signal the connectionClosed change.
+            cond.signalAll();
         } finally {
             lock.unlock();
         }
@@ -557,13 +545,8 @@ public class XMPPStreamBOSH extends XMPPStream
         if(boshClientCopy != null)
             boshClientCopy.close();
 
-        /* Signal connectionClosed again, now that we've actually closed the connection. */
-        lock.lock();
-        try {
-            cond.signalAll();
-        } finally {
-            lock.unlock();
-        }
+        if(recoveryTaskRef != null)
+            recoveryTaskRef.cancel();
     }
 
     /**
@@ -617,76 +600,171 @@ public class XMPPStreamBOSH extends XMPPStream
         return builder;
     }
 
-    public void recoverConnection() throws XMPPException {
-        assertNotLocked();
-        PacketCallback currentCallback = getCallbacks();
-        if(currentCallback == null)
-            throw new IllegalStateException("Callbacks are not set");
+    private static class TemporaryRecoveryFailure extends Exception {
+        XMPPException cause;
+        TemporaryRecoveryFailure(XMPPException cause) { this.cause = cause; } 
+    }
 
-        lock.lock();
-        try {
-            if(bosh_client == null)
-                throw new IllegalStateException("Connection not initialized");
-            // Don't run recoverConnection multiple times in separate threads.
-            if(recoveryInProgress)
-                throw new XMPPException("Connection recovery is already in process");
-            if(connectionClosed)
-                return;
+    /**
+     * Asynchronously attempt to recover the connection.
+     */
+    static class RecoveryTask {
+        private final BOSHClient client;
+        private final ConnectionConfiguration config;
+        private final URI wantedUri;
+        private final PacketCallback callbacks;
+        private final ReentrantLock lock = new ReentrantLock();
+        private XMPPStreamBOSH lookupStream;
+        private Thread thread;
+        private boolean cancelled = false;
 
-            recoveryInProgress = true;
-            try {
-                ++reconnectionAttempts;
+        RecoveryTask(BOSHClient client, ConnectionConfiguration config, URI wantedUri, PacketCallback callbacks) {
+            this.client = client;
+            this.config = config;
+            this.wantedUri = wantedUri;
+            this.callbacks = callbacks;
+
+            if(callbacks == null)
+                throw new IllegalStateException("Callbacks must be set");
+
+            thread = config.getThreadFactory().newThread(task);
+            thread.setName("Reconnection");
+        }
+
+        private Runnable task = new Runnable() {
+            public void run() {
+                assertNotLocked();
     
-                ConnectDataBOSH data;
                 try {
-                    data = getConnectDataInternal();
+                    reconnect();
+                } catch(TemporaryRecoveryFailure e) {
+                    callbacks.onRecoverableError(e.cause);
                 } catch(XMPPException e) {
-                    // Autodiscovery itself failing is a recoverable error; it usually means that the
-                    // network connection is offline.  Dispatch an onRecoverableError.
-                    dispatchErrorCallback(currentCallback, e, true); 
-                    return;
+                    callbacks.onError(e);
                 }
+            }
+        };
+
+        public void start() {
+            thread.start();
+        }
+
+        public void cancel() {
+            assertNotLocked();
+
+            lock.lock();
+            try {
+                // Stop reconnect() from creating lookupStream.
+                cancelled = true;
                 
+                // If reconnect() has already created lookupStream, cancel it.
+                if(lookupStream != null)
+                    lookupStream.disconnect();
+                
+                // The remainder of reconnect() is nonblocking.
+            } finally {
+                lock.unlock();
+            }
+            
+            // If we're being called from within the thread, then we're underneith
+            // the onError or onRecoverableError callback, in which case we're about
+            // to exit anyway.
+            if(Thread.currentThread() != thread)
+                ThreadUtil.uninterruptibleJoin(thread);
+        }
+
+        private void reconnect() throws XMPPException, TemporaryRecoveryFailure {
+            assertNotLocked();
+            lock.lock();
+            try {
+                // If cancel() was already called, stop.
+                if(cancelled)
+                    throw new XMPPException("Connection recovery cancelled");
+
+                // Create a slave stream to rerun discovery.
+                lookupStream = new XMPPStreamBOSH(config);
+            } finally {
+                lock.unlock();
+            }
+
+            // Run the lookup unlocked, so it can be cancelled.
+            ConnectDataBOSH data;
+            try {
+                data = lookupStream.getConnectData();
+            } catch(XMPPException e) {
+                // Autodiscovery itself failing is a recoverable error; it usually means that the
+                // network connection is offline.  Dispatch an onRecoverableError.
+                throw new TemporaryRecoveryFailure(e);
+            } finally {
+                lookupStream.disconnect();
+                lookupStream = null;
+            }
+
+            lock.lock();
+            try {
                 // If the URI we were connected to is no longer in the URI list, then it's been removed
                 // from TXT.  Raise a fatal error so reconnection starts over from scratch.
                 boolean hostFound = false;
                 for(URI uri: data.addresses) {
-                    if(uri.equals(XMPPStreamBOSH.this.uri))
+                    if(uri.equals(wantedUri))
                         hostFound = true;
                 }
 
-                // getConnectDataInternal temporarily unlocked; recheck whether disconnect() has been called.
-                if(connectionClosed)
-                    return;
-                
-                if(!hostFound) {
-                    throw new XMPPException("BOSH URI " + XMPPStreamBOSH.this.uri.toString() + " is no longer in discovered service list");
-                }
-                
+                if(!hostFound)
+                    throw new XMPPException("BOSH URI " + wantedUri + " is no longer in discovered service list");
+
                 // Begin BOSH reconnection.  This call returns immediately.  Success is indicated when
                 // we receive another packet from the server; failure if onError/onRecoverableError is
                 // called again.
                 try {
-                    if(!bosh_client.attemptReconnection()) {
+                    if(!client.attemptReconnection()) {
                         // The connection is already established, and no reconnection attempt was
                         // needed.
-                        recoveryInProgress = false;
-                        cond.signalAll();
                         return;
                     }
                 } catch(BOSHException e) {
-                    // The connection is disconnected unrecoverably.
+                    // The reconnection failed unrecoverably.
                     throw new XMPPException(e);
                 }
-            } catch(XMPPException e) {            
-                recoveryInProgress = false;
-                cond.signalAll();
-                throw e;
+            } finally {
+                lock.unlock();
+            }
+        }
+        
+        private void assertNotLocked() {
+            if(lock.isHeldByCurrentThread())
+                throw new RuntimeException("Lock should not be held");
+        }
+    };
+
+    public void recoverConnection() {
+        assertNotLocked();
+        lock.lock();
+        try {
+            if(bosh_client == null)
+                throw new IllegalStateException("Connection not initialized");
+            if(connectionClosed)
+                return;
+
+            // If the recovery task is already in progress, stop it and recreate it.
+            RecoveryTask recoveryTaskRef = recoveryTask;
+            recoveryTask = null;
+
+            lock.unlock();
+            try {
+                if(recoveryTaskRef != null)
+                    recoveryTaskRef.cancel();
+            } finally {
+                lock.lock();
             }
 
-            // Wait for a packet, error or shutdown.  
-            while(!connectionClosed && recoveryInProgress)
-                ThreadUtil.uninterruptibleWait(cond);
+            // Check if disconnect() was called while we were unlocked.
+            if(connectionClosed)
+                return;
+
+            // Begin recovery.
+            recoveryTask = new RecoveryTask(bosh_client, config, this.uri, callback);
+            recoveryTask.start();
         } finally {
             lock.unlock();
         }
@@ -700,16 +778,15 @@ public class XMPPStreamBOSH extends XMPPStream
 
         lock.lock();
         try {
-            if(!recoveryInProgress)
+            // Be sure to only call onRecovered if a reconnection attempt was actually taking place.
+            if(recoveryTask == null)
                 return;
-
-            // Reset the reconnection counter and wake up recoverConnection() when we receive a packet.
-            reconnectionAttempts = 0;
-            recoveryInProgress = false;
-            cond.signalAll();
         } finally {
             lock.unlock();
         }
+
+        // 
+        cb.onRecovered();
     }
 
     private class ResponseListener implements BOSHClientResponseListener
@@ -721,8 +798,6 @@ public class XMPPStreamBOSH extends XMPPStream
             PacketCallback currentCallback = getCallbacks();
             if(currentCallback == null)
                 return;
-
-            checkForRecovery(currentCallback);
 
             AbstractBody body = event.getBody();
 
@@ -744,6 +819,8 @@ public class XMPPStreamBOSH extends XMPPStream
                 dispatchErrorCallback(currentCallback, new XMPPException("Error reading packet", e), false);
                 return;
             }
+
+            checkForRecovery(currentCallback);
 
             if(currentCallback instanceof SetupPacketCallback) {
                 SetupPacketCallback setupCallbacks = (SetupPacketCallback) currentCallback;
@@ -777,19 +854,8 @@ public class XMPPStreamBOSH extends XMPPStream
     private void dispatchErrorCallback(PacketCallback currentCallback, XMPPException e, boolean recoverable) {
         assertNotLocked();
 
-        lock.lock();
-        try {
-            if(recoveryInProgress) {
-                // Wake up recoverConnection() on error.
-                recoveryInProgress = false;
-                cond.signalAll();
-            }
-        } finally {
-            lock.unlock();
-        }
-
         if(recoverable)
-            currentCallback.onRecoverableError(e, reconnectionAttempts);
+            currentCallback.onRecoverableError(e);
         else
             currentCallback.onError(e);
     }
