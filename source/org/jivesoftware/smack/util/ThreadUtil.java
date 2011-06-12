@@ -33,6 +33,9 @@ public class ThreadUtil {
      * @param thread The thread to join.
      */
     static public void uninterruptibleJoin(Thread thread) {
+        if(Thread.currentThread() == thread)
+            throw new RuntimeException("Can't join a thread from within itself");
+
         boolean interrupted = false;
         while(true) {
             try {
