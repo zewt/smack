@@ -24,9 +24,6 @@ import org.jivesoftware.smack.packet.StreamError;
 import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.packet.XMPPError.Condition;
 
-import java.io.PrintStream;
-import java.io.PrintWriter;
-
 /**
  * A generic exception that is thrown when an error occurs performing an
  * XMPP operation. XMPP servers can respond to error conditions with an error code
@@ -176,36 +173,6 @@ public class XMPPException extends Exception {
      */
     public StreamError getStreamError() {
         return streamError;
-    }
-
-    /**
-     * Returns the Throwable asscociated with this exception, or <tt>null</tt> if there
-     * isn't one.
-     *
-     * @return the Throwable asscociated with this exception.
-     */
-    public Throwable getWrappedThrowable() {
-        return getCause();
-    }
-
-    public void printStackTrace() {
-        printStackTrace(System.err);
-    }
-
-    public void printStackTrace(PrintStream out) {
-        super.printStackTrace(out);
-        if (getCause() != null) {
-            out.println("Nested Exception: ");
-            getCause().printStackTrace(out);
-        }
-    }
-
-    public void printStackTrace(PrintWriter out) {
-        super.printStackTrace(out);
-        if (getCause() != null) {
-            out.println("Nested Exception: ");
-            getCause().printStackTrace(out);
-        }
     }
 
     public String getMessage() {
