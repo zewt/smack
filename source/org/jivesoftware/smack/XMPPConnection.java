@@ -540,9 +540,9 @@ public class XMPPConnection extends Connection {
             collector.connectionLost();
     }
     
-    // XXX cleanup
     class ConnectionPacketCallbacks extends PacketCallback {
         public void onPacket(Element packet) {
+            assertNotLocked();
             packetReader.parsePacket(packet);
         }
 
