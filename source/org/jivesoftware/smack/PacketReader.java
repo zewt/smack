@@ -128,6 +128,8 @@ class PacketReader {
                 // Deliver the received packet to listeners.
                 listenerExecutor.submit(new ListenerNotification(receivedPacket));
             }
+        } catch (RuntimeException e) {
+            throw e;
         } catch (XMPPException e) {
             connection.handleError(e);
         } catch (Exception e) {
