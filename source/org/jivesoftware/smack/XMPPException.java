@@ -177,31 +177,35 @@ public class XMPPException extends Exception {
 
     public String getMessage() {
         String msg = super.getMessage();
+        if(msg != null)
+            return msg;
+
         // If the message was not set, but there is an XMPPError, return the
         // XMPPError as the message.
-        if (msg == null && error != null) {
+        if (error != null)
             return error.toString();
-        }
-        else if (msg == null && streamError != null) {
+
+        if (streamError != null)
             return streamError.toString();
-        }
-        return msg;
+
+        return null;
     }
 
     public String toString() {
         StringBuilder buf = new StringBuilder();
         String message = super.getMessage();
         if (message != null) {
-            buf.append(message).append(": ");
+            buf.append(message);
         }
         if (error != null) {
+            if(buf.length() > 0)
+                buf.append(": ");
             buf.append(error);
         }
         if (streamError != null) {
+            if(buf.length() > 0)
+                buf.append(": ");
             buf.append(streamError);
-        }
-        if (getCause() != null) {
-            buf.append("\n  -- caused by: ").append(getCause());
         }
 
         return buf.toString();
