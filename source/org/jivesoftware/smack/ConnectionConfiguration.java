@@ -23,6 +23,7 @@ package org.jivesoftware.smack;
 import java.net.URI;
 import java.security.KeyStore;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
 
 import org.apache.harmony.javax.security.auth.callback.CallbackHandler;
 import org.jivesoftware.smack.proxy.ProxyInfo;
@@ -90,6 +91,8 @@ public class ConnectionConfiguration implements Cloneable {
 
     private ScheduledExecutorService executorService;
 
+    private ThreadFactory threadFactory;
+    
     /**
      * Creates a new ConnectionConfiguration for the specified service name.
      * A DNS SRV lookup will be performed to find out the actual host address
@@ -657,5 +660,26 @@ public class ConnectionConfiguration implements Cloneable {
     
     public void setExecutorService(ScheduledExecutorService executorService) {
         this.executorService = executorService;
+    }
+    
+    static final ThreadFactory DEFAULT_THREAD_FACTORY = new ThreadFactory() {
+        public Thread newThread(Runnable runnable) { return new Thread(runnable); }
+    };
+    
+    public ThreadFactory getThreadFactory() {
+        if(threadFactory == null)
+            return DEFAULT_THREAD_FACTORY;
+        else
+            return threadFactory;
+    }
+
+    /**
+     * Set the thread factory for short-lived worker threads.
+     * <p>
+     * This is only used for threads that should keep the system awake; background threads
+     * are created normally.
+     */
+    public void setThreadFactory(ThreadFactory threadFactory) {
+        this.threadFactory = threadFactory;
     }
 }
