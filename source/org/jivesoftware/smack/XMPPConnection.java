@@ -384,8 +384,7 @@ public class XMPPConnection extends Connection {
         // packet.  This will always happen without blocking (as this packet was already received),
         // so we don't need to allow for disconnection while we wait.
         //
-        // readerThreadException will not be called before we set setPacketCallbacks, since
-        // the reader thread won't receive any callbacks.
+        // handleError will not be called before we set setPacketCallbacks.
         PacketCollector<ReceivedPacket> coll =
             this.createPacketCollector(new ReceivedPacketFilter("features", "http://etherx.jabber.org/streams"),
                 ReceivedPacket.class);
@@ -509,13 +508,15 @@ public class XMPPConnection extends Connection {
             }
         }
     }
+    
+    public void recoverConnection() {
+        assertNotLocked();
+        assertConnectCalled();
+        
+        data_stream.recoverConnection();
+    }
 
-    /**
-     * Called by PacketReader when an error occurs after startup() returns successfully.
-     *
-     * @param error the exception that caused the connection close event.
-     */
-    protected void readerThreadException(XMPPException error) {
+    void handleError(XMPPException error) {
         assertNotLocked();
         assertConnectCalled();
 
@@ -544,19 +545,7 @@ public class XMPPConnection extends Connection {
 
             notifyConnectionClosedOnError(error);
         }
-    }
-
-    public void recoverConnection() {
-        assertNotLocked();
-        assertConnectCalled();
         
-        data_stream.recoverConnection();
-    }
-
-    void handleError(XMPPException e) {
-        // XXX rename/merge
-        readerThreadException(e);
-
         // Wake up any thread waiting for a packet collector, so they notice
         // that we're disconnected.  This must be done after notifying connection,
         // so connection.isConnected returns false.
