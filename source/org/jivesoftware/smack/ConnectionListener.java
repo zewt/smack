@@ -53,7 +53,7 @@ public class ConnectionListener {
      * for sending and {@link Connection#isConnected()} will return true.  If
      * recovery is not wanted, call {@link Connection#shutdown()}.
      */
-    public void connectionClosedRecoverably(Exception e) { }
+    public void connectionClosedRecoverably(XMPPException e) { }
     
     /**
      * Due to an earlier call to {@link Connection#recoverConnection()}, the connection has been
