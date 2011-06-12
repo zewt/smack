@@ -259,12 +259,8 @@ public class XMPPStreamTCP extends XMPPStream
 
             initialLookup = null;
 
-            if(data.addresses == null) {
-                // Set remote_server_not_found, so connectUsingConfiguration knows to stop trying
-                // this transport.  If we don't do this, it'll treat it as a per-server error and
-                // try again with a higher index.
-                throw new XMPPException("Connection cancelled", XMPPError.Condition.remote_server_not_found);
-            }
+            if(data.addresses == null)
+                throw new XMPPException("Connection cancelled");
 
             return data;
         } finally {
