@@ -62,7 +62,7 @@ public class PacketParserUtils {
      * @return a Message packet.
      * @throws Exception if an exception occurs while parsing the packet.
      */
-    public static Packet parseMessage(Element packet) throws Exception {
+    public static Message parseMessage(Element packet) throws Exception {
         Message message = new Message();
         String id = packet.getAttribute("id");
         message.setPacketID(id.equals("")? Packet.ID_NOT_AVAILABLE : id);
