@@ -22,6 +22,8 @@ package org.jivesoftware.smack.packet;
 
 import org.jivesoftware.smack.util.StringUtils;
 
+import org.w3c.dom.Element;
+
 import java.io.ByteArrayOutputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -64,6 +66,12 @@ public abstract class Packet {
      * forum a unique ID.
      */
     private static long id = 0;
+
+    /**
+     * If this is a packet received from the server, this stores the original XML
+     * representation of this packet.
+     */
+    private Element element;
 
     private String xmlns = DEFAULT_XML_NS;
 
@@ -316,6 +324,18 @@ public abstract class Packet {
             return Collections.emptySet();
         }
         return Collections.unmodifiableSet(new HashSet<String>(properties.keySet()));
+    }
+
+    /** Save the original XML data. */
+    // ... but when we get it from the low level, it's already parsed
+    public void setElement(Element element) {
+        this.element = element;
+    }
+
+    /** Retrieve the original XML data of this packet, or {@code null} if this is
+     *  a locally-generated packet. */
+    public Element getElement() { // XXX rename to getElement, merge with ReceivedPacket
+        return element;
     }
 
     /**

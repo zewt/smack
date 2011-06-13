@@ -17,7 +17,6 @@
 package org.jivesoftware.smack.filter;
 
 import org.jivesoftware.smack.packet.Packet;
-import org.jivesoftware.smack.packet.ReceivedPacket;
 import org.w3c.dom.Element;
 
 /**
@@ -42,14 +41,9 @@ public class ReceivedPacketFilter implements PacketFilter {
     }
 
     public boolean accept(Packet packet) {
-        if (!(packet instanceof ReceivedPacket)) {
-            return false;
-        }
-        ReceivedPacket receivedPacket = (ReceivedPacket) packet;
-        Element root = receivedPacket.getElement();
+        Element root = packet.getElement();
         if(localName != null && !root.getLocalName().equals(localName))
             return false;
         return root.getNamespaceURI().equals(namespaceURI);
     }
-
 }

@@ -105,8 +105,10 @@ class PacketReader {
                 throw new XMPPException(PacketParserUtils.parseStreamError(packet));
             } else {
                 // Treat any unknown packet types generically.
-                receivedPacket = new ReceivedPacket(packet);
+                receivedPacket = new ReceivedPacket();
             }
+
+            receivedPacket.setElement(packet);
 
             for (ListenerWrapper listenerWrapper : connection.recvListeners.values()) {
                 if(listenerWrapper.isSynchronous())

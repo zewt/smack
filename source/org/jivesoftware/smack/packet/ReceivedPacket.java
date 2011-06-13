@@ -23,23 +23,6 @@ import org.w3c.dom.Element;
  * for.  These packets are only received from the server, and never sent by us.
  */
 public class ReceivedPacket extends Packet {
-    private final Element element;
-
-    public ReceivedPacket(Element element) {
-        super();
-        if (element == null)
-            throw new IllegalArgumentException();
-        this.element = element;
-    }
-
-    /**
-     * If this is a packet received from the server (and not a constructed packet
-     * about to be sent), retrieve the DOM element representation of this packet.
-     */
-    public Element getElement() {
-        return element;
-    }
-
     /* Features is only received and never sent, so we don't support converting
      * to XML.  Throws RuntimeException. */
     public String toXML() {
