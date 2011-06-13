@@ -275,10 +275,6 @@ public class PacketParserUtils {
                         XmlPullParser parser = new XmlPullParserDom(child, true);
                         iqPacket = ((IQProvider)provider).parseIQ(parser);
                     }
-                    else if (provider instanceof Class) {
-                        iqPacket = (IQ)PacketParserUtils.parseWithIntrospection(elementName,
-                                (Class)provider, child);
-                    }
                 }
             }
         }
@@ -707,10 +703,6 @@ public class PacketParserUtils {
             if (provider instanceof PacketExtensionProvider) {
                 return ((PacketExtensionProvider)provider).parseExtension(parser);
             }
-            else if (provider instanceof Class) {
-                return (PacketExtension)parseWithIntrospection(
-                        elementName, (Class)provider, parser);
-            }
         }
         // No providers registered, so use a default extension.
         DefaultPacketExtension extension = new DefaultPacketExtension(elementName, namespace);
@@ -751,9 +743,6 @@ public class PacketParserUtils {
                 XmlPullParser parser = new XmlPullParserDom(packet, true);
                 return ((PacketExtensionProvider)provider).parseExtension(parser);
             }
-            else if (provider instanceof Class) {
-                return (PacketExtension)parseWithIntrospection(elementName, (Class)provider, packet);
-            }
         }
 
         // No providers registered, so use a default extension.
@@ -767,86 +756,5 @@ public class PacketParserUtils {
 
     private static String getLanguageAttribute(Element parser) {
         return parser.getAttributeNS("http://www.w3.org/XML/1998/namespace", "lang").trim();
-    }
-
-    public static Object parseWithIntrospection(String elementName,
-            Class objectClass, XmlPullParser parser) throws Exception
-    {
-        boolean done = false;
-        Object object = objectClass.newInstance();
-        while (!done) {
-            int eventType = parser.next();
-            if (eventType == XmlPullParser.START_TAG) {
-                String name = parser.getName();
-                String stringValue = parser.nextText();
-                Class propertyType = object.getClass().getMethod(
-                    "get" + Character.toUpperCase(name.charAt(0)) + name.substring(1)).getReturnType();
-                // Get the value of the property by converting it from a
-                // String to the correct object type.
-                Object value = decode(propertyType, stringValue);
-                // Set the value of the bean.
-                object.getClass().getMethod("set" + Character.toUpperCase(name.charAt(0)) + name.substring(1), propertyType)
-                .invoke(object, value);
-            }
-            else if (eventType == XmlPullParser.END_TAG) {
-                if (parser.getName().equals(elementName)) {
-                    done = true;
-                }
-            }
-        }
-        return object;
-    }
-
-    public static Object parseWithIntrospection(String elementName,
-            Class objectClass, Element packet) throws Exception
-    {
-        Object object = objectClass.newInstance();
-        for(Element child: XmlUtil.getChildElements(packet)) {
-            String name = packet.getLocalName();
-            String stringValue = XmlUtil.getTextContent(packet);
-            Class propertyType = object.getClass().getMethod(
-                "get" + Character.toUpperCase(name.charAt(0)) + name.substring(1)).getReturnType();
-            // Get the value of the property by converting it from a
-            // String to the correct object type.
-            Object value = decode(propertyType, stringValue);
-            // Set the value of the bean.
-            object.getClass().getMethod("set" + Character.toUpperCase(name.charAt(0)) + name.substring(1), propertyType)
-                .invoke(object, value);
-        }
-        return object;
-    }
-
-    /**
-     * Decodes a String into an object of the specified type. If the object
-     * type is not supported, null will be returned.
-     *
-     * @param type the type of the property.
-     * @param value the encode String value to decode.
-     * @return the String value decoded into the specified type.
-     * @throws Exception If decoding failed due to an error.
-     */
-    private static Object decode(Class type, String value) throws Exception {
-        if (type.getName().equals("java.lang.String")) {
-            return value;
-        }
-        if (type.getName().equals("boolean")) {
-            return Boolean.valueOf(value);
-        }
-        if (type.getName().equals("int")) {
-            return Integer.valueOf(value);
-        }
-        if (type.getName().equals("long")) {
-            return Long.valueOf(value);
-        }
-        if (type.getName().equals("float")) {
-            return Float.valueOf(value);
-        }
-        if (type.getName().equals("double")) {
-            return Double.valueOf(value);
-        }
-        if (type.getName().equals("java.lang.Class")) {
-            return Class.forName(value);
-        }
-        return null;
     }
 }
