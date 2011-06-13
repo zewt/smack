@@ -32,7 +32,6 @@ import org.jivesoftware.smack.packet.ReceivedPacket;
 import org.jivesoftware.smack.util.PacketParserUtils;
 import org.jivesoftware.smack.util.XmlPullParserDom;
 import org.w3c.dom.Element;
-import org.xmlpull.v1.XmlPullParser;
 
 /**
  * Listens for XML traffic from the XMPP server and parses it into packet objects.
@@ -92,26 +91,17 @@ class PacketReader {
      */
     void parsePacket(Element packet) {
         try {
-            /* Convert the stanza to an XmlPullParser. */
-            XmlPullParser parser = new XmlPullParserDom(packet, true);
-
-            if(parser.getEventType() == XmlPullParser.START_DOCUMENT)
-                parser.next();
-            
-            if(parser.getEventType() != XmlPullParser.START_TAG)
-                return;
-
             Packet receivedPacket;
-            if (parser.getName().equals("message")) {
+            if (packet.getLocalName().equals("message")) {
                 receivedPacket = PacketParserUtils.parseMessage(packet);
             }
-            else if (parser.getName().equals("iq")) {
+            else if (packet.getLocalName().equals("iq")) {
                 receivedPacket = PacketParserUtils.parseIQ(packet, connection);
             }
-            else if (parser.getName().equals("presence")) {
+            else if (packet.getLocalName().equals("presence")) {
                 receivedPacket = PacketParserUtils.parsePresence(packet);
             }
-            else if (parser.getName().equals("error")) {
+            else if (packet.getLocalName().equals("error")) {
                 throw new XMPPException(PacketParserUtils.parseStreamError(packet));
             } else {
                 // Treat any unknown packet types generically.
