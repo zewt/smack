@@ -98,37 +98,37 @@ class PacketReader {
             if(parser.getEventType() == XmlPullParser.START_DOCUMENT)
                 parser.next();
             
-                if(parser.getEventType() != XmlPullParser.START_TAG)
-                    return;
+            if(parser.getEventType() != XmlPullParser.START_TAG)
+                return;
 
-                Packet receivedPacket;
-                if (parser.getName().equals("message")) {
-                    receivedPacket = PacketParserUtils.parseMessage(parser);
-                }
-                else if (parser.getName().equals("iq")) {
-                    receivedPacket = PacketParserUtils.parseIQ(parser, connection);
-                }
-                else if (parser.getName().equals("presence")) {
-                    receivedPacket = PacketParserUtils.parsePresence(parser);
-                }
-                else if (parser.getName().equals("error")) {
-                    throw new XMPPException(PacketParserUtils.parseStreamError(parser));
-                } else {
-                    // Treat any unknown packet types generically.
-                    receivedPacket = new ReceivedPacket(packet);
-                }
+            Packet receivedPacket;
+            if (parser.getName().equals("message")) {
+                receivedPacket = PacketParserUtils.parseMessage(parser);
+            }
+            else if (parser.getName().equals("iq")) {
+                receivedPacket = PacketParserUtils.parseIQ(parser, connection);
+            }
+            else if (parser.getName().equals("presence")) {
+                receivedPacket = PacketParserUtils.parsePresence(parser);
+            }
+            else if (parser.getName().equals("error")) {
+                throw new XMPPException(PacketParserUtils.parseStreamError(parser));
+            } else {
+                // Treat any unknown packet types generically.
+                receivedPacket = new ReceivedPacket(packet);
+            }
 
-                for (ListenerWrapper listenerWrapper : connection.recvListeners.values()) {
-                    if(listenerWrapper.isSynchronous())
-                        listenerWrapper.notifyListener(receivedPacket);
-                }
+            for (ListenerWrapper listenerWrapper : connection.recvListeners.values()) {
+                if(listenerWrapper.isSynchronous())
+                    listenerWrapper.notifyListener(receivedPacket);
+            }
 
-                // Loop through all collectors and notify the appropriate ones.
-                for (PacketCollector collector: connection.getPacketCollectors())
-                    collector.processPacket(receivedPacket);
+            // Loop through all collectors and notify the appropriate ones.
+            for (PacketCollector collector: connection.getPacketCollectors())
+                collector.processPacket(receivedPacket);
 
-                // Deliver the received packet to listeners.
-                listenerExecutor.submit(new ListenerNotification(receivedPacket));
+            // Deliver the received packet to listeners.
+            listenerExecutor.submit(new ListenerNotification(receivedPacket));
         } catch (RuntimeException e) {
             throw e;
         } catch (XMPPException e) {
