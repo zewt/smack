@@ -109,7 +109,7 @@ class PacketReader {
                 receivedPacket = PacketParserUtils.parseIQ(parser, connection);
             }
             else if (parser.getName().equals("presence")) {
-                receivedPacket = PacketParserUtils.parsePresence(parser);
+                receivedPacket = PacketParserUtils.parsePresence(packet);
             }
             else if (parser.getName().equals("error")) {
                 throw new XMPPException(PacketParserUtils.parseStreamError(parser));

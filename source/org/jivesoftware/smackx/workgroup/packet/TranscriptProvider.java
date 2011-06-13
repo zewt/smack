@@ -23,6 +23,8 @@ import org.jivesoftware.smack.provider.IQProvider;
 import org.jivesoftware.smack.packet.IQ;
 import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.util.PacketParserUtils;
+import org.jivesoftware.smack.util.XmlUtil;
+import org.w3c.dom.Element;
 import org.xmlpull.v1.XmlPullParser;
 
 import java.util.ArrayList;
@@ -51,7 +53,8 @@ public class TranscriptProvider implements IQProvider {
                     packets.add(PacketParserUtils.parseMessage(parser));
                 }
                 else if (parser.getName().equals("presence")) {
-                    packets.add(PacketParserUtils.parsePresence(parser));
+                    Element packet = XmlUtil.ReadNodeFromXmlPull(parser);
+                    packets.add(PacketParserUtils.parsePresence(packet));
                 }
             }
             else if (eventType == XmlPullParser.END_TAG) {
