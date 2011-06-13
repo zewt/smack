@@ -269,12 +269,10 @@ public class PacketParserUtils {
             // Otherwise, see if there is a registered provider for
             // this element name and namespace.
             else {
-                Object provider = ProviderManager.getInstance().getIQProvider(elementName, namespace);
+                IQProvider provider = ProviderManager.getInstance().getIQProvider(elementName, namespace);
                 if (provider != null) {
-                    if (provider instanceof IQProvider) {
-                        XmlPullParser parser = new XmlPullParserDom(child, true);
-                        iqPacket = ((IQProvider)provider).parseIQ(parser);
-                    }
+                    XmlPullParser parser = new XmlPullParserDom(child, true);
+                    iqPacket = provider.parseIQ(parser);
                 }
             }
         }
@@ -698,11 +696,9 @@ public class PacketParserUtils {
     public static PacketExtension parsePacketExtension(String elementName, String namespace, XmlPullParser parser) throws Exception
     {
         // See if a provider is registered to handle the extension.
-        Object provider = ProviderManager.getInstance().getExtensionProvider(elementName, namespace);
+        PacketExtensionProvider provider = ProviderManager.getInstance().getExtensionProvider(elementName, namespace);
         if (provider != null) {
-            if (provider instanceof PacketExtensionProvider) {
-                return ((PacketExtensionProvider)provider).parseExtension(parser);
-            }
+            return provider.parseExtension(parser);
         }
         // No providers registered, so use a default extension.
         DefaultPacketExtension extension = new DefaultPacketExtension(elementName, namespace);
@@ -737,12 +733,10 @@ public class PacketParserUtils {
     throws Exception
     {
         // See if a provider is registered to handle the extension.
-        Object provider = ProviderManager.getInstance().getExtensionProvider(elementName, namespace);
+        PacketExtensionProvider provider = ProviderManager.getInstance().getExtensionProvider(elementName, namespace);
         if (provider != null) {
-            if (provider instanceof PacketExtensionProvider) {
-                XmlPullParser parser = new XmlPullParserDom(packet, true);
-                return ((PacketExtensionProvider)provider).parseExtension(parser);
-            }
+            XmlPullParser parser = new XmlPullParserDom(packet, true);
+            return provider.parseExtension(parser);
         }
 
         // No providers registered, so use a default extension.

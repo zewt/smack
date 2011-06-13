@@ -129,8 +129,8 @@ public class ProviderManager {
 
     private static ProviderManager instance;
 
-    private Map<String, Object> extensionProviders = new ConcurrentHashMap<String, Object>();
-    private Map<String, Object> iqProviders = new ConcurrentHashMap<String, Object>();
+    private Map<String, PacketExtensionProvider> extensionProviders = new ConcurrentHashMap<String, PacketExtensionProvider>();
+    private Map<String, IQProvider> iqProviders = new ConcurrentHashMap<String, IQProvider>();
 
     /**
      * Returns the only ProviderManager valid instance.  Use {@link #setInstance(ProviderManager)}
@@ -173,11 +173,8 @@ public class ProviderManager {
         // itself, then we'll use reflection later to create instances of the class.
         try {
             // Add the provider to the map.
-            Class provider = Class.forName(className);
-            if (IQProvider.class.isAssignableFrom(provider))
-                iqProviders.put(key, provider.newInstance());
-            else if (IQ.class.isAssignableFrom(provider))
-                iqProviders.put(key, provider);
+            Class<IQProvider> provider = (Class<IQProvider>) Class.forName(className);
+            iqProviders.put(key, provider.newInstance());
         }
         catch (ClassNotFoundException e) {
             e.printStackTrace();
@@ -200,11 +197,8 @@ public class ProviderManager {
         // itself and then we'll use reflection later to create instances of the class.
         try {
             // Add the provider to the map.
-            Class provider = Class.forName(className);
-            if (PacketExtensionProvider.class.isAssignableFrom(provider))
-                extensionProviders.put(key, provider.newInstance());
-            else if (PacketExtension.class.isAssignableFrom(provider))
-                extensionProviders.put(key, provider);
+            Class<PacketExtensionProvider> provider = (Class<PacketExtensionProvider>) Class.forName(className);
+            extensionProviders.put(key, provider.newInstance());
         }
         catch (ClassNotFoundException e) {
             e.printStackTrace();
@@ -291,7 +285,7 @@ public class ProviderManager {
      * @param namespace the XML namespace.
      * @return the IQ provider.
      */
-    public Object getIQProvider(String elementName, String namespace) {
+    public IQProvider getIQProvider(String elementName, String namespace) {
         String key = getProviderKey(elementName, namespace);
         return iqProviders.get(key);
     }
@@ -303,7 +297,7 @@ public class ProviderManager {
      *
      * @return all IQProvider instances.
      */
-    public Collection<Object> getIQProviders() {
+    public Collection<IQProvider> getIQProviders() {
         return Collections.unmodifiableCollection(iqProviders.values());
     }
 
@@ -317,14 +311,8 @@ public class ProviderManager {
      * @param provider the IQ provider.
      */
     public void addIQProvider(String elementName, String namespace,
-            Object provider)
+            IQProvider provider)
     {
-        if (!(provider instanceof IQProvider || (provider instanceof Class &&
-                IQ.class.isAssignableFrom((Class)provider))))
-        {
-            throw new IllegalArgumentException("Provider must be an IQProvider " +
-                    "or a Class instance.");
-        }
         String key = getProviderKey(elementName, namespace);
         iqProviders.put(key, provider);
     }
@@ -361,7 +349,7 @@ public class ProviderManager {
      * @param namespace namespace associated with extension provider.
      * @return the extenion provider.
      */
-    public Object getExtensionProvider(String elementName, String namespace) {
+    public PacketExtensionProvider getExtensionProvider(String elementName, String namespace) {
         String key = getProviderKey(elementName, namespace);
         return extensionProviders.get(key);
     }
@@ -376,12 +364,8 @@ public class ProviderManager {
      * @param provider the extension provider.
      */
     public void addExtensionProvider(String elementName, String namespace,
-            Object provider)
+            PacketExtensionProvider provider)
     {
-        if (!(provider instanceof PacketExtensionProvider || provider instanceof Class)) {
-            throw new IllegalArgumentException("Provider must be a PacketExtensionProvider " +
-                    "or a Class instance.");
-        }
         String key = getProviderKey(elementName, namespace);
         extensionProviders.put(key, provider);
     }
@@ -406,7 +390,7 @@ public class ProviderManager {
      *
      * @return all PacketExtensionProvider instances.
      */
-    public Collection<Object> getExtensionProviders() {
+    public Collection<PacketExtensionProvider> getExtensionProviders() {
         return Collections.unmodifiableCollection(extensionProviders.values());
     }
 
