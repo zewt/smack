@@ -145,6 +145,9 @@ public class XMPPStreamBOSH extends XMPPStream
     public ConnectDataBOSH getConnectData() throws XMPPException {
         assertNotLocked();
 
+        if(!this.config.getBoshURI().equals(ConnectionConfiguration.AUTO_DETECT_BOSH))
+            return getDefaultConnectData();
+        
         lock.lock();
         try {
             if(bosh_client != null)
@@ -155,11 +158,6 @@ public class XMPPStreamBOSH extends XMPPStream
                 throw new XMPPException("Connection permanently closed");
 
             ConnectDataBOSH data = new ConnectDataBOSH();
-            if(this.uri == null)
-                return data;
-
-            if(!this.config.getBoshURI().equals(ConnectionConfiguration.AUTO_DETECT_BOSH))
-                return getDefaultConnectData();
 
             // This will return the same results each time, because the weight
             // shuffling is cached.
