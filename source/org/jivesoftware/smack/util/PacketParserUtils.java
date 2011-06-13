@@ -62,18 +62,18 @@ public class PacketParserUtils {
      * @return a Message packet.
      * @throws Exception if an exception occurs while parsing the packet.
      */
-    public static Packet parseMessage(XmlPullParser parser) throws Exception {
+    public static Packet parseMessage(Element packet) throws Exception {
         Message message = new Message();
-        String id = parser.getAttributeValue("", "id");
-        message.setPacketID(id == null ? Packet.ID_NOT_AVAILABLE : id);
-        message.setTo(parser.getAttributeValue("", "to"));
-        message.setFrom(parser.getAttributeValue("", "from"));
-        message.setType(Message.Type.fromString(parser.getAttributeValue("", "type")));
-        String language = getLanguageAttribute(parser);
+        String id = packet.getAttribute("id");
+        message.setPacketID(id.equals("")? Packet.ID_NOT_AVAILABLE : id);
+        message.setTo(packet.getAttribute("to"));
+        message.setFrom(packet.getAttribute("from"));
+        message.setType(Message.Type.fromString(packet.getAttribute("type")));
+        String language = getLanguageAttribute(packet);
         
         // determine message's default language
         String defaultLanguage = null;
-        if (language != null && !"".equals(language.trim())) {
+        if (!language.equals("")) {
             message.setLanguage(language);
             defaultLanguage = language;
         } 
@@ -84,61 +84,52 @@ public class PacketParserUtils {
         // Parse sub-elements. We include extra logic to make sure the values
         // are only read once. This is because it's possible for the names to appear
         // in arbitrary sub-elements.
-        boolean done = false;
         String thread = null;
         Map<String, Object> properties = null;
-        while (!done) {
-            int eventType = parser.next();
-            if (eventType == XmlPullParser.START_TAG) {
-                String elementName = parser.getName();
-                String namespace = parser.getNamespace();
-                if (elementName.equals("subject")) {
-                    String xmlLang = getLanguageAttribute(parser);
-                    if (xmlLang == null) {
-                        xmlLang = defaultLanguage;
-                    }
+        for(Element child: XmlUtil.getChildElements(packet)) {
+            String elementName = child.getLocalName();
+            String namespace = child.getNamespaceURI();
+            if (elementName.equals("subject")) {
+                String xmlLang = getLanguageAttribute(child);
+                if (xmlLang == null) {
+                    xmlLang = defaultLanguage;
+                }
 
-                    String subject = parseContent(parser);
+                String subject = XmlUtil.getTextContent(child);
 
-                    if (message.getSubject(xmlLang) == null) {
-                        message.addSubject(xmlLang, subject);
-                    }
-                }
-                else if (elementName.equals("body")) {
-                    String xmlLang = getLanguageAttribute(parser);
-                    if (xmlLang == null) {
-                        xmlLang = defaultLanguage;
-                    }
-
-                    String body = parseContent(parser);
-                    
-                    if (message.getBody(xmlLang) == null) {
-                        message.addBody(xmlLang, body);
-                    }
-                }
-                else if (elementName.equals("thread")) {
-                    if (thread == null) {
-                        thread = parser.nextText();
-                    }
-                }
-                else if (elementName.equals("error")) {
-                    message.setError(parseError(parser));
-                }
-                else if (elementName.equals("properties") &&
-                        namespace.equals(PROPERTIES_NAMESPACE))
-                {
-                    properties = parseProperties(parser);
-                }
-                // Otherwise, it must be a packet extension.
-                else {
-                    message.addExtension(
-                    PacketParserUtils.parsePacketExtension(elementName, namespace, parser));
+                if (message.getSubject(xmlLang) == null) {
+                    message.addSubject(xmlLang, subject);
                 }
             }
-            else if (eventType == XmlPullParser.END_TAG) {
-                if (parser.getName().equals("message")) {
-                    done = true;
+            else if (elementName.equals("body")) {
+                String xmlLang = getLanguageAttribute(child);
+                if (xmlLang == null) {
+                    xmlLang = defaultLanguage;
                 }
+
+                String body = XmlUtil.getTextContent(child);
+                
+                if (message.getBody(xmlLang) == null) {
+                    message.addBody(xmlLang, body);
+                }
+            }
+            else if (elementName.equals("thread")) {
+                if (thread == null) {
+                    thread = XmlUtil.getTextContent(child);
+                }
+            }
+            else if (elementName.equals("error")) {
+                message.setError(parseError(child));
+            }
+            else if (elementName.equals("properties") &&
+                    namespace.equals(PROPERTIES_NAMESPACE))
+            {
+                properties = parseProperties(child);
+            }
+            // Otherwise, it must be a packet extension.
+            else {
+                message.addExtension(
+                PacketParserUtils.parsePacketExtension(elementName, namespace, child));
             }
         }
 

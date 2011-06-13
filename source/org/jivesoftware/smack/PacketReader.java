@@ -103,7 +103,7 @@ class PacketReader {
 
             Packet receivedPacket;
             if (parser.getName().equals("message")) {
-                receivedPacket = PacketParserUtils.parseMessage(parser);
+                receivedPacket = PacketParserUtils.parseMessage(packet);
             }
             else if (parser.getName().equals("iq")) {
                 receivedPacket = PacketParserUtils.parseIQ(parser, connection);

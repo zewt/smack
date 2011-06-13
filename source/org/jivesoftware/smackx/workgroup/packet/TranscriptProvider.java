@@ -49,11 +49,11 @@ public class TranscriptProvider implements IQProvider {
         while (!done) {
             int eventType = parser.next();
             if (eventType == XmlPullParser.START_TAG) {
+                Element packet = XmlUtil.ReadNodeFromXmlPull(parser);
                 if (parser.getName().equals("message")) {
-                    packets.add(PacketParserUtils.parseMessage(parser));
+                    packets.add(PacketParserUtils.parseMessage(packet));
                 }
                 else if (parser.getName().equals("presence")) {
-                    Element packet = XmlUtil.ReadNodeFromXmlPull(parser);
                     packets.add(PacketParserUtils.parsePresence(packet));
                 }
             }
