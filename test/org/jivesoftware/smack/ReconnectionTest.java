@@ -178,7 +178,7 @@ public class ReconnectionTest extends SmackTestCase {
         return 1;
     }
 
-    private class XMPPConnectionTestListener implements ConnectionListener {
+    private class XMPPConnectionTestListener extends ConnectionListener {
 
         // Variables to support listener notifications verification
         private boolean connectionClosed = false;

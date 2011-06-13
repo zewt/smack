@@ -35,11 +35,12 @@ import org.jivesoftware.smack.packet.IQ.Type;
 import org.jivesoftware.smack.packet.RosterPacket.Item;
 import org.jivesoftware.smack.packet.RosterPacket.ItemType;
 import org.jivesoftware.smack.util.PacketParserUtils;
+import org.jivesoftware.smack.util.XmlUtil;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.xmlpull.v1.XmlPullParserFactory;
-import org.xmlpull.v1.XmlPullParser;
+import org.w3c.dom.Element;
+import org.xml.sax.InputSource;
 
 /**
  * Tests that verifies the correct behavior of the {@see Roster} implementation.
@@ -315,8 +316,6 @@ public class RosterTest {
         final String contactJID = "nurse@example.com";
         final Roster roster = connection.getRoster();
         assertNotNull("Can't get the roster from the provided connection!", roster);
-        final XmlPullParser parser = XmlPullParserFactory.newInstance().newPullParser();
-        parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
         final StringBuilder sb = new StringBuilder();
         sb.append("<iq id=\"rostertest1\" type=\"set\" ")
                 .append("to=\"").append(connection.getUser()).append("\">")
@@ -324,9 +323,8 @@ public class RosterTest {
                 .append("<item jid=\"").append(contactJID).append("\"/>")
                 .append("</query>")
                 .append("</iq>");
-        parser.setInput(new StringReader(sb.toString()));
-        parser.next();
-        final IQ rosterPush = PacketParserUtils.parseIQ(parser, connection);
+        Element packet = XmlUtil.getXMLRootNode(new InputSource(new StringReader(sb.toString())));
+        final IQ rosterPush = PacketParserUtils.parseIQ(packet, connection);
         initRoster(connection, roster);
         rosterListener.reset();
 
@@ -430,8 +428,6 @@ public class RosterTest {
         final String contactJID = "nurse@example.com";
         final Roster roster = connection.getRoster();
         assertNotNull("Can't get the roster from the provided connection!", roster);
-        final XmlPullParser parser = XmlPullParserFactory.newInstance().newPullParser();
-        parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
         final StringBuilder sb = new StringBuilder();
         sb.append("<iq id=\"rostertest2\" type=\"set\" ")
                 .append("to=\"").append(connection.getUser()).append("\">")
@@ -441,9 +437,8 @@ public class RosterTest {
                 .append("</item>")
                 .append("</query>")
                 .append("</iq>");
-        parser.setInput(new StringReader(sb.toString()));
-        parser.next();
-        final IQ rosterPush = PacketParserUtils.parseIQ(parser, connection);
+        Element packet = XmlUtil.getXMLRootNode(new InputSource(new StringReader(sb.toString())));
+        final IQ rosterPush = PacketParserUtils.parseIQ(packet, connection);
         initRoster(connection, roster);
         rosterListener.reset();
 
