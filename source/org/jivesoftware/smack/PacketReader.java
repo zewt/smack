@@ -106,7 +106,7 @@ class PacketReader {
                 receivedPacket = PacketParserUtils.parseMessage(packet);
             }
             else if (parser.getName().equals("iq")) {
-                receivedPacket = PacketParserUtils.parseIQ(parser, connection);
+                receivedPacket = PacketParserUtils.parseIQ(packet, connection);
             }
             else if (parser.getName().equals("presence")) {
                 receivedPacket = PacketParserUtils.parsePresence(packet);

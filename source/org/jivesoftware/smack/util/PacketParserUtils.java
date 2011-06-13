@@ -144,27 +144,6 @@ public class PacketParserUtils {
     }
 
     /**
-     * Returns the content of a tag as string regardless of any tags included.
-     * 
-     * @param parser the XML pull parser
-     * @return the content of a tag as string
-     * @throws XmlPullParserException if parser encounters invalid XML
-     * @throws IOException if an IO error occurs
-     */
-    private static String parseContent(XmlPullParser parser)
-                    throws XmlPullParserException, IOException {
-        String content = "";
-        int parserDepth = parser.getDepth();
-        while (!(parser.next() == XmlPullParser.END_TAG && parser
-                        .getDepth() == parserDepth)) {
-            String text = parser.getText();
-            if(text != null)
-                content += text;
-        }
-        return content;
-    }
-
-    /**
      * Parses a presence packet.
      *
      * @param parser the XML parser, positioned at the start of a presence packet.
@@ -259,59 +238,51 @@ public class PacketParserUtils {
      * @return an IQ object.
      * @throws Exception if an exception occurs while parsing the packet.
      */
-    public static IQ parseIQ(XmlPullParser parser, Connection connection) throws Exception {
+    public static IQ parseIQ(Element packet, Connection connection) throws Exception {
         IQ iqPacket = null;
 
-        String id = parser.getAttributeValue("", "id");
-        String to = parser.getAttributeValue("", "to");
-        String from = parser.getAttributeValue("", "from");
-        IQ.Type type = IQ.Type.fromString(parser.getAttributeValue("", "type"));
+        String id = packet.getAttribute("id");
+        String to = packet.getAttribute("to");
+        String from = packet.getAttribute("from");
+        IQ.Type type = IQ.Type.fromString(packet.getAttribute("type"));
         XMPPError error = null;
 
-        boolean done = false;
-        while (!done) {
-            int eventType = parser.next();
-
-            if (eventType == XmlPullParser.START_TAG) {
-                String elementName = parser.getName();
-                String namespace = parser.getNamespace();
-                if (elementName.equals("error")) {
-                    error = PacketParserUtils.parseError(parser);
-                }
-                else if (elementName.equals("query") && namespace.equals("jabber:iq:auth")) {
-                    iqPacket = parseAuthentication(parser);
-                }
-                else if (elementName.equals("query") && namespace.equals("jabber:iq:roster")) {
-                    iqPacket = parseRoster(parser);
-                }
-                else if (elementName.equals("query") && namespace.equals("jabber:iq:register")) {
-                    iqPacket = parseRegistration(parser);
-                }
-                else if (elementName.equals("bind") &&
-                        namespace.equals("urn:ietf:params:xml:ns:xmpp-bind")) {
-                    iqPacket = parseResourceBinding(parser);
-                }
-                // Otherwise, see if there is a registered provider for
-                // this element name and namespace.
-                else {
-                    Object provider = ProviderManager.getInstance().getIQProvider(elementName, namespace);
-                    if (provider != null) {
-                        if (provider instanceof IQProvider) {
-                            iqPacket = ((IQProvider)provider).parseIQ(parser);
-                        }
-                        else if (provider instanceof Class) {
-                            iqPacket = (IQ)PacketParserUtils.parseWithIntrospection(elementName,
-                                    (Class)provider, parser);
-                        }
+        for(Element child: XmlUtil.getChildElements(packet)) {
+            String elementName = child.getLocalName();
+            String namespace = child.getNamespaceURI();
+            if (elementName.equals("error")) {
+                error = PacketParserUtils.parseError(child);
+            }
+            else if (elementName.equals("query") && namespace.equals("jabber:iq:auth")) {
+                iqPacket = parseAuthentication(child);
+            }
+            else if (elementName.equals("query") && namespace.equals("jabber:iq:roster")) {
+                iqPacket = parseRoster(child);
+            }
+            else if (elementName.equals("query") && namespace.equals("jabber:iq:register")) {
+                iqPacket = parseRegistration(child);
+            }
+            else if (elementName.equals("bind") &&
+                    namespace.equals("urn:ietf:params:xml:ns:xmpp-bind")) {
+                iqPacket = parseResourceBinding(child);
+            }
+            // Otherwise, see if there is a registered provider for
+            // this element name and namespace.
+            else {
+                Object provider = ProviderManager.getInstance().getIQProvider(elementName, namespace);
+                if (provider != null) {
+                    if (provider instanceof IQProvider) {
+                        XmlPullParser parser = new XmlPullParserDom(child, true);
+                        iqPacket = ((IQProvider)provider).parseIQ(parser);
+                    }
+                    else if (provider instanceof Class) {
+                        iqPacket = (IQ)PacketParserUtils.parseWithIntrospection(elementName,
+                                (Class)provider, child);
                     }
                 }
             }
-            else if (eventType == XmlPullParser.END_TAG) {
-                if (parser.getName().equals("iq")) {
-                    done = true;
-                }
-            }
         }
+
         // Decide what to do when an IQ packet was not understood
         if (iqPacket == null) {
             if (IQ.Type.GET == type || IQ.Type.SET == type ) {
@@ -351,137 +322,96 @@ public class PacketParserUtils {
         return iqPacket;
     }
 
-    private static Authentication parseAuthentication(XmlPullParser parser) throws Exception {
+    private static Authentication parseAuthentication(Element packet) throws Exception {
         Authentication authentication = new Authentication();
-        boolean done = false;
-        while (!done) {
-            int eventType = parser.next();
-            if (eventType == XmlPullParser.START_TAG) {
-                if (parser.getName().equals("username")) {
-                    authentication.setUsername(parser.nextText());
-                }
-                else if (parser.getName().equals("password")) {
-                    authentication.setPassword(parser.nextText());
-                }
-                else if (parser.getName().equals("digest")) {
-                    authentication.setDigest(parser.nextText());
-                }
-                else if (parser.getName().equals("resource")) {
-                    authentication.setResource(parser.nextText());
-                }
-            }
-            else if (eventType == XmlPullParser.END_TAG) {
-                if (parser.getName().equals("query")) {
-                    done = true;
-                }
-            }
+        for(Element child: XmlUtil.getChildElements(packet)) {
+            if (child.getLocalName().equals("username"))
+                authentication.setUsername(XmlUtil.getTextContent(child));
+            else if (child.getLocalName().equals("password"))
+                authentication.setPassword(XmlUtil.getTextContent(child));
+            else if (child.getLocalName().equals("digest"))
+                authentication.setDigest(XmlUtil.getTextContent(child));
+            else if (child.getLocalName().equals("resource"))
+                authentication.setResource(XmlUtil.getTextContent(child));
         }
         return authentication;
     }
 
-    private static RosterPacket parseRoster(XmlPullParser parser) throws Exception {
+    private static RosterPacket parseRoster(Element packet) throws Exception {
         RosterPacket roster = new RosterPacket();
-        boolean done = false;
         RosterPacket.Item item = null;
-        while (!done) {
-            int eventType = parser.next();
-            if (eventType == XmlPullParser.START_TAG) {
-                if (parser.getName().equals("item")) {
-                    String jid = parser.getAttributeValue("", "jid");
-                    String name = parser.getAttributeValue("", "name");
-                    // Create packet.
-                    item = new RosterPacket.Item(jid, name);
-                    // Set status.
-                    String ask = parser.getAttributeValue("", "ask");
-                    RosterPacket.ItemStatus status = RosterPacket.ItemStatus.fromString(ask);
-                    item.setItemStatus(status);
-                    // Set type.
-                    String subscription = parser.getAttributeValue("", "subscription");
-                    RosterPacket.ItemType type = RosterPacket.ItemType.valueOf(subscription != null ? subscription : "none");
-                    item.setItemType(type);
-                }
-                if (parser.getName().equals("group") && item!= null) {
-                    final String groupName = parser.nextText();
-                    if (groupName != null && groupName.trim().length() > 0) {
-                        item.addGroupName(groupName);
+        for(Element child: XmlUtil.getChildElements(packet)) {
+            if (child.getLocalName().equals("item")) {
+                String jid = child.getAttribute("jid");
+                String name = child.getAttribute("name");
+
+                // Create packet.
+                item = new RosterPacket.Item(jid, name);
+
+                // Set status.
+                String ask = child.getAttribute("ask");
+                RosterPacket.ItemStatus status = RosterPacket.ItemStatus.fromString(ask);
+                item.setItemStatus(status);
+                
+                // Set type.
+                String subscription = child.getAttribute("subscription");
+                RosterPacket.ItemType type = RosterPacket.ItemType.valueOf(subscription != null ? subscription : "none");
+                item.setItemType(type);
+                for(Element child2: XmlUtil.getChildElements(child)) {
+                    if (child2.getLocalName().equals("group")) {
+                        String groupName = XmlUtil.getTextContent(child2);
+                        if (groupName.trim().length() > 0)
+                            item.addGroupName(groupName);
                     }
                 }
-            }
-            else if (eventType == XmlPullParser.END_TAG) {
-                if (parser.getName().equals("item")) {
-                    roster.addRosterItem(item);
-                }
-                if (parser.getName().equals("query")) {
-                    done = true;
-                }
+                roster.addRosterItem(item);
             }
         }
         return roster;
     }
 
-     private static Registration parseRegistration(XmlPullParser parser) throws Exception {
+     private static Registration parseRegistration(Element packet) throws Exception {
         Registration registration = new Registration();
         Map<String, String> fields = null;
-        boolean done = false;
-        while (!done) {
-            int eventType = parser.next();
-            if (eventType == XmlPullParser.START_TAG) {
-                // Any element that's in the jabber:iq:register namespace,
-                // attempt to parse it if it's in the form <name>value</name>.
-                if (parser.getNamespace().equals("jabber:iq:register")) {
-                    String name = parser.getName();
-                    String value = "";
-                    if (fields == null) {
-                        fields = new HashMap<String, String>();
-                    }
-
-                    if (parser.next() == XmlPullParser.TEXT) {
-                        value = parser.getText();
-                    }
-                    // Ignore instructions, but anything else should be added to the map.
-                    if (!name.equals("instructions")) {
-                        fields.put(name, value);
-                    }
-                    else {
-                        registration.setInstructions(value);
-                    }
+        for(Element child: XmlUtil.getChildElements(packet)) {
+            // Any element that's in the jabber:iq:register namespace,
+            // attempt to parse it if it's in the form <name>value</name>.
+            if (child.getNamespaceURI().equals("jabber:iq:register")) {
+                String name = child.getLocalName();
+                String value = XmlUtil.getTextContent(child);
+                if (fields == null) {
+                    fields = new HashMap<String, String>();
                 }
-                // Otherwise, it must be a packet extension.
+
+                // Ignore instructions, but anything else should be added to the map.
+                if (!name.equals("instructions")) {
+                    fields.put(name, value);
+                }
                 else {
-                    registration.addExtension(
-                        PacketParserUtils.parsePacketExtension(
-                            parser.getName(),
-                            parser.getNamespace(),
-                            parser));
+                    registration.setInstructions(value);
                 }
             }
-            else if (eventType == XmlPullParser.END_TAG) {
-                if (parser.getName().equals("query")) {
-                    done = true;
-                }
+            // Otherwise, it must be a packet extension.
+            else {
+                registration.addExtension(
+                    PacketParserUtils.parsePacketExtension(
+                        child.getLocalName(),
+                        child.getNamespaceURI(),
+                        child));
             }
         }
         registration.setAttributes(fields);
         return registration;
     }
 
-    private static Bind parseResourceBinding(XmlPullParser parser) throws IOException,
-            XmlPullParserException {
+    private static Bind parseResourceBinding(Element packet) {
         Bind bind = new Bind();
-        boolean done = false;
-        while (!done) {
-            int eventType = parser.next();
-            if (eventType == XmlPullParser.START_TAG) {
-                if (parser.getName().equals("resource")) {
-                    bind.setResource(parser.nextText());
-                }
-                else if (parser.getName().equals("jid")) {
-                    bind.setJid(parser.nextText());
-                }
-            } else if (eventType == XmlPullParser.END_TAG) {
-                if (parser.getName().equals("bind")) {
-                    done = true;
-                }
+        for(Element child: XmlUtil.getChildElements(packet)) {
+            if (child.getLocalName().equals("resource")) {
+                bind.setResource(XmlUtil.getTextContent(child));
+            }
+            else if (child.getLocalName().equals("jid")) {
+                bind.setJid(XmlUtil.getTextContent(child));
             }
         }
 
@@ -619,7 +549,7 @@ public class PacketParserUtils {
     public static Map<String, Object> parseProperties(Element packet) {
         Map<String, Object> properties = new HashMap<String, Object>();
         for(Element child: XmlUtil.getChildElements(packet)) {
-            if(!packet.getLocalName().equals("property"))
+            if(!child.getLocalName().equals("property"))
                 continue;
 
             // Parse a property
@@ -629,11 +559,11 @@ public class PacketParserUtils {
             for(Element propertyNode: XmlUtil.getChildElements(child)) {
                 String elementName = propertyNode.getLocalName();
                 if (elementName.equals("name")) {
-                    name = XmlUtil.getTextContent(packet);
+                    name = XmlUtil.getTextContent(propertyNode);
                 }
                 else if (elementName.equals("value")) {
-                    type = packet.getAttribute("type");
-                    valueText = XmlUtil.getTextContent(packet);
+                    type = propertyNode.getAttribute("type");
+                    valueText = XmlUtil.getTextContent(propertyNode);
                 }
             }
 
@@ -773,16 +703,16 @@ public class PacketParserUtils {
         for(Element child: XmlUtil.getChildElements(packet)) {
             String elementName = child.getLocalName();
             String namespace = child.getNamespaceURI();
-                if (elementName.equals("text")) {
-                    message = XmlUtil.getTextContent(packet);
-                }
-                else {
-                    // Condition tag, it can be xmpp error or an application defined error.
-                    if (errorNamespace.equals(namespace))
-                        condition = elementName;
-                    else
-                        extensions.add(parsePacketExtension(elementName, namespace, packet));
-                }
+            if (elementName.equals("text")) {
+                message = XmlUtil.getTextContent(child);
+            }
+            else {
+                // Condition tag, it can be xmpp error or an application defined error.
+                if (errorNamespace.equals(namespace))
+                    condition = elementName;
+                else
+                    extensions.add(parsePacketExtension(elementName, namespace, child));
+            }
         }
 
         // Parse the error type.
@@ -874,18 +804,6 @@ public class PacketParserUtils {
             extension.setValue(name, XmlUtil.getTextContent(child));
         }
         return extension;
-    }
-
-    private static String getLanguageAttribute(XmlPullParser parser) {
-    	for (int i = 0; i < parser.getAttributeCount(); i++) {
-            String attributeName = parser.getAttributeName(i);
-            if ( "xml:lang".equals(attributeName) ||
-                    ("lang".equals(attributeName) &&
-                            "xml".equals(parser.getAttributePrefix(i)))) {
-    			return parser.getAttributeValue(i);
-    		}
-    	}
-    	return null;
     }
 
     private static String getLanguageAttribute(Element parser) {
