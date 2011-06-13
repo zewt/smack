@@ -26,7 +26,6 @@ import org.jivesoftware.smack.XMPPException;
 import org.xmlpull.v1.XmlPullParserFactory;
 import org.xmlpull.v1.XmlPullParser;
 
-import javax.net.SocketFactory;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
@@ -76,19 +75,6 @@ public abstract class SmackTestCase extends TestCase {
      */
     protected int getMaxConnections() {
         return 0;
-    }
-
-    /**
-     * Returns a SocketFactory that will be used to create the socket to the XMPP server. By 
-     * default no SocketFactory is used but subclasses my want to redefine this method.<p>
-     * 
-     * A custom SocketFactory allows fine-grained control of the actual connection to the XMPP 
-     * server. A typical use for a custom SocketFactory is when connecting through a SOCKS proxy.
-     * 
-     * @return a SocketFactory that will be used to create the socket to the XMPP server.
-     */
-    protected SocketFactory getSocketFactory() {
-        return null;
     }
 
     /**
@@ -145,9 +131,6 @@ public abstract class SmackTestCase extends TestCase {
         ConnectionConfiguration config = new ConnectionConfiguration(host, port);
         config.setCompressionEnabled(Boolean.getBoolean("test.compressionEnabled"));
         config.setSendPresence(sendInitialPresence());
-        if (getSocketFactory() == null) {
-            config.setSocketFactory(getSocketFactory());
-        }
         return config;
     }
 
