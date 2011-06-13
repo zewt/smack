@@ -766,7 +766,7 @@ public class PacketParserUtils {
     }
 
     private static String getLanguageAttribute(Element parser) {
-        return parser.getAttributeNS("xml", "lang").trim();
+        return parser.getAttributeNS("http://www.w3.org/XML/1998/namespace", "lang").trim();
     }
 
     public static Object parseWithIntrospection(String elementName,
