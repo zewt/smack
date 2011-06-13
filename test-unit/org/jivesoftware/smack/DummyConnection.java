@@ -236,4 +236,7 @@ public class DummyConnection extends Connection {
             listenerWrapper.notifyListener(packet);
         }
     }
+
+    public void recoverConnection() {
+    }
 }
