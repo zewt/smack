@@ -678,7 +678,8 @@ public class PacketParserUtilsTest {
         try {
             PacketParserUtils.parseMessage(getPacket(invalidControl));
             fail("Exception should be thrown");
-        } catch(XmlPullParserException e) {
+        } catch(XMPPException e) {
+            XmlPullParserException e2 = (XmlPullParserException) e.getCause();
             // assertTrue(e.getMessage().contains("end tag name </span>"));
         }
 
@@ -687,7 +688,8 @@ public class PacketParserUtilsTest {
         try {
             PacketParserUtils.parseMessage(getPacket(invalidControl));
             fail("Exception should be thrown");
-        } catch(XmlPullParserException e) {
+        } catch(XMPPException e) {
+            XmlPullParserException e2 = (XmlPullParserException) e.getCause();
             // assertTrue(e.getMessage().contains("end tag name </body>"));
         }
 
@@ -696,7 +698,8 @@ public class PacketParserUtilsTest {
         try {
             PacketParserUtils.parseMessage(getPacket(invalidControl));
             fail("Exception should be thrown");
-        } catch(XmlPullParserException e) {
+        } catch(XMPPException e) {
+            XmlPullParserException e2 = (XmlPullParserException) e.getCause();
             // assertTrue(e.getMessage().contains("end tag name </message>"));
         }
 
