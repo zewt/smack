@@ -604,24 +604,13 @@ public class PacketParserUtils {
      * @return an stream error packet.
      * @throws Exception if an exception occurs while parsing the packet.
      */
-    public static StreamError parseStreamError(XmlPullParser parser) throws IOException,
+    public static StreamError parseStreamError(Element packet) throws IOException,
             XmlPullParserException {
-    StreamError streamError = null;
-    boolean done = false;
-    while (!done) {
-        int eventType = parser.next();
-
-        if (eventType == XmlPullParser.START_TAG) {
-            streamError = new StreamError(parser.getName());
+        for(Element child: XmlUtil.getChildElements(packet)) {
+            return new StreamError(packet.getLocalName());
         }
-        else if (eventType == XmlPullParser.END_TAG) {
-            if (parser.getName().equals("error")) {
-                done = true;
-            }
-        }
+        return null;
     }
-    return streamError;
-}
 
     /**
      * Parses error sub-packets.

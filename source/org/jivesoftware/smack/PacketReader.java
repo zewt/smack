@@ -112,7 +112,7 @@ class PacketReader {
                 receivedPacket = PacketParserUtils.parsePresence(packet);
             }
             else if (parser.getName().equals("error")) {
-                throw new XMPPException(PacketParserUtils.parseStreamError(parser));
+                throw new XMPPException(PacketParserUtils.parseStreamError(packet));
             } else {
                 // Treat any unknown packet types generically.
                 receivedPacket = new ReceivedPacket(packet);
