@@ -437,35 +437,6 @@ public class PacketParserUtils {
     }
 
     /**
-     * Parse the available compression methods reported from the server.
-     *
-     * @param parser the XML parser, positioned at the start of the compression stanza.
-     * @return a collection of Stings with the methods included in the compression stanza.
-     * @throws Exception if an exception occurs while parsing the stanza.
-     */
-    public static Collection<String> parseCompressionMethods(XmlPullParser parser)
-            throws IOException, XmlPullParserException {
-        List<String> methods = new ArrayList<String>();
-        boolean done = false;
-        while (!done) {
-            int eventType = parser.next();
-
-            if (eventType == XmlPullParser.START_TAG) {
-                String elementName = parser.getName();
-                if (elementName.equals("method")) {
-                    methods.add(parser.nextText());
-                }
-            }
-            else if (eventType == XmlPullParser.END_TAG) {
-                if (parser.getName().equals("compression")) {
-                    done = true;
-                }
-            }
-        }
-        return methods;
-    }
-
-    /**
      * Parse a properties sub-packet. If any errors occur while de-serializing Java object
      * properties, an exception will be printed and not thrown since a thrown
      * exception will shut down the entire connection. ClassCastExceptions will occur
@@ -604,8 +575,7 @@ public class PacketParserUtils {
      * @return an stream error packet.
      * @throws Exception if an exception occurs while parsing the packet.
      */
-    public static StreamError parseStreamError(Element packet) throws IOException,
-            XmlPullParserException {
+    public static StreamError parseStreamError(Element packet) {
         for(Element child: XmlUtil.getChildElements(packet)) {
             return new StreamError(packet.getLocalName());
         }
