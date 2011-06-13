@@ -21,6 +21,8 @@
 package org.jivesoftware.smackx.packet;
 
 import org.jivesoftware.smack.packet.IQ;
+import org.jivesoftware.smack.provider.IQProvider;
+import org.xmlpull.v1.XmlPullParser;
 
 /**
  * A Version IQ packet, which is used by XMPP clients to discover version information
@@ -128,5 +130,32 @@ public class Version extends IQ {
         }
         buf.append("</query>");
         return buf.toString();
+    }
+
+    public static class Provider implements IQProvider {
+        public Provider() {
+        }
+
+        public IQ parseIQ(XmlPullParser parser) throws Exception {
+            Version version = new Version();
+            boolean done = false;
+            while (!done) {
+                int eventType = parser.next();
+                if (eventType == XmlPullParser.START_TAG) {
+                    if (parser.getName().equals("name"))
+                        version.setName(parser.nextText());
+                    else if (parser.getName().equals("version"))
+                        version.setVersion(parser.nextText());
+                    else if (parser.getName().equals("os"))
+                        version.setName(parser.nextText());
+                } else if (eventType == XmlPullParser.END_TAG) {
+                    if (parser.getName().equals("query")) {
+                        done = true;
+                    }
+                }
+            }
+
+            return version;
+        }
     }
 }

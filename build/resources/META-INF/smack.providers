@@ -13,7 +13,7 @@
     <iqProvider> 
         <elementName>query</elementName> 
         <namespace>jabber:iq:time</namespace> 
-        <className>org.jivesoftware.smackx.packet.Time</className> 
+        <className>org.jivesoftware.smackx.packet.Time$Provider</className> 
     </iqProvider>
     
     <!-- Roster Exchange -->
@@ -134,7 +134,7 @@
     <iqProvider>
         <elementName>query</elementName>
         <namespace>jabber:iq:version</namespace>
-        <className>org.jivesoftware.smackx.packet.Version</className> 
+        <className>org.jivesoftware.smackx.packet.Version$Provider</className> 
     </iqProvider>
 
     <!-- VCard -->

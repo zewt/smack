@@ -21,6 +21,8 @@
 package org.jivesoftware.smackx.packet;
 
 import org.jivesoftware.smack.packet.IQ;
+import org.jivesoftware.smack.provider.IQProvider;
+import org.xmlpull.v1.XmlPullParser;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -194,5 +196,34 @@ public class Time extends IQ {
         }
         buf.append("</query>");
         return buf.toString();
+    }
+
+    public static class Provider implements IQProvider {
+        public Provider() {
+        }
+
+        public IQ parseIQ(XmlPullParser parser) throws Exception {
+            Time version = new Time();
+            boolean done = false;
+            while (!done) {
+                int eventType = parser.next();
+                if (eventType == XmlPullParser.START_TAG) {
+                    if (parser.getName().equals("utc")) {
+                        Date date = utcFormat.parse(parser.nextText());
+                        version.setTime(date);
+                    }
+                    else if (parser.getName().equals("tz"))
+                        version.setTz(parser.nextText());
+                    else if (parser.getName().equals("display"))
+                        version.setDisplay(parser.nextText());
+                } else if (eventType == XmlPullParser.END_TAG) {
+                    if (parser.getName().equals("query")) {
+                        done = true;
+                    }
+                }
+            }
+
+            return version;
+        }
     }
 }
