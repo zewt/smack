@@ -21,6 +21,7 @@
 package org.jivesoftware.smack.util;
 
 import org.jivesoftware.smack.Connection;
+import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.packet.*;
 import org.jivesoftware.smack.provider.IQProvider;
 import org.jivesoftware.smack.provider.PacketExtensionProvider;
@@ -60,9 +61,9 @@ public class PacketParserUtils {
      *
      * @param parser the XML parser, positioned at the start of a message packet.
      * @return a Message packet.
-     * @throws Exception if an exception occurs while parsing the packet.
+     * @throws XMPPException if an exception occurs while parsing the packet.
      */
-    public static Message parseMessage(Element packet) throws Exception {
+    public static Message parseMessage(Element packet) throws XMPPException {
         Message message = new Message();
         String id = packet.getAttribute("id");
         message.setPacketID(id.equals("")? Packet.ID_NOT_AVAILABLE : id);
@@ -148,9 +149,9 @@ public class PacketParserUtils {
      *
      * @param parser the XML parser, positioned at the start of a presence packet.
      * @return a Presence packet.
-     * @throws Exception if an exception occurs while parsing the packet.
+     * @throws XMPPException if an exception occurs while parsing the packet.
      */
-    public static Presence parsePresence(Element packet) throws Exception {
+    public static Presence parsePresence(Element packet) throws XMPPException {
         Presence.Type type = Presence.Type.available;
         String typeString = packet.getAttribute("type");
         if (!typeString.equals("")) {
@@ -236,9 +237,9 @@ public class PacketParserUtils {
      *
      * @param parser the XML parser, positioned at the start of an IQ packet.
      * @return an IQ object.
-     * @throws Exception if an exception occurs while parsing the packet.
+     * @throws XMPPException if an exception occurs while parsing the packet.
      */
-    public static IQ parseIQ(Element packet, Connection connection) throws Exception {
+    public static IQ parseIQ(Element packet, Connection connection) throws XMPPException {
         IQ iqPacket = null;
 
         String id = packet.getAttribute("id");
@@ -272,7 +273,11 @@ public class PacketParserUtils {
                 IQProvider provider = ProviderManager.getInstance().getIQProvider(elementName, namespace);
                 if (provider != null) {
                     XmlPullParser parser = new XmlPullParserDom(child, true);
-                    iqPacket = provider.parseIQ(parser);
+                    try {
+                        iqPacket = provider.parseIQ(parser);
+                    } catch(Exception e) {
+                        throw new XMPPException(e);
+                    }
                 }
             }
         }
@@ -316,7 +321,7 @@ public class PacketParserUtils {
         return iqPacket;
     }
 
-    private static Authentication parseAuthentication(Element packet) throws Exception {
+    private static Authentication parseAuthentication(Element packet) {
         Authentication authentication = new Authentication();
         for(Element child: XmlUtil.getChildElements(packet)) {
             if (child.getLocalName().equals("username"))
@@ -331,7 +336,7 @@ public class PacketParserUtils {
         return authentication;
     }
 
-    private static RosterPacket parseRoster(Element packet) throws Exception {
+    private static RosterPacket parseRoster(Element packet) {
         RosterPacket roster = new RosterPacket();
         RosterPacket.Item item = null;
         for(Element child: XmlUtil.getChildElements(packet)) {
@@ -364,7 +369,7 @@ public class PacketParserUtils {
         return roster;
     }
 
-     private static Registration parseRegistration(Element packet) throws Exception {
+     private static Registration parseRegistration(Element packet) throws XMPPException {
         Registration registration = new Registration();
         Map<String, String> fields = null;
         for(Element child: XmlUtil.getChildElements(packet)) {
@@ -417,7 +422,6 @@ public class PacketParserUtils {
      *
      * @param parser the XML parser, positioned at the start of the mechanisms stanza.
      * @return a collection of Stings with the mechanisms included in the mechanisms stanza.
-     * @throws Exception if an exception occurs while parsing the stanza.
      */
     public static Collection<String> parseMechanisms(Node node) {
         List<String> mechanisms = new ArrayList<String>();
@@ -567,7 +571,6 @@ public class PacketParserUtils {
      *
      * @param parser the XML parser.
      * @return an stream error packet.
-     * @throws Exception if an exception occurs while parsing the packet.
      */
     public static StreamError parseStreamError(Element packet) {
         for(Element child: XmlUtil.getChildElements(packet)) {
@@ -640,7 +643,7 @@ public class PacketParserUtils {
         return new XMPPError(Integer.parseInt(errorCode), errorType, condition, message, extensions);
     }
 
-    public static XMPPError parseError(Element packet) throws Exception {
+    public static XMPPError parseError(Element packet) throws XMPPException {
         final String errorNamespace = "urn:ietf:params:xml:ns:xmpp-stanzas";
         String message = null;
         String condition = null;
@@ -730,13 +733,19 @@ public class PacketParserUtils {
     }
 
     public static PacketExtension parsePacketExtension(String elementName, String namespace, Element packet)
-    throws Exception
+    throws XMPPException
     {
         // See if a provider is registered to handle the extension.
         PacketExtensionProvider provider = ProviderManager.getInstance().getExtensionProvider(elementName, namespace);
         if (provider != null) {
             XmlPullParser parser = new XmlPullParserDom(packet, true);
-            return provider.parseExtension(parser);
+            try {
+                return provider.parseExtension(parser);
+            } catch(RuntimeException e) {
+                throw e;
+            } catch(Exception e) {
+                throw new XMPPException(e);
+            }
         }
 
         // No providers registered, so use a default extension.
