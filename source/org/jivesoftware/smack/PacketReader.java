@@ -95,9 +95,11 @@ class PacketReader {
             /* Convert the stanza to an XmlPullParser. */
             XmlPullParser parser = new XmlPullParserDom(packet, true);
 
-            for ( ; parser.getEventType() != XmlPullParser.END_DOCUMENT; parser.next() ) {
+            if(parser.getEventType() == XmlPullParser.START_DOCUMENT)
+                parser.next();
+            
                 if(parser.getEventType() != XmlPullParser.START_TAG)
-                    continue;
+                    return;
 
                 Packet receivedPacket;
                 if (parser.getName().equals("message")) {
@@ -127,7 +129,6 @@ class PacketReader {
 
                 // Deliver the received packet to listeners.
                 listenerExecutor.submit(new ListenerNotification(receivedPacket));
-            }
         } catch (RuntimeException e) {
             throw e;
         } catch (XMPPException e) {
