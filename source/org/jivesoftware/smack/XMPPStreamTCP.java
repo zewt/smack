@@ -1290,7 +1290,6 @@ public class XMPPStreamTCP extends XMPPStream
                 // Send heartbeat if no packet has been sent to the server for a given time
                 try {
                     if (getMsUntilKeepalive() <= 0) {
-                        android.util.Log.w("XMPP", "Sending keepalive");
                         writePacket(" ");
                     }
                 }
