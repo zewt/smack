@@ -663,7 +663,7 @@ public class Message extends Packet {
             try {
                 return Type.valueOf(name);
             }
-            catch (Exception e) {
+            catch (IllegalArgumentException e) {
                 return normal;
             }
         }
