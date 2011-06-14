@@ -175,8 +175,9 @@ public class ProviderManager {
             // Add the provider to the map.
             Class<IQProvider> provider = (Class<IQProvider>) Class.forName(className);
             iqProviders.put(key, provider.newInstance());
-        }
-        catch (ClassNotFoundException e) {
+        } catch (ClassCastException e) {
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
             e.printStackTrace();
         } catch (InstantiationException e) {
             e.printStackTrace();
@@ -199,8 +200,9 @@ public class ProviderManager {
             // Add the provider to the map.
             Class<PacketExtensionProvider> provider = (Class<PacketExtensionProvider>) Class.forName(className);
             extensionProviders.put(key, provider.newInstance());
-        }
-        catch (ClassNotFoundException e) {
+        } catch (ClassCastException e) {
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
             e.printStackTrace();
         } catch (InstantiationException e) {
             e.printStackTrace();
