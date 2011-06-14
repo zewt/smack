@@ -67,7 +67,7 @@ public class XMPPErrorTest extends SmackTestCase {
 			"</error>";
         try {
         	// Create the xml parser
-                Element parser = getParserFromXML(xml);
+                Element parser = XmlUtil.getXMLRootNode(xml);
         	// Create a packet from the xml
         	XMPPError packet = parseError(parser);
         	
@@ -88,7 +88,7 @@ public class XMPPErrorTest extends SmackTestCase {
     			"</error>";
         try {
         	// Create the xml parser
-                Element parser = getParserFromXML(xml);
+                Element parser = XmlUtil.getXMLRootNode(xml);
         	// Create a packet from the xml
         	XMPPError error = parseError(parser);
         	
@@ -109,7 +109,7 @@ public class XMPPErrorTest extends SmackTestCase {
 	   		"</error>";
        try {
        	// Create the xml parser
-        Element parser = getParserFromXML(xml);
+        Element parser = XmlUtil.getXMLRootNode(xml);
        	// Create a packet from the xml
        	XMPPError error = parseError(parser);
        	
@@ -135,7 +135,7 @@ public class XMPPErrorTest extends SmackTestCase {
     			"</error>";
         try {
         	// Create the xml parser
-                Element parser = getParserFromXML(xml);
+                Element parser = XmlUtil.getXMLRootNode(xml);
         	// Create a packet from the xml
         	XMPPError error = parseError(parser);
         	
@@ -160,7 +160,7 @@ public class XMPPErrorTest extends SmackTestCase {
     			"</error>";
         try {
         	// Create the xml parser
-                Element parser = getParserFromXML(xml);
+                Element parser = XmlUtil.getXMLRootNode(xml);
         	// Create a packet from the xml
         	XMPPError error = parseError(parser);
         	
@@ -173,10 +173,6 @@ public class XMPPErrorTest extends SmackTestCase {
     
     private XMPPError parseError(Element packet) throws XMPPException {
 	return PacketParserUtils.parseError(packet);
-    }
-    
-    private Element getParserFromXML(String xml) throws SAXException, IOException {
-        return XmlUtil.getXMLRootNode(new InputSource(new StringReader(xml)));
     }
     
     protected int getMaxConnections() {

@@ -17,6 +17,7 @@
 package org.jivesoftware.smack.util;
 
 import java.io.IOException;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -72,6 +73,21 @@ public class XmlUtil {
 
         throw new RuntimeException("Document had no root node");
     }
+
+    /**
+     * Parse an XML document, and return the resulting root {@link Node}.
+     *
+     * @throws SAXException if XML parsing fails
+     * @throws IOException if reading from stream fails
+     */
+    public static Element getXMLRootNode(String s) throws SAXException {
+        try {
+            return getXMLRootNode(new InputSource(new StringReader(s)));
+        } catch(IOException e) {
+            // We're reading from a string, so we never receive IOException.
+            throw new RuntimeException("Illegal IOException reading from a string");
+        }
+    }    
 
     /**
      * Return an iterable Collection<Node> of the child Elements of the specified
