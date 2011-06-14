@@ -2,6 +2,8 @@ package org.jivesoftware.smack.packet;
 
 import org.jivesoftware.smack.provider.PrivacyProvider;
 import org.jivesoftware.smack.test.SmackTestCase;
+import org.jivesoftware.smack.util.XmlUtil;
+import org.w3c.dom.Element;
 import org.xmlpull.v1.XmlPullParserFactory;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -108,10 +110,8 @@ public class PrivacyProviderTest extends SmackTestCase {
     		  + "</iq>	";
 
         try {
-        	// Create the xml parser
-        	XmlPullParser parser = getParserFromXML(xml);
-        	// Create a packet from the xml
-        	Privacy packet = (Privacy) (new PrivacyProvider()).parseIQ(parser);
+            Element parsedXml = XmlUtil.getXMLRootNode(xml);
+            Privacy packet = (Privacy) (new PrivacyProvider()).parseIQ(parsedXml);
         	
         	// check if it exist
             assertNotNull(packet);
@@ -300,10 +300,8 @@ public class PrivacyProviderTest extends SmackTestCase {
     		  + " </iq>	";
 
         try {
-        	// Create the xml parser
-        	XmlPullParser parser = getParserFromXML(xml);
-        	// Create a packet from the xml
-        	Privacy packet = (Privacy) (new PrivacyProvider()).parseIQ(parser);
+            Element parsedXml = XmlUtil.getXMLRootNode(xml);
+            Privacy packet = (Privacy) (new PrivacyProvider()).parseIQ(parsedXml);
         	
             assertNotNull(packet);
             assertNotNull(packet.getChildElementXML());
@@ -339,10 +337,8 @@ public class PrivacyProviderTest extends SmackTestCase {
     		  + " </iq>	";
 
         try {
-        	// Create the xml parser
-        	XmlPullParser parser = getParserFromXML(xml);
-        	// Create a packet from the xml
-        	Privacy packet = (Privacy) (new PrivacyProvider()).parseIQ(parser);
+            Element parsedXml = XmlUtil.getXMLRootNode(xml);
+            Privacy packet = (Privacy) (new PrivacyProvider()).parseIQ(parsedXml);
         	
             assertNotNull(packet);
             
@@ -355,13 +351,6 @@ public class PrivacyProviderTest extends SmackTestCase {
             e.printStackTrace();
             fail(e.getMessage());
         }
-    }
-    
-    private XmlPullParser getParserFromXML(String xml) throws XmlPullParserException {
-	XmlPullParser parser = XmlPullParserFactory.newInstance().newPullParser();
-    	parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
-    	parser.setInput(new StringReader(xml));
-    	return parser;
     }
     
     protected int getMaxConnections() {
