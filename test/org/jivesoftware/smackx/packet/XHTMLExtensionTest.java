@@ -230,12 +230,12 @@ public class XHTMLExtensionTest extends SmackTestCase {
 	    // Verify the result.  Note that this verification depends on our particular
 	    // implementation of XmlUtil.parserNodeToString.
 	    String expect_ES =
-                "<body lang='es-ES' xmlns='http://www.w3.org/1999/xhtml'><h1>impresionante!</h1><p>Como Emerson dijo una vez:</p><blockquote><p>Una consistencia ridicula es el espantajo de mentes pequenas.</p></blockquote></body>";
+                "<body xml:lang='es-ES' xmlns='http://www.w3.org/1999/xhtml'><h1>impresionante!</h1><p>Como Emerson dijo una vez:</p><blockquote><p>Una consistencia ridicula es el espantajo de mentes pequenas.</p></blockquote></body>";
             String result = it.next();
 	    assertEquals(expect_ES, result);
 
 	    String expect_EN =
-                "<body lang='en-US' xmlns='http://www.w3.org/1999/xhtml'><h1>awesome!</h1><p>As Emerson once said:</p><blockquote><p>A foolish consistency is the hobgoblin of little minds.</p></blockquote></body>";
+                "<body xml:lang='en-US' xmlns='http://www.w3.org/1999/xhtml'><h1>awesome!</h1><p>As Emerson once said:</p><blockquote><p>A foolish consistency is the hobgoblin of little minds.</p></blockquote></body>";
             result = it.next();
             assertEquals(expect_EN, result);
 	}

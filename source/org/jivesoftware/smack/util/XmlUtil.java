@@ -32,6 +32,7 @@ import org.jivesoftware.smack.XMPPException;
 import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.w3c.dom.Text;
@@ -144,50 +145,50 @@ public class XmlUtil {
      * @param an {@link XmlPullParser} with a current event type of START_TAG
      * @return an XML string
      */
-    public static String parserNodeToString(XmlPullParser parser) throws XmlPullParserException, IOException {
+    public static String elementToString(Element element) {
         StringBuilder content = new StringBuilder();
-        parserNodeToString(content, parser, new HashMap<String, String>());
+        HashMap<String, String> existingNamespaces = new HashMap<String, String>();
+        // Don't redeclare the reserved namespace xmlns:xml; it's predefined.
+        existingNamespaces.put("xml", "http://www.w3.org/XML/1998/namespace");
+        elementToString(content, element, existingNamespaces);
         return content.toString();
     }
 
-    private static void parserNodeToString(StringBuilder content, XmlPullParser parser,
-            Map<String, String> namespaceNodes)
-                    throws XmlPullParserException, IOException {
-        // This is made more complicated due to many XmlPullParser implementations
-        // support neither FEATURE_XML_ROUNDTRIP nor FEATURE_REPORT_NAMESPACE_ATTRIBUTES.
-        if (parser.getEventType() != XmlPullParser.START_TAG)
-            throw new IllegalArgumentException("parseContent must start at a start tag");
-
+    private static void elementToString(StringBuilder content, Element element,
+            Map<String, String> namespaceNodes) {
         {
             HashMap<String,String> neededNamespaces = new HashMap<String,String>();
             content.append("<");
 
             // Append the element prefix, if any.
-            String elemPrefix = parser.getPrefix();
+            String elemPrefix = element.getPrefix();
             if(elemPrefix != null)
                 content.append(elemPrefix + ":");
-            neededNamespaces.put(elemPrefix == null? "":elemPrefix, parser.getNamespace());
+            if(element.getNamespaceURI() != null)
+                neededNamespaces.put(elemPrefix == null? "":elemPrefix, element.getNamespaceURI());
 
-            content.append(parser.getName());
-            for(int i = 0; i < parser.getAttributeCount(); ++i) {
+            content.append(element.getLocalName());
+            NamedNodeMap attributes = element.getAttributes();
+            for(int i = 0; i < attributes.getLength(); ++i) {
+                Attr attr = (Attr) attributes.item(i);
+
                 // Some XML parsers include xmlns attributes and some don't.  We handle them below
                 // in case they don't, so exclude any provided xmlns attributes.
-                String attrName = parser.getAttributeName(i);
+                String attrName = attr.getLocalName();
                 if(attrName.equals("xmlns"))
                     continue;
 
                 content.append(" ");
 
                 // Append the attribute prefix, if any.
-                String attrPrefix = parser.getAttributePrefix(i);
+                String attrPrefix = attr.getPrefix();
                 if(attrPrefix != null)
-                    neededNamespaces.put(attrPrefix, parser.getAttributeNamespace(i));
+                    neededNamespaces.put(attrPrefix, attr.getNamespaceURI());
                 if(attrPrefix != null)
                     content.append(attrPrefix + ":");
 
                 content.append(attrName + "='");
-                String attrValue = parser.getAttributeValue(i);
-                content.append(StringUtils.escapeForXML(attrValue));
+                content.append(StringUtils.escapeForXML(attr.getValue()));
                 content.append("'");
             }
 
@@ -225,28 +226,25 @@ public class XmlUtil {
             content.append(">");
         }
 
-        while (true) {
-            parser.next();
-            switch(parser.getEventType()) {
-            case XmlPullParser.START_TAG:
-                parserNodeToString(content, parser, namespaceNodes);
-                break;
-            case XmlPullParser.END_TAG:
-                content.append("</");
-                if(parser.getPrefix() != null)
-                    content.append(parser.getPrefix() + ":");
-                content.append(parser.getName() + ">");
-                return;
-            case XmlPullParser.END_DOCUMENT:
-                return;
-            default:
-                String text = parser.getText();
+        NodeList children = element.getChildNodes();
+        ArrayList<Element> result = new ArrayList<Element>(children.getLength());
+        for(int i = 0; i < children.getLength(); ++i) {
+            Node child = children.item(i);
+            if(child instanceof Element) {
+                elementToString(content, (Element) child, namespaceNodes);
+            }
+            else if(child instanceof Text) {
+                String text = ((Text) child).getData();
                 if(text == null)
-                    throw new RuntimeException("Unexpected null result from parser.getText");
+                    throw new RuntimeException("Unexpected null result from Text.getText");
                 content.append(StringUtils.escapeForXML(text));
-                break;
             }
         }
+
+        content.append("</");
+        if(element.getPrefix() != null)
+            content.append(element.getPrefix() + ":");
+        content.append(element.getLocalName() + ">");
     }
 
 

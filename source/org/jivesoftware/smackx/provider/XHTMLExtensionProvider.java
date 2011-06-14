@@ -24,6 +24,7 @@ import org.jivesoftware.smack.packet.PacketExtension;
 import org.jivesoftware.smack.provider.PacketExtensionProvider;
 import org.jivesoftware.smack.util.XmlUtil;
 import org.jivesoftware.smackx.packet.XHTMLExtension;
+import org.w3c.dom.Element;
 import org.xmlpull.v1.XmlPullParser;
 
 /**
@@ -43,37 +44,15 @@ public class XHTMLExtensionProvider extends PacketExtensionProvider {
     /**
      * Parses a XHTMLExtension packet (extension sub-packet).
      *
-     * @param parser the XML parser, positioned at the starting element of the extension.
      * @return a PacketExtension.
-     * @throws Exception if a parsing error occurs.
      */
-    protected PacketExtension parseExtension(XmlPullParser parser)
-        throws Exception {
+    public PacketExtension parseExtension(Element packet) {
         XHTMLExtension xhtmlExtension = new XHTMLExtension();
-        int startDepth = parser.getDepth();
-        while (true) {
-            int eventType = parser.next();
-            if (eventType == XmlPullParser.START_TAG) {
-                if (parser.getName().equals("body") &&
-                    parser.getNamespace().equals("http://www.w3.org/1999/xhtml")) {
-                    String content = XmlUtil.parserNodeToString(parser);
-                    xhtmlExtension.addBody(content);
-                    continue;
-                }
-
-                // Ignore any unrecognized tags.  Read until we receive the END_TAG at our
-                // current level.
-                int currentLevel = parser.getDepth();
-                do {
-                    eventType = parser.next();
-                    if(eventType == XmlPullParser.END_DOCUMENT)
-                        break;
-                } while(eventType != XmlPullParser.END_TAG || parser.getDepth() > currentLevel);
-            } else if (eventType == XmlPullParser.END_TAG) {
-                if (parser.getName().equals(xhtmlExtension.getElementName())
-                        && parser.getDepth() <= startDepth) {
-                    break;
-                }
+        for(Element child: XmlUtil.getChildElements(packet)) {
+            if (child.getLocalName().equals("body") &&
+                child.getNamespaceURI().equals("http://www.w3.org/1999/xhtml")) {
+                String content = XmlUtil.elementToString(child);
+                xhtmlExtension.addBody(content);
             }
         }
 
