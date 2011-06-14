@@ -103,7 +103,7 @@ public class XHTMLText {
      * @param lang the language of the body
      */
     private void appendOpenBodyTag(String style, String lang) {
-        StringBuilder sb = new StringBuilder("<body");
+        StringBuilder sb = new StringBuilder("<body xmlns=\"http://www.w3.org/1999/xhtml\"");
         if (style != null) {
             sb.append(" style=\"");
             sb.append(style);
