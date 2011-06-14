@@ -25,6 +25,7 @@ import org.jivesoftware.smack.util.StringUtils;
 import org.w3c.dom.Element;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.*;
@@ -403,7 +404,7 @@ public abstract class Packet {
                         String encodedVal = StringUtils.encodeBase64(byteStream.toByteArray());
                         buf.append(encodedVal).append("</value>");
                     }
-                    catch (Exception e) {
+                    catch (IOException e) {
                         e.printStackTrace();
                     }
                     finally {
@@ -411,7 +412,7 @@ public abstract class Packet {
                             try {
                                 out.close();
                             }
-                            catch (Exception e) {
+                            catch (IOException e) {
                                 // Ignore.
                             }
                         }
@@ -419,7 +420,7 @@ public abstract class Packet {
                             try {
                                 byteStream.close();
                             }
-                            catch (Exception e) {
+                            catch (IOException e) {
                                 // Ignore.
                             }
                         }
