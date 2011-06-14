@@ -23,8 +23,12 @@ package org.jivesoftware.smackx.provider;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.packet.PacketExtension;
 import org.jivesoftware.smack.provider.PacketExtensionProvider;
+import org.jivesoftware.smack.util.XmlPullParserDom;
+import org.jivesoftware.smack.util.XmlUtil;
+import org.w3c.dom.Element;
 import org.xmlpull.v1.XmlPullParser;
 
 /**
@@ -65,27 +69,19 @@ public class PEPProvider extends PacketExtensionProvider {
      * @return a PacketExtension.
      * @throws Exception if a parsing error occurs.
      */
-    public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
-
+    public PacketExtension parseExtension(Element packet) throws XMPPException {
         boolean done = false;
-        while (!done) {
-            int eventType = parser.next();
-            if (eventType == XmlPullParser.START_TAG) {
-                if (parser.getName().equals("event")) {
-                } else if (parser.getName().equals("items")) {
-                    // Figure out the node for this event.
-                    String node = parser.getAttributeValue("", "node");
-                    // Get the parser for this kind of node, and if found then parse the node.
-                    PacketExtensionProvider nodeParser = nodeParsers.get(node);
-                    if (nodeParser != null) {
-                        pepItem = nodeParser.parseExtension(parser);
-                    }
-                 }
-            } else if (eventType == XmlPullParser.END_TAG) {
-                if (parser.getName().equals("event")) {
-                    done = true;
+        for(Element child: XmlUtil.getChildElements(packet)) {
+            if (child.getLocalName().equals("event")) {
+            } else if (child.getLocalName().equals("items")) {
+                // Figure out the node for this event.
+                String node = child.getAttribute("node");
+                // Get the parser for this kind of node, and if found then parse the node.
+                PacketExtensionProvider nodeParser = nodeParsers.get(node);
+                if (nodeParser != null) {
+                    return nodeParser.parseExtension(child);
                 }
-            }
+             }
         }
 
         return pepItem;
