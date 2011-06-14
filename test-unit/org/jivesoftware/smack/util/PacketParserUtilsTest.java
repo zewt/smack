@@ -48,6 +48,7 @@ public class PacketParserUtilsTest {
         
         // message has default language, body has no language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -67,6 +68,7 @@ public class PacketParserUtilsTest {
 
         // message has non-default language, body has no language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -86,6 +88,7 @@ public class PacketParserUtilsTest {
         
         // message has no language, body has no language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -104,6 +107,7 @@ public class PacketParserUtilsTest {
 
         // message has no language, body has default language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -125,6 +129,7 @@ public class PacketParserUtilsTest {
 
         // message has no language, body has non-default language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -145,6 +150,7 @@ public class PacketParserUtilsTest {
 
         // message has default language, body has non-default language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -166,6 +172,7 @@ public class PacketParserUtilsTest {
 
         // message has non-default language, body has default language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -196,6 +203,7 @@ public class PacketParserUtilsTest {
         
         // message has default language, subject has no language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -215,6 +223,7 @@ public class PacketParserUtilsTest {
 
         // message has non-default language, subject has no language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -234,6 +243,7 @@ public class PacketParserUtilsTest {
         
         // message has no language, subject has no language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -252,6 +262,7 @@ public class PacketParserUtilsTest {
 
         // message has no language, subject has default language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -273,6 +284,7 @@ public class PacketParserUtilsTest {
 
         // message has no language, subject has non-default language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -293,6 +305,7 @@ public class PacketParserUtilsTest {
 
         // message has default language, subject has non-default language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -314,6 +327,7 @@ public class PacketParserUtilsTest {
 
         // message has non-default language, subject has default language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -345,6 +359,7 @@ public class PacketParserUtilsTest {
 
         // message has default language, first body no language, second body other language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -369,6 +384,7 @@ public class PacketParserUtilsTest {
 
         // message has default language, first body no language, second body default language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -392,6 +408,7 @@ public class PacketParserUtilsTest {
 
         // message has non-default language, first body no language, second body default language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -416,6 +433,7 @@ public class PacketParserUtilsTest {
 
         // message has no language, first body no language, second body default language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -438,6 +456,7 @@ public class PacketParserUtilsTest {
 
         // message has no language, first body no language, second body other language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -461,6 +480,7 @@ public class PacketParserUtilsTest {
 
         // message has no language, first body no language, second body no language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -492,6 +512,7 @@ public class PacketParserUtilsTest {
 
         // message has default language, first subject no language, second subject other language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -516,6 +537,7 @@ public class PacketParserUtilsTest {
 
         // message has default language, first subject no language, second subject default language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -539,6 +561,7 @@ public class PacketParserUtilsTest {
 
         // message has non-default language, first subject no language, second subject default language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -563,6 +586,7 @@ public class PacketParserUtilsTest {
 
         // message has no language, first subject no language, second subject default language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -585,6 +609,7 @@ public class PacketParserUtilsTest {
 
         // message has no language, first subject no language, second subject other language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -608,6 +633,7 @@ public class PacketParserUtilsTest {
 
         // message has no language, first subject no language, second subject no language
         control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -632,6 +658,7 @@ public class PacketParserUtilsTest {
     @Test
     public void invalidMessageBodyContainingTagTest() throws Exception {
         String control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -664,6 +691,7 @@ public class PacketParserUtilsTest {
     @Test
     public void invalidXMLInMessageBody() throws Exception {
         String validControl = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -709,6 +737,7 @@ public class PacketParserUtilsTest {
     @Test
     public void multipleMessageBodiesParsingTest() throws Exception {
         String control = XMLBuilder.create("message")
+            .a("xmlns", "jabber:client")
             .a("from", "romeo@montague.lit/orchard")
             .a("to", "juliet@capulet.lit/balcony")
             .a("id", "zid615d9")
@@ -733,6 +762,7 @@ public class PacketParserUtilsTest {
     private Element getPacket(String control) throws XmlPullParserException, XMPPException, IOException {
         XmlPullParser parser = XmlPullParserFactory.newInstance().newPullParser();
         parser.setInput(new StringReader(control));
+        parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
         while(true) {
             if(parser.next() == XmlPullParser.START_TAG
                     && parser.getName().equals("message")) { break; }
