@@ -63,6 +63,8 @@ import org.jivesoftware.smack.filter.ThreadFilter;
 import org.jivesoftware.smack.packet.Message;
 import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.test.SmackTestCase;
+import org.jivesoftware.smack.util.XmlUtil;
+import org.w3c.dom.Element;
 
 /**
  * Test the XHTML extension using the low level API
@@ -83,7 +85,7 @@ public class XHTMLExtensionTest extends SmackTestCase {
      * This is a simple test to use with a XMPP client and check if the client receives the message
      * 1. User_1 will send a message with formatted text (XHTML) to user_2
      */
-    public void testSendSimpleXHTMLMessage() {
+    public void testSendSimpleXHTMLMessage() throws Exception {
 	// User1 creates a chat with user2
 	Chat chat1 = getConnection(0).getChatManager().createChat(getBareJID(1), null);
 
@@ -93,8 +95,8 @@ public class XHTMLExtensionTest extends SmackTestCase {
 	msg.setBody("Hey John, this is my new green!!!!");
 	// Create a XHTMLExtension Package and add it to the message
 	XHTMLExtension xhtmlExtension = new XHTMLExtension();
-	xhtmlExtension.addBody(
-	"<body><p style='font-size:large'>Hey John, this is my new <span style='color:green'>green</span><em>!!!!</em></p></body>");
+        xhtmlExtension.addBody(XmlUtil.getXMLRootNode(
+	"<body><p style='font-size:large'>Hey John, this is my new <span style='color:green'>green</span><em>!!!!</em></p></body>"));
 	msg.addExtension(xhtmlExtension);
 
 	// User1 sends the message that contains the XHTML to user2
@@ -115,7 +117,7 @@ public class XHTMLExtensionTest extends SmackTestCase {
      * 3. User_1 will wait several seconds for an ACK from user_2, if none is received then
      * something is wrong
      */
-    public void testSendSimpleXHTMLMessageAndDisplayReceivedXHTMLMessage() {
+    public void testSendSimpleXHTMLMessageAndDisplayReceivedXHTMLMessage() throws Exception {
 	// Create a chat for each connection
 	Chat chat1 = getConnection(0).getChatManager().createChat(getBareJID(1), null);
 	final PacketCollector chat2 = getConnection(1).createPacketCollector(
@@ -127,8 +129,8 @@ public class XHTMLExtensionTest extends SmackTestCase {
 	msg.setBody("Hey John, this is my new green!!!!");
 	// Create a XHTMLExtension Package and add it to the message
 	XHTMLExtension xhtmlExtension = new XHTMLExtension();
-	xhtmlExtension.addBody(
-	"<ignored>blah</ignored><body xmlns='http://www.w3.org/1999/xhtml'><p style='font-size:large'>Hey John, this is my new <span style='color:green'>green</span><em>!!!!</em></p></body>");
+        xhtmlExtension.addBody(XmlUtil.getXMLRootNode(
+	"<body xmlns='http://www.w3.org/1999/xhtml'><p style='font-size:large'>Hey John, this is my new <span style='color:green'>green</span><em>!!!!</em></p></body>"));
 	msg.addExtension(xhtmlExtension);
 
 	// User1 sends the message that contains the XHTML to user2
@@ -150,16 +152,16 @@ public class XHTMLExtensionTest extends SmackTestCase {
 		    "Message without extension \"http://jabber.org/protocol/xhtml-im\"",
 		    xhtmlExtension);
 	    assertTrue("Message without XHTML bodies", xhtmlExtension.getBodiesCount() > 0);
-	    for (Iterator it = xhtmlExtension.getBodies(); it.hasNext();) {
+	    for (Iterator<Element> it = xhtmlExtension.getBodies(); it.hasNext();) {
 	        String expected =
 	            "<body xmlns='http://www.w3.org/1999/xhtml'><p style='font-size:large'>" +
 	            "Hey John, this is my new <span style='color:green'>green</span><em>!!!!</em></p></body>";
-		String body = (String) it.next();
+                String body = XmlUtil.elementToString(it.next());
 		assertEquals(expected, body);
 	    }
 	}
 	catch (ClassCastException e) {
-	    fail("ClassCastException - Most probable cause is that smack providers is misconfigured");
+	    throw new RuntimeException("ClassCastException - Most probable cause is that smack providers is misconfigured", e);
 	}
     }
 
@@ -171,7 +173,7 @@ public class XHTMLExtensionTest extends SmackTestCase {
      * 3. User_1 will wait several seconds for an ACK from user_2, if none is received then
      * something is wrong
      */
-    public void testSendComplexXHTMLMessageAndDisplayReceivedXHTMLMessage() {
+    public void testSendComplexXHTMLMessageAndDisplayReceivedXHTMLMessage() throws Exception {
 	// Create a chat for each connection
 	Chat chat1 = getConnection(0).getChatManager().createChat(getBareJID(1), null);
 	final PacketCollector chat2 = getConnection(1).createPacketCollector(
@@ -197,10 +199,10 @@ public class XHTMLExtensionTest extends SmackTestCase {
                 "awesome! As Emerson once said: A foolish consistency is the hobgoblin of little minds.");
         // Create an XHTMLExtension and add it to the message
         XHTMLExtension xhtmlExtension = new XHTMLExtension();
-        xhtmlExtension.addBody(
-                "<body xmlns='http://www.w3.org/1999/xhtml' xml:lang=\"es-ES\"><h1>impresionante!</h1><p>Como Emerson dijo una vez:</p><blockquote><p>Una consistencia ridicula es el espantajo de mentes pequenas.</p></blockquote></body>");
-        xhtmlExtension.addBody(
-                "<body xmlns='http://www.w3.org/1999/xhtml' xml:lang=\"en-US\"><h1>awesome!</h1><p>As Emerson once said:</p><blockquote><p>A foolish consistency is the hobgoblin of little minds.</p></blockquote></body>");
+        xhtmlExtension.addBody(XmlUtil.getXMLRootNode(
+                "<body xmlns='http://www.w3.org/1999/xhtml' xml:lang=\"es-ES\"><h1>impresionante!</h1><p>Como Emerson dijo una vez:</p><blockquote><p>Una consistencia ridicula es el espantajo de mentes pequenas.</p></blockquote></body>"));
+        xhtmlExtension.addBody(XmlUtil.getXMLRootNode(
+                "<body xmlns='http://www.w3.org/1999/xhtml' xml:lang=\"en-US\"><h1>awesome!</h1><p>As Emerson once said:</p><blockquote><p>A foolish consistency is the hobgoblin of little minds.</p></blockquote></body>"));
         msg.addExtension(xhtmlExtension);
 
 	// User1 sends the message that contains the XHTML to user2
@@ -225,18 +227,18 @@ public class XHTMLExtensionTest extends SmackTestCase {
 		    "Message without extension \"http://jabber.org/protocol/xhtml-im\"",
 		    xhtmlExtension);
 	    assertTrue("Message without XHTML bodies", xhtmlExtension.getBodiesCount() > 0);
-            Iterator<String> it = xhtmlExtension.getBodies();
+            Iterator<Element> it = xhtmlExtension.getBodies();
 
 	    // Verify the result.  Note that this verification depends on our particular
 	    // implementation of XmlUtil.parserNodeToString.
 	    String expect_ES =
                 "<body xml:lang='es-ES' xmlns='http://www.w3.org/1999/xhtml'><h1>impresionante!</h1><p>Como Emerson dijo una vez:</p><blockquote><p>Una consistencia ridicula es el espantajo de mentes pequenas.</p></blockquote></body>";
-            String result = it.next();
+            String result = XmlUtil.elementToString(it.next());
 	    assertEquals(expect_ES, result);
 
 	    String expect_EN =
                 "<body xml:lang='en-US' xmlns='http://www.w3.org/1999/xhtml'><h1>awesome!</h1><p>As Emerson once said:</p><blockquote><p>A foolish consistency is the hobgoblin of little minds.</p></blockquote></body>";
-            result = it.next();
+            result = XmlUtil.elementToString(it.next());
             assertEquals(expect_EN, result);
 	}
 	catch (ClassCastException e) {

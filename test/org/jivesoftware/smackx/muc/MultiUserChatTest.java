@@ -58,12 +58,14 @@ import org.jivesoftware.smack.packet.Message;
 import org.jivesoftware.smack.packet.Presence;
 import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.test.SmackTestCase;
+import org.jivesoftware.smack.util.XmlUtil;
 import org.jivesoftware.smackx.Form;
 import org.jivesoftware.smackx.FormField;
 import org.jivesoftware.smackx.ServiceDiscoveryManager;
 import org.jivesoftware.smackx.packet.DelayInformation;
 import org.jivesoftware.smackx.packet.DiscoverInfo;
 import org.jivesoftware.smackx.packet.XHTMLExtension;
+import org.w3c.dom.Element;
 
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -347,14 +349,16 @@ public class MultiUserChatTest extends SmackTestCase {
                     XHTMLExtension extension = (XHTMLExtension) message.getExtension("html",
                             "http://jabber.org/protocol/xhtml-im");
                     assertNotNull("An extension was not found in the invitation", extension);
-                    answer[1] = (String) extension.getBodies().next();
+
+                    Element body = extension.getBodies().next();
+                    answer[1] = XmlUtil.elementToString(body);
                 }
             });
 
             // User2 invites user3 to join to the room
             Message msg = new Message();
             XHTMLExtension xhtmlExtension = new XHTMLExtension();
-            xhtmlExtension.addBody("<body>Meet me in this excellent room</body>");
+            xhtmlExtension.addBody(XmlUtil.getXMLRootNode("<body>Meet me in this excellent room</body>"));
             msg.addExtension(xhtmlExtension);
             muc2.invite(msg , getFullJID(2), "Meet me in this excellent room");
             Thread.sleep(350);

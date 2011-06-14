@@ -51,8 +51,7 @@ public class XHTMLExtensionProvider extends PacketExtensionProvider {
         for(Element child: XmlUtil.getChildElements(packet)) {
             if (child.getLocalName().equals("body") &&
                 child.getNamespaceURI().equals("http://www.w3.org/1999/xhtml")) {
-                String content = XmlUtil.elementToString(child);
-                xhtmlExtension.addBody(content);
+                xhtmlExtension.addBody(child);
             }
         }
 

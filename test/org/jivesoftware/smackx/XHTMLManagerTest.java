@@ -58,6 +58,8 @@ import org.jivesoftware.smack.*;
 import org.jivesoftware.smack.filter.ThreadFilter;
 import org.jivesoftware.smack.packet.*;
 import org.jivesoftware.smack.test.SmackTestCase;
+import org.jivesoftware.smack.util.XmlUtil;
+import org.w3c.dom.Element;
 
 /**
  * Test the XHTML extension using the high level API
@@ -82,7 +84,7 @@ public class XHTMLManagerTest extends SmackTestCase {
      * This is a simple test to use with a XMPP client and check if the client receives the message
      * 1. User_1 will send a message with formatted text (XHTML) to user_2
      */
-    public void testSendSimpleXHTMLMessage() {
+    public void testSendSimpleXHTMLMessage() throws Exception {
         // User1 creates a chat with user2
         Chat chat1 = getConnection(0).getChatManager().createChat(getBareJID(1), null);
 
@@ -122,7 +124,7 @@ public class XHTMLManagerTest extends SmackTestCase {
     * 3. User_1 will wait several seconds for an ACK from user_2, if none is received then 
     *    something is wrong
     */
-    public void testSendSimpleXHTMLMessageAndDisplayReceivedXHTMLMessage() {
+    public void testSendSimpleXHTMLMessageAndDisplayReceivedXHTMLMessage() throws Exception {
         // Create a chat for each connection
         Chat chat1 = getConnection(0).getChatManager().createChat(getBareJID(1), null);
         final PacketCollector chat2 = getConnection(1).createPacketCollector(
@@ -148,11 +150,7 @@ public class XHTMLManagerTest extends SmackTestCase {
         XHTMLManager.addBody(msg, xhtmlText.toString());
 
         // User1 sends the message that contains the XHTML to user2
-        try {
-            chat1.sendMessage(msg);
-        } catch (Exception e) {
-            fail("An error occured sending the message with XHTML");
-        }
+        chat1.sendMessage(msg);
 
         Packet packet = chat2.nextResult(2000);
         Message message = (Message) packet;
@@ -163,13 +161,13 @@ public class XHTMLManagerTest extends SmackTestCase {
             assertTrue(
                     "Message without XHTML bodies",
                     XHTMLManager.getBodies(message).hasNext());
-            for (Iterator it = XHTMLManager.getBodies(message); it.hasNext();) {
-                String body = (String) it.next();
+            for (Iterator<Element> it = XHTMLManager.getBodies(message); it.hasNext();) {
+                String body = XmlUtil.elementToString(it.next());
                 System.out.println(body);
             }
         }
         catch (ClassCastException e) {
-            fail("ClassCastException - Most probable cause is that smack providers is misconfigured");
+            throw new RuntimeException("ClassCastException - Most probable cause is that smack providers is misconfigured", e);
         }
         assertNotNull("No reply received", msg);
     }
@@ -182,7 +180,7 @@ public class XHTMLManagerTest extends SmackTestCase {
     * 3. User_1 will wait several seconds for an ACK from user_2, if none is received then 
     *    something is wrong
     */
-    public void testSendComplexXHTMLMessageAndDisplayReceivedXHTMLMessage() {
+    public void testSendComplexXHTMLMessageAndDisplayReceivedXHTMLMessage() throws Exception {
         // Create a chat for each connection
         Chat chat1 = getConnection(0).getChatManager().createChat(getBareJID(1), null);
         final PacketCollector chat2 = getConnection(1).createPacketCollector(
@@ -245,9 +243,9 @@ public class XHTMLManagerTest extends SmackTestCase {
             assertTrue(
                     "Message without XHTML bodies",
                     XHTMLManager.getBodies(message).hasNext());
-            for (Iterator it = XHTMLManager.getBodies(message); it.hasNext();) {
+            for (Iterator<Element> it = XHTMLManager.getBodies(message); it.hasNext();) {
                 received++;
-                String body = (String) it.next();
+                String body = XmlUtil.elementToString(it.next());
                 System.out.println(body);
             }
             bodiesReceived = received;

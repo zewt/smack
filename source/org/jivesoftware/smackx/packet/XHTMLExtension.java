@@ -21,11 +21,14 @@
 package org.jivesoftware.smackx.packet;
 
 import org.jivesoftware.smack.packet.PacketExtension;
+import org.jivesoftware.smack.util.XmlUtil;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+
+import org.w3c.dom.Element;
 
 /**
  * An XHTML sub-packet, which is used by XMPP clients to exchange formatted text. The XHTML 
@@ -38,7 +41,7 @@ import java.util.List;
  */
 public class XHTMLExtension implements PacketExtension {
 
-    private List<String> bodies = new ArrayList<String>();
+    private List<Element> bodyNodes = new ArrayList<Element>();
 
     /**
     * Returns the XML element name of the extension sub-packet root element.
@@ -81,8 +84,9 @@ public class XHTMLExtension implements PacketExtension {
         buf.append("<").append(getElementName()).append(" xmlns=\"").append(getNamespace()).append(
             "\">");
         // Loop through all the bodies and append them to the string buffer
-        for (Iterator i = getBodies(); i.hasNext();) {
-            buf.append((String) i.next());
+        for (Iterator<Element> i = getBodies(); i.hasNext();) {
+            String data = XmlUtil.elementToString(i.next());
+            buf.append(data);
         }
         buf.append("</").append(getElementName()).append(">");
         return buf.toString();
@@ -93,9 +97,9 @@ public class XHTMLExtension implements PacketExtension {
      *
      * @return an Iterator for the bodies in the packet.
      */
-    public Iterator<String> getBodies() {
-        synchronized (bodies) {
-            return Collections.unmodifiableList(new ArrayList(bodies)).iterator();
+    public Iterator<Element> getBodies() {
+        synchronized (bodyNodes) {
+            return Collections.unmodifiableList(new ArrayList(bodyNodes)).iterator();
         }
     }
 
@@ -104,9 +108,9 @@ public class XHTMLExtension implements PacketExtension {
      *
      * @param body the body to add.
      */
-    public void addBody(String body) {
-        synchronized (bodies) {
-            bodies.add(body);
+    public void addBody(Element body) {
+        synchronized (bodyNodes) {
+            bodyNodes.add(body);
         }
     }
 
@@ -116,7 +120,7 @@ public class XHTMLExtension implements PacketExtension {
      * @return the number of bodies in the XHTML packet.
      */
     public int getBodiesCount() {
-        return bodies.size();
+        return bodyNodes.size();
     }
 
 }

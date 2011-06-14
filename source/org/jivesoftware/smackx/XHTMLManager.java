@@ -24,8 +24,11 @@ import org.jivesoftware.smack.ConnectionCreationListener;
 import org.jivesoftware.smack.Connection;
 import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.packet.Message;
+import org.jivesoftware.smack.util.XmlUtil;
 import org.jivesoftware.smackx.packet.DiscoverInfo;
 import org.jivesoftware.smackx.packet.XHTMLExtension;
+import org.w3c.dom.Element;
+import org.xml.sax.SAXException;
 
 import java.util.Iterator;
 
@@ -57,7 +60,7 @@ public class XHTMLManager {
      * @param message an XHTML message
      * @return an Iterator for the bodies in the message or null if none.
      */
-    public static Iterator<String> getBodies(Message message) {
+    public static Iterator<Element> getBodies(Message message) {
         XHTMLExtension xhtmlExtension = (XHTMLExtension) message.getExtension("html", namespace);
         if (xhtmlExtension != null)
             return xhtmlExtension.getBodies();
@@ -71,7 +74,28 @@ public class XHTMLManager {
      * @param message the message that will receive the XHTML body
      * @param body the string to add as an XHTML body to the message
      */
-    public static void addBody(Message message, String body) {
+    public static void addBody(Message message, String body) throws XMPPException {
+        try {
+            addBody(message, XmlUtil.getXMLRootNode(body));
+        } catch (SAXException e) {
+            throw new XMPPException(e);
+        }
+    }
+
+    /**
+     * Adds an XHTML body to the message.
+     * <p>
+     * The root node of Element must be &lt;body xmlns="http://www.w3.org/1999/xhtml">.
+     *
+     * @param message the message that will receive the XHTML body
+     * @param body the element to add as an XHTML body to the message
+     */
+    public static void addBody(Message message, Element body) {
+        if(!body.getLocalName().equals("body") ||
+           body.getNamespaceURI() == null ||
+           !body.getNamespaceURI().equals("http://www.w3.org/1999/xhtml"))
+            throw new IllegalArgumentException("XHTML-IM body elements must be <body xmlns=\"http://www.w3.org/1999/xhtml\">");
+
         XHTMLExtension xhtmlExtension = (XHTMLExtension) message.getExtension("html", namespace);
         if (xhtmlExtension == null) {
             // Create an XHTMLExtension and add it to the message
