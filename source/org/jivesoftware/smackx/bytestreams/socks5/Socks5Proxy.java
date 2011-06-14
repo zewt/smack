@@ -313,6 +313,7 @@ public class Socks5Proxy {
         public void run() {
             while (true) {
                 Socket socket = null;
+                boolean error = false;
 
                 try {
 
@@ -333,15 +334,17 @@ public class Socks5Proxy {
                      * do nothing, if caused by closing the server socket, thread will terminate in
                      * next loop
                      */
-                }
-                catch (Exception e) {
-                    try {
-                        if (socket != null) {
-                            socket.close();
+                } catch (XMPPException e) {
+                    error = true;
+                } catch (IOException e) {
+                    error = true;
+                } finally {
+                    if(error) {
+                        try {
+                            if (socket != null)
+                                socket.close();
                         }
-                    }
-                    catch (IOException e1) {
-                        /* do nothing */
+                        catch (IOException e) { /* ignore */ }
                     }
                 }
             }
