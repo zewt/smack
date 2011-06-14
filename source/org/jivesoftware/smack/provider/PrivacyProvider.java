@@ -21,7 +21,7 @@ public class PrivacyProvider extends IQProvider {
 	public PrivacyProvider() {
 	}
 
-	public IQ parseIQ(XmlPullParser parser) throws Exception {
+	protected IQ parseIQ(XmlPullParser parser) throws Exception {
         Privacy privacy = new Privacy();
         /* privacy.addExtension(PacketParserUtils.parsePacketExtension(parser
                 .getName(), parser.getNamespace(), parser)); */

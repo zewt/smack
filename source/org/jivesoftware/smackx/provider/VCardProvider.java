@@ -45,7 +45,7 @@ public class VCardProvider extends IQProvider {
 
     private static final String PREFERRED_ENCODING = "UTF-8";
 
-    public IQ parseIQ(XmlPullParser parser) throws Exception {
+    protected IQ parseIQ(XmlPullParser parser) throws Exception {
         final StringBuilder sb = new StringBuilder();
         try {
             int event = parser.getEventType();

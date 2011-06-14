@@ -40,7 +40,7 @@ public class DataPacketProvider extends PacketExtensionProvider {
     }
 
     static public class DataPacketIQ extends IQProvider {
-        public IQ parseIQ(XmlPullParser parser) throws Exception {
+        protected IQ parseIQ(XmlPullParser parser) throws Exception {
             DataPacketExtension data = parse(parser);
             return new Data(data);
         }

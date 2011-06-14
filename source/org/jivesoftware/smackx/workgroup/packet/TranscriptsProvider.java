@@ -48,7 +48,7 @@ public class TranscriptsProvider extends IQProvider {
         super();
     }
 
-    public IQ parseIQ(XmlPullParser parser) throws Exception {
+    protected IQ parseIQ(XmlPullParser parser) throws Exception {
         String userID = parser.getAttributeValue("", "userID");
         List<Transcripts.TranscriptSummary> summaries = new ArrayList<Transcripts.TranscriptSummary>();
 

@@ -105,7 +105,7 @@ public class AgentInfo extends IQ {
             super();
         }
 
-        public IQ parseIQ(XmlPullParser parser) throws Exception {
+        protected IQ parseIQ(XmlPullParser parser) throws Exception {
             AgentInfo answer = new AgentInfo();
 
             boolean done = false;

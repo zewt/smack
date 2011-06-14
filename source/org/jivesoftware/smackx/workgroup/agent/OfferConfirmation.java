@@ -60,7 +60,7 @@ public class OfferConfirmation extends IQ {
 
     public static class Provider extends IQProvider {
 
-        public IQ parseIQ(XmlPullParser parser) throws Exception {
+        protected IQ parseIQ(XmlPullParser parser) throws Exception {
             final OfferConfirmation confirmation = new OfferConfirmation();
 
             boolean done = false;

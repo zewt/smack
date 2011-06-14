@@ -52,7 +52,7 @@ public class SharedGroupsInfo extends IQ {
             super();
         }
 
-        public IQ parseIQ(XmlPullParser parser) throws Exception {
+        protected IQ parseIQ(XmlPullParser parser) throws Exception {
             SharedGroupsInfo groupsInfo = new SharedGroupsInfo();
 
             boolean done = false;

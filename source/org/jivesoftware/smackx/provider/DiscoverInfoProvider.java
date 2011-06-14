@@ -33,7 +33,7 @@ import org.xmlpull.v1.XmlPullParser;
 */
 public class DiscoverInfoProvider extends IQProvider {
 
-    public IQ parseIQ(XmlPullParser parser) throws Exception {
+    protected IQ parseIQ(XmlPullParser parser) throws Exception {
         DiscoverInfo discoverInfo = new DiscoverInfo();
         boolean done = false;
         DiscoverInfo.Feature feature = null;

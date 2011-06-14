@@ -170,7 +170,7 @@ public class UserSearch extends IQ {
             super();
         }
 
-        public IQ parseIQ(XmlPullParser parser) throws Exception {
+        protected IQ parseIQ(XmlPullParser parser) throws Exception {
             UserSearch search = null;
             SimpleUserSearch simpleUserSearch = new SimpleUserSearch();
 

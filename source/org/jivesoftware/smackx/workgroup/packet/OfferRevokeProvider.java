@@ -30,7 +30,7 @@ import org.xmlpull.v1.XmlPullParser;
  */
 public class OfferRevokeProvider extends IQProvider {
 
-    public IQ parseIQ (XmlPullParser parser) throws Exception {
+    protected IQ parseIQ (XmlPullParser parser) throws Exception {
         // The parser will be positioned on the opening IQ tag, so get the JID attribute.
         String userJID = parser.getAttributeValue("", "jid");
         // Default the userID to the JID.

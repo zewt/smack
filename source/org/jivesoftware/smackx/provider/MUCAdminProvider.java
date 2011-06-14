@@ -32,7 +32,7 @@ import org.xmlpull.v1.XmlPullParser;
  */
 public class MUCAdminProvider extends IQProvider {
 
-    public IQ parseIQ(XmlPullParser parser) throws Exception {
+    protected IQ parseIQ(XmlPullParser parser) throws Exception {
         MUCAdmin mucAdmin = new MUCAdmin();
         boolean done = false;
         while (!done) {

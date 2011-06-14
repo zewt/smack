@@ -25,7 +25,7 @@ import org.xmlpull.v1.XmlPullParser;
  */
 public class CloseIQProvider extends IQProvider {
 
-    public IQ parseIQ(XmlPullParser parser) throws Exception {
+    protected IQ parseIQ(XmlPullParser parser) throws Exception {
         String sid = parser.getAttributeValue("", "sid");
         return new Close(sid);
     }

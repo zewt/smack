@@ -100,7 +100,7 @@ public class Macros extends IQ {
             super();
         }
 
-        public IQ parseIQ(XmlPullParser parser) throws Exception {
+        protected IQ parseIQ(XmlPullParser parser) throws Exception {
             Macros macroGroup = new Macros();
 
             boolean done = false;

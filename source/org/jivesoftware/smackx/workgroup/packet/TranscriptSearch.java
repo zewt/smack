@@ -64,7 +64,7 @@ public class TranscriptSearch extends IQ {
             super();
         }
 
-        public IQ parseIQ(XmlPullParser parser) throws Exception {
+        protected IQ parseIQ(XmlPullParser parser) throws Exception {
             TranscriptSearch answer = new TranscriptSearch();
 
             boolean done = false;

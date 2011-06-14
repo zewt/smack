@@ -80,7 +80,7 @@ public class SearchSettings extends IQ {
      */
     public static class InternalProvider extends IQProvider {
 
-        public IQ parseIQ(XmlPullParser parser) throws Exception {
+        protected IQ parseIQ(XmlPullParser parser) throws Exception {
             if (parser.getEventType() != XmlPullParser.START_TAG) {
                 throw new IllegalStateException("Parser not in proper position, or bad XML.");
             }

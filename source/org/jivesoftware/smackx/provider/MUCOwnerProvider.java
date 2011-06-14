@@ -33,7 +33,7 @@ import org.xmlpull.v1.XmlPullParser;
  */
 public class MUCOwnerProvider extends IQProvider {
 
-    public IQ parseIQ(XmlPullParser parser) throws Exception {
+    protected IQ parseIQ(XmlPullParser parser) throws Exception {
         MUCOwner mucOwner = new MUCOwner();
         boolean done = false;
         while (!done) {

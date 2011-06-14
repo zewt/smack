@@ -100,7 +100,7 @@ public class LastActivity extends IQ {
             super();
         }
 
-        public IQ parseIQ(XmlPullParser parser) throws Exception {
+        protected IQ parseIQ(XmlPullParser parser) throws Exception {
             if (parser.getEventType() != XmlPullParser.START_TAG) {
                 throw new IllegalStateException("Parser not in proper position, or bad XML.");
             }

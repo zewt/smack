@@ -83,7 +83,7 @@ public class ChatNotes extends IQ {
             super();
         }
 
-        public IQ parseIQ(XmlPullParser parser) throws Exception {
+        protected IQ parseIQ(XmlPullParser parser) throws Exception {
             ChatNotes chatNotes = new ChatNotes();
 
             boolean done = false;

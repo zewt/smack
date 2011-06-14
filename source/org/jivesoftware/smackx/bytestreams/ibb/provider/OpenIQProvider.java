@@ -26,7 +26,7 @@ import org.xmlpull.v1.XmlPullParser;
  */
 public class OpenIQProvider extends IQProvider {
 
-    public IQ parseIQ(XmlPullParser parser) throws Exception {
+    protected IQ parseIQ(XmlPullParser parser) throws Exception {
         String sessionID = parser.getAttributeValue("", "sid");
         int blockSize = Integer.parseInt(parser.getAttributeValue("", "block-size"));
 

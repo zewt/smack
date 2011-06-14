@@ -118,7 +118,7 @@ public class AgentStatusRequest extends IQ {
      */
     public static class Provider extends IQProvider {
 
-        public IQ parseIQ(XmlPullParser parser) throws Exception {
+        protected IQ parseIQ(XmlPullParser parser) throws Exception {
             AgentStatusRequest statusRequest = new AgentStatusRequest();
 
             if (parser.getEventType() != XmlPullParser.START_TAG) {

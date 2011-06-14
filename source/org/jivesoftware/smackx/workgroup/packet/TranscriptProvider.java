@@ -41,7 +41,7 @@ public class TranscriptProvider extends IQProvider {
         super();
     }
 
-    public IQ parseIQ(XmlPullParser parser) throws Exception {
+    protected IQ parseIQ(XmlPullParser parser) throws Exception {
         String sessionID = parser.getAttributeValue("", "sessionID");
         List<Packet> packets = new ArrayList<Packet>();
 

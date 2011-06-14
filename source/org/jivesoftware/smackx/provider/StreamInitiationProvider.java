@@ -38,7 +38,7 @@ import org.xmlpull.v1.XmlPullParser;
  */
 public class StreamInitiationProvider extends IQProvider {
 
-	public IQ parseIQ(final XmlPullParser parser) throws Exception {
+	protected IQ parseIQ(final XmlPullParser parser) throws Exception {
 		boolean done = false;
 
 		// si

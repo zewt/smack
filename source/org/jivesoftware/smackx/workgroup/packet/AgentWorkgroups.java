@@ -104,7 +104,7 @@ public class AgentWorkgroups extends IQ {
             super();
         }
 
-        public IQ parseIQ(XmlPullParser parser) throws Exception {
+        protected IQ parseIQ(XmlPullParser parser) throws Exception {
             String agentJID = parser.getAttributeValue("", "jid");
             List<String> workgroups = new ArrayList<String>();
 

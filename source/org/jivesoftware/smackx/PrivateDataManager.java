@@ -277,7 +277,7 @@ public class PrivateDataManager {
      * An IQ provider to parse IQ results containing private data.
      */
     public static class PrivateDataIQProvider extends IQProvider {
-        public IQ parseIQ(XmlPullParser parser) throws Exception {
+        protected IQ parseIQ(XmlPullParser parser) throws Exception {
             PrivateData privateData = null;
             boolean done = false;
             while (!done) {

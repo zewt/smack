@@ -43,7 +43,7 @@ public class OfferRequestProvider extends IQProvider {
     public OfferRequestProvider() {
     }
 
-    public IQ parseIQ(XmlPullParser parser) throws Exception {
+    protected IQ parseIQ(XmlPullParser parser) throws Exception {
         int eventType = parser.getEventType();
         String sessionID = null;
         int timeout = -1;

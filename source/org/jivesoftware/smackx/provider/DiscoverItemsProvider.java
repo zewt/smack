@@ -32,7 +32,7 @@ import org.xmlpull.v1.XmlPullParser;
 */
 public class DiscoverItemsProvider extends IQProvider {
 
-    public IQ parseIQ(XmlPullParser parser) throws Exception {
+    protected IQ parseIQ(XmlPullParser parser) throws Exception {
         DiscoverItems discoverItems = new DiscoverItems();
         boolean done = false;
         DiscoverItems.Item item;

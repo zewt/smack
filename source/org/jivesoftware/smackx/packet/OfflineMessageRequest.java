@@ -193,7 +193,7 @@ public class OfflineMessageRequest extends IQ {
 
     public static class Provider extends IQProvider {
 
-        public IQ parseIQ(XmlPullParser parser) throws Exception {
+        protected IQ parseIQ(XmlPullParser parser) throws Exception {
             OfflineMessageRequest request = new OfflineMessageRequest();
             boolean done = false;
             while (!done) {

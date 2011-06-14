@@ -83,7 +83,7 @@ public class ChatMetadata extends IQ {
             super();
         }
 
-        public IQ parseIQ(XmlPullParser parser) throws Exception {
+        protected IQ parseIQ(XmlPullParser parser) throws Exception {
             final ChatMetadata chatM = new ChatMetadata();
 
             boolean done = false;

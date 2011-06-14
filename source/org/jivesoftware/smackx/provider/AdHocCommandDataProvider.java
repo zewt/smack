@@ -40,7 +40,7 @@ import org.xmlpull.v1.XmlPullParser;
  */
 public class AdHocCommandDataProvider extends IQProvider {
 
-    public IQ parseIQ(XmlPullParser parser) throws Exception {
+    protected IQ parseIQ(XmlPullParser parser) throws Exception {
         boolean done = false;
         AdHocCommandData adHocCommandData = new AdHocCommandData();
         DataFormProvider dataFormProvider = new DataFormProvider();

@@ -58,7 +58,7 @@ public class WorkgroupForm extends IQ {
             super();
         }
 
-        public IQ parseIQ(XmlPullParser parser) throws Exception {
+        protected IQ parseIQ(XmlPullParser parser) throws Exception {
             WorkgroupForm answer = new WorkgroupForm();
 
             boolean done = false;

@@ -202,7 +202,7 @@ public class Time extends IQ {
         public Provider() {
         }
 
-        public IQ parseIQ(XmlPullParser parser) throws Exception {
+        protected IQ parseIQ(XmlPullParser parser) throws Exception {
             Time version = new Time();
             boolean done = false;
             while (!done) {

@@ -29,7 +29,7 @@ import org.xmlpull.v1.XmlPullParser;
  */
 public class PubSubProvider extends IQProvider
 {
-	public IQ parseIQ(XmlPullParser parser) throws Exception
+	protected IQ parseIQ(XmlPullParser parser) throws Exception
 	{
         PubSub pubsub = new PubSub();
         String namespace = parser.getNamespace();
