@@ -25,7 +25,6 @@ import org.jivesoftware.smack.provider.PacketExtensionProvider;
 import org.jivesoftware.smack.util.XmlUtil;
 import org.jivesoftware.smackx.packet.XHTMLExtension;
 import org.w3c.dom.Element;
-import org.xmlpull.v1.XmlPullParser;
 
 /**
  * The XHTMLExtensionProvider parses XHTML packets.
@@ -33,14 +32,6 @@ import org.xmlpull.v1.XmlPullParser;
  * @author Gaston Dombiak
  */
 public class XHTMLExtensionProvider extends PacketExtensionProvider {
-
-    /**
-     * Creates a new XHTMLExtensionProvider.
-     * ProviderManager requires that every PacketExtensionProvider has a public, no-argument constructor
-     */
-    public XHTMLExtensionProvider() {
-    }
-
     /**
      * Parses a XHTMLExtension packet (extension sub-packet).
      *
