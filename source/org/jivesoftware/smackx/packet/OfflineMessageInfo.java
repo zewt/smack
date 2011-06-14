@@ -88,7 +88,7 @@ public class OfflineMessageInfo implements PacketExtension {
         return buf.toString();
     }
 
-    public static class Provider implements PacketExtensionProvider {
+    public static class Provider extends PacketExtensionProvider {
 
         /**
          * Creates a new Provider.

@@ -82,8 +82,8 @@ public class AttentionExtension implements PacketExtension {
      * {@link AttentionExtension}.
      * 
      * @author Guus der Kinderen, guus.der.kinderen@gmail.com
-s     */
-    public static class Provider implements PacketExtensionProvider {
+     */
+    public static class Provider extends PacketExtensionProvider {
 
         /*
          * (non-Javadoc)

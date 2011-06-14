@@ -117,37 +117,37 @@ public class AdHocCommandDataProvider implements IQProvider {
         return adHocCommandData;
     }
 
-    public static class BadActionError implements PacketExtensionProvider {
+    public static class BadActionError extends PacketExtensionProvider {
         public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
             return new AdHocCommandData.SpecificError(AdHocCommand.SpecificErrorCondition.badAction);
         }
     }
 
-    public static class MalformedActionError implements PacketExtensionProvider {
+    public static class MalformedActionError extends PacketExtensionProvider {
         public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
             return new AdHocCommandData.SpecificError(AdHocCommand.SpecificErrorCondition.malformedAction);
         }
     }
 
-    public static class BadLocaleError implements PacketExtensionProvider {
+    public static class BadLocaleError extends PacketExtensionProvider {
         public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
             return new AdHocCommandData.SpecificError(AdHocCommand.SpecificErrorCondition.badLocale);
         }
     }
 
-    public static class BadPayloadError implements PacketExtensionProvider {
+    public static class BadPayloadError extends PacketExtensionProvider {
         public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
             return new AdHocCommandData.SpecificError(AdHocCommand.SpecificErrorCondition.badPayload);
         }
     }
 
-    public static class BadSessionIDError implements PacketExtensionProvider {
+    public static class BadSessionIDError extends PacketExtensionProvider {
         public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
             return new AdHocCommandData.SpecificError(AdHocCommand.SpecificErrorCondition.badSessionid);
         }
     }
 
-    public static class SessionExpiredError implements PacketExtensionProvider {
+    public static class SessionExpiredError extends PacketExtensionProvider {
         public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
             return new AdHocCommandData.SpecificError(AdHocCommand.SpecificErrorCondition.sessionExpired);
         }

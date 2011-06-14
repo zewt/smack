@@ -34,7 +34,7 @@ import java.util.List;
  * 
  * @author Gaston Dombiak
  */
-public class DataFormProvider implements PacketExtensionProvider {
+public class DataFormProvider extends PacketExtensionProvider {
 
     /**
      * Creates a new DataFormProvider.

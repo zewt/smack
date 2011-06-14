@@ -30,7 +30,7 @@ import org.xmlpull.v1.XmlPullParser;
  *
  * @author Gaston Dombiak
  */
-public class MultipleAddressesProvider implements PacketExtensionProvider {
+public class MultipleAddressesProvider extends PacketExtensionProvider {
 
     /**
      * Creates a new MultipleAddressesProvider.

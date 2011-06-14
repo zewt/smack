@@ -218,7 +218,7 @@ public class AgentStatus implements PacketExtension {
     /**
      * Packet extension provider for AgentStatus packets.
      */
-    public static class Provider implements PacketExtensionProvider {
+    public static class Provider extends PacketExtensionProvider {
 
         public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
             AgentStatus agentStatus = new AgentStatus();

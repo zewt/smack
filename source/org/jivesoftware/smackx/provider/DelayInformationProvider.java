@@ -46,7 +46,7 @@ import org.xmlpull.v1.XmlPullParser;
  * @author Gaston Dombiak
  * @author Henning Staib
  */
-public class DelayInformationProvider implements PacketExtensionProvider {
+public class DelayInformationProvider extends PacketExtensionProvider {
 
     /*
      * Date format used to parse dates in the XEP-0091 format but missing leading

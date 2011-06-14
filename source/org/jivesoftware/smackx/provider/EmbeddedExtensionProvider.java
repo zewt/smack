@@ -79,7 +79,7 @@ import org.xmlpull.v1.XmlPullParser;
  * 
  * @author Robin Collier
  */
-abstract public class EmbeddedExtensionProvider implements PacketExtensionProvider
+abstract public class EmbeddedExtensionProvider extends PacketExtensionProvider
 {
 
 	final public PacketExtension parseExtension(XmlPullParser parser) throws Exception

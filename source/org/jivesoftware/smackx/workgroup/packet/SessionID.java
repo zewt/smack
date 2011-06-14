@@ -63,7 +63,7 @@ public class SessionID implements PacketExtension {
         return buf.toString();
     }
 
-    public static class Provider implements PacketExtensionProvider {
+    public static class Provider extends PacketExtensionProvider {
 
         public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
             String sessionID = parser.getAttributeValue("", "id");

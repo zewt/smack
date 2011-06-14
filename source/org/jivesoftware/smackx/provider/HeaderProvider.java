@@ -23,7 +23,7 @@ import org.xmlpull.v1.XmlPullParser;
  * 
  * @author Robin Collier
  */
-public class HeaderProvider implements PacketExtensionProvider
+public class HeaderProvider extends PacketExtensionProvider
 {
 	public PacketExtension parseExtension(XmlPullParser parser) throws Exception
 	{

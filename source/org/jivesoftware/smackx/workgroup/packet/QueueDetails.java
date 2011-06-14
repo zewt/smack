@@ -139,7 +139,7 @@ public class QueueDetails implements PacketExtension {
     /**
      * Provider class for QueueDetails packet extensions.
      */
-    public static class Provider implements PacketExtensionProvider {
+    public static class Provider extends PacketExtensionProvider {
         
         public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
             

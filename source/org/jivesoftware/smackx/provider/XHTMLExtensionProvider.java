@@ -31,7 +31,7 @@ import org.xmlpull.v1.XmlPullParser;
  *
  * @author Gaston Dombiak
  */
-public class XHTMLExtensionProvider implements PacketExtensionProvider {
+public class XHTMLExtensionProvider extends PacketExtensionProvider {
 
     /**
      * Creates a new XHTMLExtensionProvider.

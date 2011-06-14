@@ -34,7 +34,7 @@ import org.xmlpull.v1.XmlPullParser;
  *
  * @author loki der quaeler
  */
-public class MetaDataProvider implements PacketExtensionProvider {
+public class MetaDataProvider extends PacketExtensionProvider {
 
     /**
      * PacketExtensionProvider implementation

@@ -140,7 +140,7 @@ public class RoomTransfer implements PacketExtension {
         workgroup
     }
 
-    public static class Provider implements PacketExtensionProvider {
+    public static class Provider extends PacketExtensionProvider {
 
         public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
             final RoomTransfer invitation = new RoomTransfer();

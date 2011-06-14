@@ -41,7 +41,7 @@ import org.xmlpull.v1.XmlPullParser;
  *
  * @author Jeff Williams
  */
-public class PEPProvider implements PacketExtensionProvider {
+public class PEPProvider extends PacketExtensionProvider {
 
     Map<String, PacketExtensionProvider> nodeParsers = new HashMap<String, PacketExtensionProvider>();
     PacketExtension pepItem;

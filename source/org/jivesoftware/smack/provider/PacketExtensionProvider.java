@@ -30,7 +30,7 @@ import org.xmlpull.v1.XmlPullParser;
  *
  * @author Matt Tucker
  */
-public interface PacketExtensionProvider {
+public abstract class PacketExtensionProvider {
 
     /**
      * Parse an extension sub-packet and create a PacketExtension instance. At
@@ -42,5 +42,5 @@ public interface PacketExtensionProvider {
      * @return a new IQ instance.
      * @throws java.lang.Exception if an error occurs parsing the XML.
      */
-    public PacketExtension parseExtension(XmlPullParser parser) throws Exception;
+    public abstract PacketExtension parseExtension(XmlPullParser parser) throws Exception;
 }

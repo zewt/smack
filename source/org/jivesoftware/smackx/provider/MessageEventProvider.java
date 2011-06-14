@@ -31,7 +31,7 @@ import org.xmlpull.v1.XmlPullParser;
 *
  * @author Gaston Dombiak
  */
-public class MessageEventProvider implements PacketExtensionProvider {
+public class MessageEventProvider extends PacketExtensionProvider {
 
     /**
      * Creates a new MessageEventProvider.

@@ -34,7 +34,7 @@ import org.xmlpull.v1.XmlPullParser;
  *
  * @author Gaston Dombiak
  */
-public class RosterExchangeProvider implements PacketExtensionProvider {
+public class RosterExchangeProvider extends PacketExtensionProvider {
 
     /**
      * Creates a new RosterExchangeProvider.

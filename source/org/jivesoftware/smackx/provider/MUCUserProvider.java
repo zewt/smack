@@ -31,7 +31,7 @@ import org.xmlpull.v1.XmlPullParser;
  *
  * @author Gaston Dombiak
  */
-public class MUCUserProvider implements PacketExtensionProvider {
+public class MUCUserProvider extends PacketExtensionProvider {
 
     /**
      * Creates a new MUCUserProvider.

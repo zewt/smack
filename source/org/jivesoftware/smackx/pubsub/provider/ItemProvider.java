@@ -30,7 +30,7 @@ import org.xmlpull.v1.XmlPullParser;
  * 
  * @author Robin Collier
  */
-public class ItemProvider implements PacketExtensionProvider
+public class ItemProvider extends PacketExtensionProvider
 {
 	public PacketExtension parseExtension(XmlPullParser parser) throws Exception
 	{

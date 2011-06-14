@@ -27,7 +27,7 @@ import org.xmlpull.v1.XmlPullParser;
  * 
  * @author Henning Staib
  */
-public class DataPacketProvider implements PacketExtensionProvider, IQProvider {
+public class DataPacketProvider extends PacketExtensionProvider implements IQProvider {
 
     public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
         String sessionID = parser.getAttributeValue("", "sid");

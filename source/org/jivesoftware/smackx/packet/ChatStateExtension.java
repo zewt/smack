@@ -57,7 +57,7 @@ public class ChatStateExtension implements PacketExtension {
         return "<" + getElementName() + " xmlns=\"" + getNamespace() + "\" />";
     }
 
-    public static class Provider implements PacketExtensionProvider {
+    public static class Provider extends PacketExtensionProvider {
 
         public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
             ChatState state;
