@@ -20,17 +20,20 @@
 
 package org.jivesoftware.smackx.provider;
 
+import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.packet.IQ;
 import org.jivesoftware.smack.packet.PacketExtension;
 import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.provider.IQProvider;
 import org.jivesoftware.smack.provider.PacketExtensionProvider;
 import org.jivesoftware.smack.util.PacketParserUtils;
+import org.jivesoftware.smack.util.XmlUtil;
 import org.jivesoftware.smackx.commands.AdHocCommand;
 import org.jivesoftware.smackx.commands.AdHocCommand.Action;
 import org.jivesoftware.smackx.commands.AdHocCommandNote;
 import org.jivesoftware.smackx.packet.AdHocCommandData;
 import org.jivesoftware.smackx.packet.DataForm;
+import org.w3c.dom.Element;
 import org.xmlpull.v1.XmlPullParser;
 
 /**
@@ -40,19 +43,15 @@ import org.xmlpull.v1.XmlPullParser;
  */
 public class AdHocCommandDataProvider extends IQProvider {
 
-    protected IQ parseIQ(XmlPullParser parser) throws Exception {
-        boolean done = false;
+    public IQ parseIQ(Element packet) throws XMPPException {
         AdHocCommandData adHocCommandData = new AdHocCommandData();
         DataFormProvider dataFormProvider = new DataFormProvider();
 
-        int eventType;
-        String elementName;
-        String namespace;
-        adHocCommandData.setSessionID(parser.getAttributeValue("", "sessionid"));
-        adHocCommandData.setNode(parser.getAttributeValue("", "node"));
+        adHocCommandData.setSessionID(packet.getAttribute("sessionid"));
+        adHocCommandData.setNode(packet.getAttribute("node"));
 
         // Status
-        String status = parser.getAttributeValue("", "status");
+        String status = packet.getAttribute("status");
         if (AdHocCommand.Status.executing.toString().equalsIgnoreCase(status)) {
             adHocCommandData.setStatus(AdHocCommand.Status.executing);
         }
@@ -64,7 +63,7 @@ public class AdHocCommandDataProvider extends IQProvider {
         }
 
         // Action
-        String action = parser.getAttributeValue("", "action");
+        String action = packet.getAttribute("action");
         if (action != null) {
             Action realAction = AdHocCommand.Action.valueOf(action);
             if (realAction == null || realAction.equals(Action.unknown)) {
@@ -74,45 +73,36 @@ public class AdHocCommandDataProvider extends IQProvider {
                 adHocCommandData.setAction(realAction);
             }
         }
-        while (!done) {
-            eventType = parser.next();
-            elementName = parser.getName();
-            namespace = parser.getNamespace();
-            if (eventType == XmlPullParser.START_TAG) {
-                if (parser.getName().equals("actions")) {
-                    String execute = parser.getAttributeValue("", "execute");
-                    if (execute != null) {
+        for(Element child: XmlUtil.getChildElements(packet)) {
+            String elementName = child.getLocalName();
+            String namespace = child.getNamespaceURI();
+                if (elementName.equals("actions")) {
+                    String execute = child.getAttribute("execute");
+                    if (!execute.equals(""))
                         adHocCommandData.setExecuteAction(AdHocCommand.Action.valueOf(execute));
-                    }
                 }
-                else if (parser.getName().equals("next")) {
+                else if (elementName.equals("next")) {
                     adHocCommandData.addAction(AdHocCommand.Action.next);
                 }
-                else if (parser.getName().equals("complete")) {
+                else if (elementName.equals("complete")) {
                     adHocCommandData.addAction(AdHocCommand.Action.complete);
                 }
-                else if (parser.getName().equals("prev")) {
+                else if (elementName.equals("prev")) {
                     adHocCommandData.addAction(AdHocCommand.Action.prev);
                 }
                 else if (elementName.equals("x") && namespace.equals("jabber:x:data")) {
-                    adHocCommandData.setForm((DataForm) dataFormProvider.parseExtension(parser));
+                    adHocCommandData.setForm((DataForm) dataFormProvider.parseExtension(packet));
                 }
-                else if (parser.getName().equals("note")) {
+                else if (elementName.equals("note")) {
                     AdHocCommandNote.Type type = AdHocCommandNote.Type.valueOf(
-                            parser.getAttributeValue("", "type"));
-                    String value = parser.nextText();
+                            child.getAttribute("type"));
+                    String value = XmlUtil.getTextContent(child);
                     adHocCommandData.addNote(new AdHocCommandNote(type, value));
                 }
-                else if (parser.getName().equals("error")) {
-                    XMPPError error = PacketParserUtils.parseError(parser);
+                else if (elementName.equals("error")) {
+                    XMPPError error = PacketParserUtils.parseError(child);
                     adHocCommandData.setError(error);
                 }
-            }
-            else if (eventType == XmlPullParser.END_TAG) {
-                if (parser.getName().equals("command")) {
-                    done = true;
-                }
-            }
         }
         return adHocCommandData;
     }

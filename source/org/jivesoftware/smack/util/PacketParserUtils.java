@@ -507,67 +507,10 @@ public class PacketParserUtils {
     /**
      * Parses error sub-packets.
      *
-     * @param parser the XML parser.
+     * @param packet the XML element.
      * @return an error sub-packet.
      * @throws Exception if an exception occurs while parsing the packet.
      */
-    public static XMPPError parseError(XmlPullParser parser) throws Exception {
-        final String errorNamespace = "urn:ietf:params:xml:ns:xmpp-stanzas";
-    	String errorCode = "-1";
-        String type = null;
-        String message = null;
-        String condition = null;
-        List<PacketExtension> extensions = new ArrayList<PacketExtension>();
-
-        // Parse the error header
-        for (int i=0; i<parser.getAttributeCount(); i++) {
-            if (parser.getAttributeName(i).equals("code")) {
-                errorCode = parser.getAttributeValue("", "code");
-            }
-            if (parser.getAttributeName(i).equals("type")) {
-            	type = parser.getAttributeValue("", "type");
-            }
-        }
-        boolean done = false;
-        // Parse the text and condition tags
-        while (!done) {
-            int eventType = parser.next();
-            if (eventType == XmlPullParser.START_TAG) {
-                if (parser.getName().equals("text")) {
-                    message = parser.nextText();
-                }
-                else {
-                	// Condition tag, it can be xmpp error or an application defined error.
-                    String elementName = parser.getName();
-                    String namespace = parser.getNamespace();
-                    if (errorNamespace.equals(namespace)) {
-                    	condition = elementName;
-                    }
-                    else {
-                    	extensions.add(parsePacketExtension(elementName, namespace, parser));
-                    }
-                }
-            }
-                else if (eventType == XmlPullParser.END_TAG) {
-                    if (parser.getName().equals("error")) {
-                        done = true;
-                    }
-                }
-        }
-        // Parse the error type.
-        XMPPError.Type errorType = XMPPError.Type.CANCEL;
-        try {
-            if (type != null) {
-                errorType = XMPPError.Type.valueOf(type.toUpperCase());
-            }
-        }
-        catch (IllegalArgumentException iae) {
-            // Print stack trace. We shouldn't be getting an illegal error type.
-            iae.printStackTrace();
-        }
-        return new XMPPError(Integer.parseInt(errorCode), errorType, condition, message, extensions);
-    }
-
     public static XMPPError parseError(Element packet) throws XMPPException {
         final String errorNamespace = "urn:ietf:params:xml:ns:xmpp-stanzas";
         String message = null;
