@@ -20,9 +20,12 @@
 
 package org.jivesoftware.smack;
 
-import org.xmlpull.v1.XmlPullParserFactory;
-import org.xmlpull.v1.XmlPullParser;
+import org.jivesoftware.smack.util.XmlUtil;
+import org.w3c.dom.Element;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.*;
@@ -63,67 +66,66 @@ public final class SmackConfiguration {
      * 1) a set of classes will be loaded in order to execute their static init block
      * 2) retrieve and set the current Smack release
      */
-    static {
-        try {
-            // Get an array of class loaders to try loading the providers files from.
-            ClassLoader[] classLoaders = getClassLoaders();
-            for (ClassLoader classLoader : classLoaders) {
-                Enumeration configEnum = classLoader.getResources("META-INF/smack-config.xml");
-                while (configEnum.hasMoreElements()) {
-                    URL url = (URL) configEnum.nextElement();
-                    InputStream systemStream = null;
-                    try {
-                        systemStream = url.openStream();
-                        XmlPullParser parser = XmlPullParserFactory.newInstance().newPullParser();
-                        parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
-                        parser.setInput(systemStream, "UTF-8");
-                        int eventType = parser.getEventType();
-                        do {
-                            if (eventType == XmlPullParser.START_TAG) {
-                                if (parser.getName().equals("className")) {
-                                    // Attempt to load the class so that the class can get initialized
-                                    parseClassToLoad(parser);
-                                }
-                                else if (parser.getName().equals("packetReplyTimeout")) {
-                                    packetReplyTimeout =
-                                            parseIntProperty(parser, packetReplyTimeout);
-                                }
-                                else if (parser.getName().equals("keepAliveInterval")) {
-                                    keepAliveInterval = parseIntProperty(parser, keepAliveInterval);
-                                }
-                                else if (parser.getName().equals("mechName")) {
-                                    defaultMechs.add(parser.nextText());
-                                } else if (parser.getName().equals("localSocks5ProxyEnabled")) {
-                                    localSocks5ProxyEnabled = Boolean.parseBoolean(parser
-                                            .nextText());
-                                } else if (parser.getName().equals("localSocks5ProxyPort")) {
-                                    localSocks5ProxyPort = parseIntProperty(parser,
-                                            localSocks5ProxyPort);
-                                }
-                            }
-                            eventType = parser.next();
-                        }
-                        while (eventType != XmlPullParser.END_DOCUMENT);
-                    }
-                    catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                    finally {
-                        try {
-                            systemStream.close();
-                        }
-                        catch (Exception e) {
-                            // Ignore.
-                        }
-                    }
-                }
+    static private void loadFromXML(Element element) {
+        for(Element child: XmlUtil.getChildElements(element)) {
+            if (child.getLocalName().equals("className")) {
+                // Attempt to load the class so that the class can get initialized
+                parseClassToLoad(child);
             }
-        }
-        catch (Exception e) {
-            e.printStackTrace();
+            else if (child.getLocalName().equals("packetReplyTimeout")) {
+                packetReplyTimeout = parseIntProperty(child, packetReplyTimeout);
+            }
+            else if (child.getLocalName().equals("keepAliveInterval")) {
+                keepAliveInterval = parseIntProperty(child, keepAliveInterval);
+            }
+            else if (child.getLocalName().equals("mechName")) {
+                defaultMechs.add(XmlUtil.getTextContent(child));
+            } else if (child.getLocalName().equals("localSocks5ProxyEnabled")) {
+                localSocks5ProxyEnabled = Boolean.parseBoolean(XmlUtil.getTextContent(child));
+            } else if (child.getLocalName().equals("localSocks5ProxyPort")) {
+                localSocks5ProxyPort = parseIntProperty(child, localSocks5ProxyPort);
+            }
         }
     }
 
+    static private void initClass() {
+        // Get an array of class loaders to try loading the providers files from.
+        ClassLoader[] classLoaders = getClassLoaders();
+        for (ClassLoader classLoader : classLoaders) {
+            Enumeration<URL> configEnum;
+            try {
+                configEnum = classLoader.getResources("META-INF/smack-config.xml");
+            } catch (IOException e) {
+                e.printStackTrace();
+                return;
+            }
+
+            while (configEnum.hasMoreElements()) {
+                URL url = configEnum.nextElement();
+                InputStream systemStream = null;
+                try {
+                    systemStream = url.openStream();
+                    Element config = XmlUtil.getXMLRootNode(new InputSource(systemStream));
+                    loadFromXML(config);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                } catch (SAXException e) {
+                    e.printStackTrace();
+                }
+                finally {
+                    try {
+                        systemStream.close();
+                    }
+                    catch (IOException e) { /* ignore */ }
+                }
+            }
+        }
+    }
+
+    static {
+        initClass();
+    }
+    
     /**
      * Returns the Smack version information, eg "1.3.0".
      * 
@@ -276,8 +278,8 @@ public final class SmackConfiguration {
         SmackConfiguration.localSocks5ProxyPort = localSocks5ProxyPort;
     }
 
-    private static void parseClassToLoad(XmlPullParser parser) throws Exception {
-        String className = parser.nextText();
+    private static void parseClassToLoad(Element element) {
+        String className = XmlUtil.getTextContent(element);
         // Attempt to load the class so that the class can get initialized
         try {
             Class.forName(className);
@@ -288,11 +290,10 @@ public final class SmackConfiguration {
         }
     }
 
-    private static int parseIntProperty(XmlPullParser parser, int defaultValue)
-            throws Exception
+    private static int parseIntProperty(Element element, int defaultValue)
     {
         try {
-            return Integer.parseInt(parser.nextText());
+            return Integer.parseInt(XmlUtil.getTextContent(element));
         }
         catch (NumberFormatException nfe) {
             nfe.printStackTrace();
