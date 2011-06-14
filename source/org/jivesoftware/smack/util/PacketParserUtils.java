@@ -642,16 +642,8 @@ public class PacketParserUtils {
     {
         // See if a provider is registered to handle the extension.
         PacketExtensionProvider provider = ProviderManager.getInstance().getExtensionProvider(elementName, namespace);
-        if (provider != null) {
-            XmlPullParser parser = new XmlPullParserDom(packet, true);
-            try {
-                return provider.parseExtension(packet);
-            } catch(RuntimeException e) {
-                throw e;
-            } catch(Exception e) {
-                throw new XMPPException(e);
-            }
-        }
+        if (provider != null)
+            return provider.parseExtension(packet);
 
         // No providers registered, so use a default extension.
         DefaultPacketExtension extension = new DefaultPacketExtension(elementName, namespace);
