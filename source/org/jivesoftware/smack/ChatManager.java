@@ -142,7 +142,7 @@ public class ChatManager {
         while(true) {
             threadID = nextID();
             Pair<String,String> jidAndThreadId = new Pair<String,String>(bareJID, threadID);
-            if(threadChats.get(jidAndThreadId) != null)
+            if(threadChats.get(jidAndThreadId) == null)
                 return createChat(userJID, threadID, listener);
         }
     }
