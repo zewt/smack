@@ -20,9 +20,7 @@ import org.jivesoftware.smack.packet.Packet;
 import org.w3c.dom.Element;
 
 /**
- * Filter ReceivedPacket filters for a given localName/namespace tuple.
- *
- * @see org.jivesoftware.smack.packet.ReceivedPacket
+ * Filter packets with a given localName/namespace tuple.
  */
 public class ReceivedPacketFilter implements PacketFilter {
     private final String localName;
