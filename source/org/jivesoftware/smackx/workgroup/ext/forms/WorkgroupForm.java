@@ -52,7 +52,7 @@ public class WorkgroupForm extends IQ {
      *
      * @author Derek DeMoro
      */
-    public static class InternalProvider implements IQProvider {
+    public static class InternalProvider extends IQProvider {
 
         public InternalProvider() {
             super();

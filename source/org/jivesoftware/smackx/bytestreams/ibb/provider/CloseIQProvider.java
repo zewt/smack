@@ -23,7 +23,7 @@ import org.xmlpull.v1.XmlPullParser;
  * 
  * @author Henning Staib
  */
-public class CloseIQProvider implements IQProvider {
+public class CloseIQProvider extends IQProvider {
 
     public IQ parseIQ(XmlPullParser parser) throws Exception {
         String sid = parser.getAttributeValue("", "sid");

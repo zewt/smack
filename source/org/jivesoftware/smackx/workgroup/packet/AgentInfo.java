@@ -99,7 +99,7 @@ public class AgentInfo extends IQ {
      *
      * @author Gaston Dombiak
      */
-    public static class Provider implements IQProvider {
+    public static class Provider extends IQProvider {
 
         public Provider() {
             super();

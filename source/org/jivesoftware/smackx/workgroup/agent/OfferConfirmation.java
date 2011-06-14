@@ -58,7 +58,7 @@ public class OfferConfirmation extends IQ {
         return buf.toString();
     }
 
-    public static class Provider implements IQProvider {
+    public static class Provider extends IQProvider {
 
         public IQ parseIQ(XmlPullParser parser) throws Exception {
             final OfferConfirmation confirmation = new OfferConfirmation();

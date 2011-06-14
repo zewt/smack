@@ -27,19 +27,22 @@ import org.xmlpull.v1.XmlPullParser;
  * 
  * @author Henning Staib
  */
-public class DataPacketProvider extends PacketExtensionProvider implements IQProvider {
-
-    public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
+public class DataPacketProvider extends PacketExtensionProvider {
+    static private DataPacketExtension parse(XmlPullParser parser) throws Exception {
         String sessionID = parser.getAttributeValue("", "sid");
         long seq = Long.parseLong(parser.getAttributeValue("", "seq"));
         String data = parser.nextText();
         return new DataPacketExtension(sessionID, seq, data);
     }
 
-    public IQ parseIQ(XmlPullParser parser) throws Exception {
-        DataPacketExtension data = (DataPacketExtension) parseExtension(parser);
-        IQ iq = new Data(data);
-        return iq;
+    public DataPacketExtension parseExtension(XmlPullParser parser) throws Exception {
+        return parse(parser);
     }
 
+    static public class DataPacketIQ extends IQProvider {
+        public IQ parseIQ(XmlPullParser parser) throws Exception {
+            DataPacketExtension data = parse(parser);
+            return new Data(data);
+        }
+    };
 }

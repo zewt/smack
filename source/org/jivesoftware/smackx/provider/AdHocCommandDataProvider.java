@@ -38,7 +38,7 @@ import org.xmlpull.v1.XmlPullParser;
  * 
  * @author Gabriel Guardincerri
  */
-public class AdHocCommandDataProvider implements IQProvider {
+public class AdHocCommandDataProvider extends IQProvider {
 
     public IQ parseIQ(XmlPullParser parser) throws Exception {
         boolean done = false;

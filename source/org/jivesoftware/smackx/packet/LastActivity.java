@@ -94,7 +94,7 @@ public class LastActivity extends IQ {
      *
      * @author Derek DeMoro
      */
-    public static class Provider implements IQProvider {
+    public static class Provider extends IQProvider {
 
         public Provider() {
             super();

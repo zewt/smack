@@ -30,7 +30,7 @@ import org.xmlpull.v1.XmlPullParser;
  *
  * @author Matt Tucker
  */
-public interface IQProvider {
+public abstract class IQProvider {
 
     /**
      * Parse the IQ sub-document and create an IQ instance. Each IQ must have a
@@ -43,5 +43,5 @@ public interface IQProvider {
      * @return a new IQ instance.
      * @throws Exception if an error occurs parsing the XML.
      */
-    public IQ parseIQ(XmlPullParser parser) throws Exception;
+    public abstract IQ parseIQ(XmlPullParser parser) throws Exception;
 }

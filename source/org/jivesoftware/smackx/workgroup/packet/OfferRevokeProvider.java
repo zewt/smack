@@ -28,7 +28,7 @@ import org.xmlpull.v1.XmlPullParser;
  *
  * @author loki der quaeler
  */
-public class OfferRevokeProvider implements IQProvider {
+public class OfferRevokeProvider extends IQProvider {
 
     public IQ parseIQ (XmlPullParser parser) throws Exception {
         // The parser will be positioned on the opening IQ tag, so get the JID attribute.

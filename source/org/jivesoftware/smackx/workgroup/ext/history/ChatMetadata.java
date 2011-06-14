@@ -77,7 +77,7 @@ public class ChatMetadata extends IQ {
      *
      * @author Derek DeMoro
      */
-    public static class Provider implements IQProvider {
+    public static class Provider extends IQProvider {
 
         public Provider() {
             super();

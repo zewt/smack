@@ -41,7 +41,7 @@ import java.util.List;
  * @author Gaston Dombiak
  * @author Derek DeMoro
  */
-public class VCardProvider implements IQProvider {
+public class VCardProvider extends IQProvider {
 
     private static final String PREFERRED_ENCODING = "UTF-8";
 

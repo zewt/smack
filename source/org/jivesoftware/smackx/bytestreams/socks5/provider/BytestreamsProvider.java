@@ -23,7 +23,7 @@ import org.xmlpull.v1.XmlPullParser;
  * 
  * @author Alexander Wenckus
  */
-public class BytestreamsProvider implements IQProvider {
+public class BytestreamsProvider extends IQProvider {
 
     public IQ parseIQ(XmlPullParser parser) throws Exception {
         boolean done = false;

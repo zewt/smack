@@ -27,7 +27,7 @@ import org.xmlpull.v1.XmlPullParser;
  * 
  * @author Robin Collier
  */
-public class PubSubProvider implements IQProvider
+public class PubSubProvider extends IQProvider
 {
 	public IQ parseIQ(XmlPullParser parser) throws Exception
 	{

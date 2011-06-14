@@ -38,7 +38,7 @@ import java.util.Map;
  *
  * @author loki der quaeler
  */
-public class OfferRequestProvider implements IQProvider {
+public class OfferRequestProvider extends IQProvider {
 
     public OfferRequestProvider() {
     }

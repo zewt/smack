@@ -110,7 +110,7 @@ public class OfflineSettings extends IQ {
     /**
      * Packet extension provider for AgentStatusRequest packets.
      */
-    public static class InternalProvider implements IQProvider {
+    public static class InternalProvider extends IQProvider {
 
         public IQ parseIQ(XmlPullParser parser) throws Exception {
             if (parser.getEventType() != XmlPullParser.START_TAG) {

@@ -43,7 +43,7 @@ public class SharedGroupsInfo extends IQ {
     /**
      * Internal Search service Provider.
      */
-    public static class Provider implements IQProvider {
+    public static class Provider extends IQProvider {
 
         /**
          * Provider Constructor.

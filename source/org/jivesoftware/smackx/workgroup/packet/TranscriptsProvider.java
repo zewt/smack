@@ -37,7 +37,7 @@ import java.util.TimeZone;
  *
  * @author Gaston Dombiak
  */
-public class TranscriptsProvider implements IQProvider {
+public class TranscriptsProvider extends IQProvider {
 
     private static final SimpleDateFormat UTC_FORMAT = new SimpleDateFormat("yyyyMMdd'T'HH:mm:ss");
     static {

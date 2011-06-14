@@ -35,7 +35,7 @@ import java.util.List;
  *
  * @author Gaston Dombiak
  */
-public class TranscriptProvider implements IQProvider {
+public class TranscriptProvider extends IQProvider {
 
     public TranscriptProvider() {
         super();

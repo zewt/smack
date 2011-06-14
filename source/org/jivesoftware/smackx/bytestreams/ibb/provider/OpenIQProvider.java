@@ -24,7 +24,7 @@ import org.xmlpull.v1.XmlPullParser;
  * 
  * @author Henning Staib
  */
-public class OpenIQProvider implements IQProvider {
+public class OpenIQProvider extends IQProvider {
 
     public IQ parseIQ(XmlPullParser parser) throws Exception {
         String sessionID = parser.getAttributeValue("", "sid");

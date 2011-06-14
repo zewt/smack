@@ -198,7 +198,7 @@ public class Time extends IQ {
         return buf.toString();
     }
 
-    public static class Provider implements IQProvider {
+    public static class Provider extends IQProvider {
         public Provider() {
         }
 

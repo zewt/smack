@@ -16,7 +16,7 @@ import java.util.ArrayList;
  * 
  * @author Francisco Vives
  */
-public class PrivacyProvider implements IQProvider {
+public class PrivacyProvider extends IQProvider {
 
 	public PrivacyProvider() {
 	}

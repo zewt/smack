@@ -31,7 +31,7 @@ import org.xmlpull.v1.XmlPullParser;
  * 
  * @author Gaston Dombiak
  */
-public class MUCOwnerProvider implements IQProvider {
+public class MUCOwnerProvider extends IQProvider {
 
     public IQ parseIQ(XmlPullParser parser) throws Exception {
         MUCOwner mucOwner = new MUCOwner();

@@ -124,7 +124,7 @@ public class OccupantsInfo extends IQ {
     /**
      * Packet extension provider for AgentStatusRequest packets.
      */
-    public static class Provider implements IQProvider {
+    public static class Provider extends IQProvider {
 
         public IQ parseIQ(XmlPullParser parser) throws Exception {
             if (parser.getEventType() != XmlPullParser.START_TAG) {

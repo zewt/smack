@@ -36,7 +36,7 @@ import org.xmlpull.v1.XmlPullParser;
  * @author Alexander Wenckus
  * 
  */
-public class StreamInitiationProvider implements IQProvider {
+public class StreamInitiationProvider extends IQProvider {
 
 	public IQ parseIQ(final XmlPullParser parser) throws Exception {
 		boolean done = false;

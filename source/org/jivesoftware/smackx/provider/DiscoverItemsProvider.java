@@ -30,7 +30,7 @@ import org.xmlpull.v1.XmlPullParser;
 *
 * @author Gaston Dombiak
 */
-public class DiscoverItemsProvider implements IQProvider {
+public class DiscoverItemsProvider extends IQProvider {
 
     public IQ parseIQ(XmlPullParser parser) throws Exception {
         DiscoverItems discoverItems = new DiscoverItems();
