@@ -272,11 +272,15 @@ public class PacketParserUtils {
             else {
                 IQProvider provider = ProviderManager.getInstance().getIQProvider(elementName, namespace);
                 if (provider != null) {
-                    XmlPullParser parser = new XmlPullParserDom(child, true);
                     try {
-                        iqPacket = provider.parseIQ(parser);
-                    } catch(Exception e) {
-                        throw new XMPPException(e);
+                        iqPacket = provider.parseIQ(child);
+                    } catch(IQProvider.UseXmlPullParser e) {
+                        try {
+                            XmlPullParser parser = new XmlPullParserDom(child, true);
+                            iqPacket = provider.parseIQ(parser);
+                        } catch(Exception e2) {
+                            throw new XMPPException(e2);
+                        }
                     }
                 }
             }

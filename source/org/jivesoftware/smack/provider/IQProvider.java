@@ -20,7 +20,10 @@
 
 package org.jivesoftware.smack.provider;
 
+import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.packet.IQ;
+import org.jivesoftware.smack.packet.PacketExtension;
+import org.w3c.dom.Element;
 import org.xmlpull.v1.XmlPullParser;
 
 /**
@@ -31,6 +34,7 @@ import org.xmlpull.v1.XmlPullParser;
  * @author Matt Tucker
  */
 public abstract class IQProvider {
+    static public class UseXmlPullParser extends Exception { };
 
     /**
      * Parse the IQ sub-document and create an IQ instance. Each IQ must have a
@@ -44,4 +48,17 @@ public abstract class IQProvider {
      * @throws Exception if an error occurs parsing the XML.
      */
     public abstract IQ parseIQ(XmlPullParser parser) throws Exception;
+
+    /**
+     * Parse the IQ sub-document and create an IQ instance. Each IQ must have a
+     * single child element.
+     * <p>
+     * Transitionally, this is optional.  If UseXmlPullParser is thrown,
+     * {@link #parseExtension} will be called instead.
+     * 
+     * @param parser the XML element.
+     */
+    public IQ parseIQ(Element packet) throws UseXmlPullParser, XMPPException {
+        throw new UseXmlPullParser();
+    }
 }
