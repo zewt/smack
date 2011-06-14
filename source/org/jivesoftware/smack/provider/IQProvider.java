@@ -23,6 +23,7 @@ package org.jivesoftware.smack.provider;
 import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.packet.IQ;
 import org.jivesoftware.smack.packet.PacketExtension;
+import org.jivesoftware.smack.util.XmlPullParserDom;
 import org.w3c.dom.Element;
 import org.xmlpull.v1.XmlPullParser;
 
@@ -34,8 +35,6 @@ import org.xmlpull.v1.XmlPullParser;
  * @author Matt Tucker
  */
 public abstract class IQProvider {
-    static public class UseXmlPullParser extends Exception { };
-
     /**
      * Parse the IQ sub-document and create an IQ instance. Each IQ must have a
      * single child element. At the beginning of the method call, the xml parser
@@ -47,7 +46,7 @@ public abstract class IQProvider {
      * @return a new IQ instance.
      * @throws Exception if an error occurs parsing the XML.
      */
-    public IQ parseIQ(XmlPullParser parser) throws Exception {
+    protected IQ parseIQ(XmlPullParser parser) throws Exception {
         throw new RuntimeException("parseIQ(Element) threw UseXmlPullParser, but parseIQ(XmlPullParser) is not implement");
     }
 
@@ -55,12 +54,23 @@ public abstract class IQProvider {
      * Parse the IQ sub-document and create an IQ instance. Each IQ must have a
      * single child element.
      * <p>
-     * Transitionally, this is optional.  If UseXmlPullParser is thrown,
-     * {@link #parseExtension} will be called instead.
+     * Transitionally, this is optional.  The default implementation converts to an
+     * XmlPullParser and calls {@link #parseIQ(XmlPullParser)}.
      * 
      * @param parser the XML element.
      */
-    public IQ parseIQ(Element packet) throws UseXmlPullParser, XMPPException {
-        throw new UseXmlPullParser();
+    public IQ parseIQ(Element packet) throws XMPPException {
+        try {
+            XmlPullParser parser = new XmlPullParserDom(packet, true);
+            if(parser.getEventType() != XmlPullParserDom.START_DOCUMENT)
+                throw new XMPPException("Invalid XmlPullParser state");
+            parser.next();
+            if(parser.getEventType() != XmlPullParserDom.START_TAG)
+                throw new XMPPException("Invalid XmlPullParser state");
+
+            return parseIQ(parser);
+        } catch(Exception e) {
+            throw new XMPPException(e);
+        }
     }
 }
