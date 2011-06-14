@@ -32,11 +32,8 @@ import org.xmlpull.v1.XmlPullParser;
  */
 public class DelayInfoProvider extends DelayInformationProvider
 {
-
-	@Override
-	public PacketExtension parseExtension(XmlPullParser parser) throws Exception
-	{
-		return new DelayInfo((DelayInformation)super.parseExtension(parser));
-	}
-
+    protected PacketExtension parseExtension(XmlPullParser parser) throws Exception
+    {
+        return new DelayInfo((DelayInformation)super.parseExtension(parser));
+    }
 }

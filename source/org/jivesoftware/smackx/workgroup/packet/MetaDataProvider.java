@@ -39,7 +39,7 @@ public class MetaDataProvider extends PacketExtensionProvider {
     /**
      * PacketExtensionProvider implementation
      */
-    public PacketExtension parseExtension (XmlPullParser parser)
+    protected PacketExtension parseExtension (XmlPullParser parser)
         throws Exception {
         Map metaData = MetaDataUtils.parseMetaData(parser);
 

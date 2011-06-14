@@ -40,7 +40,7 @@ public class MultipleAddressesProvider extends PacketExtensionProvider {
     public MultipleAddressesProvider() {
     }
 
-    public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
+    protected PacketExtension parseExtension(XmlPullParser parser) throws Exception {
         boolean done = false;
         MultipleAddresses multipleAddresses = new MultipleAddresses();
         while (!done) {

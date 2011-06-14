@@ -117,7 +117,7 @@ public class QueueOverview implements PacketExtension {
 
     public static class Provider extends PacketExtensionProvider {
 
-        public PacketExtension parseExtension (XmlPullParser parser) throws Exception {
+        protected PacketExtension parseExtension (XmlPullParser parser) throws Exception {
             int eventType = parser.getEventType();
             QueueOverview queueOverview = new QueueOverview();            
             SimpleDateFormat dateFormat = new SimpleDateFormat(DATE_FORMAT);

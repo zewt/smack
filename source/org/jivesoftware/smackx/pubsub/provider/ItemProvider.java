@@ -32,7 +32,7 @@ import org.xmlpull.v1.XmlPullParser;
  */
 public class ItemProvider extends PacketExtensionProvider
 {
-	public PacketExtension parseExtension(XmlPullParser parser) throws Exception
+	protected PacketExtension parseExtension(XmlPullParser parser) throws Exception
 	{
 		String id = parser.getAttributeValue(null, "id");
         String node = parser.getAttributeValue(null, "node");

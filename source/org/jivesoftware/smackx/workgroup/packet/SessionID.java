@@ -65,7 +65,7 @@ public class SessionID implements PacketExtension {
 
     public static class Provider extends PacketExtensionProvider {
 
-        public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
+        protected PacketExtension parseExtension(XmlPullParser parser) throws Exception {
             String sessionID = parser.getAttributeValue("", "id");
 
             // Advance to end of extension.

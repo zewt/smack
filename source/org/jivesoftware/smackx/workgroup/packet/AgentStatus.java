@@ -220,7 +220,7 @@ public class AgentStatus implements PacketExtension {
      */
     public static class Provider extends PacketExtensionProvider {
 
-        public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
+        protected PacketExtension parseExtension(XmlPullParser parser) throws Exception {
             AgentStatus agentStatus = new AgentStatus();
 
             agentStatus.workgroupJID = parser.getAttributeValue("", "jid");

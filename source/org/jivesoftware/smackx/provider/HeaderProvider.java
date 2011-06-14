@@ -25,7 +25,7 @@ import org.xmlpull.v1.XmlPullParser;
  */
 public class HeaderProvider extends PacketExtensionProvider
 {
-	public PacketExtension parseExtension(XmlPullParser parser) throws Exception
+	protected PacketExtension parseExtension(XmlPullParser parser) throws Exception
 	{
 		String name = parser.getAttributeValue(null, "name");
 		String value = null;

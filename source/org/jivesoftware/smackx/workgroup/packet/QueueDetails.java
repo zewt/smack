@@ -141,7 +141,7 @@ public class QueueDetails implements PacketExtension {
      */
     public static class Provider extends PacketExtensionProvider {
         
-        public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
+        protected PacketExtension parseExtension(XmlPullParser parser) throws Exception {
             
             SimpleDateFormat dateFormat = new SimpleDateFormat(DATE_FORMAT);
             QueueDetails queueDetails = new QueueDetails();

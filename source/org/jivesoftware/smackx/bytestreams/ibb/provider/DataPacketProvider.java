@@ -35,7 +35,7 @@ public class DataPacketProvider extends PacketExtensionProvider {
         return new DataPacketExtension(sessionID, seq, data);
     }
 
-    public DataPacketExtension parseExtension(XmlPullParser parser) throws Exception {
+    protected DataPacketExtension parseExtension(XmlPullParser parser) throws Exception {
         return parse(parser);
     }
 

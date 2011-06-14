@@ -26,7 +26,7 @@ import org.xmlpull.v1.XmlPullParser;
  */
 public class SubscriptionProvider extends PacketExtensionProvider
 {
-	public PacketExtension parseExtension(XmlPullParser parser) throws Exception
+	protected PacketExtension parseExtension(XmlPullParser parser) throws Exception
 	{
 		String jid = parser.getAttributeValue(null, "jid");
 		String nodeId = parser.getAttributeValue(null, "node");

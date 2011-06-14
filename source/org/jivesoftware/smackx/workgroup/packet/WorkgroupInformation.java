@@ -72,7 +72,7 @@ public class WorkgroupInformation implements PacketExtension {
         /**
          * PacketExtensionProvider implementation
          */
-        public PacketExtension parseExtension (XmlPullParser parser)
+        protected PacketExtension parseExtension (XmlPullParser parser)
             throws Exception {
             String workgroupJID = parser.getAttributeValue("", "jid");
 

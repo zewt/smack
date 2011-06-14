@@ -84,15 +84,7 @@ public class AttentionExtension implements PacketExtension {
      * @author Guus der Kinderen, guus.der.kinderen@gmail.com
      */
     public static class Provider extends PacketExtensionProvider {
-
-        /*
-         * (non-Javadoc)
-         * 
-         * @see
-         * org.jivesoftware.smack.provider.PacketExtensionProvider#parseExtension
-         * (org.xmlpull.v1.XmlPullParser)
-         */
-        public PacketExtension parseExtension(XmlPullParser arg0)
+        protected PacketExtension parseExtension(XmlPullParser arg0)
                 throws Exception {
             return new AttentionExtension();
         }

@@ -91,7 +91,7 @@ public class QueueUpdate implements PacketExtension {
 
     public static class Provider extends PacketExtensionProvider {
 
-        public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
+        protected PacketExtension parseExtension(XmlPullParser parser) throws Exception {
             boolean done = false;
             int position = -1;
             int timeRemaining = -1;

@@ -47,7 +47,7 @@ public class XHTMLExtensionProvider extends PacketExtensionProvider {
      * @return a PacketExtension.
      * @throws Exception if a parsing error occurs.
      */
-    public PacketExtension parseExtension(XmlPullParser parser)
+    protected PacketExtension parseExtension(XmlPullParser parser)
         throws Exception {
         XHTMLExtension xhtmlExtension = new XHTMLExtension();
         int startDepth = parser.getDepth();

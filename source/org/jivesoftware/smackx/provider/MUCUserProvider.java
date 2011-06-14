@@ -48,7 +48,7 @@ public class MUCUserProvider extends PacketExtensionProvider {
      * @return a PacketExtension.
      * @throws Exception if a parsing error occurs.
      */
-    public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
+    protected PacketExtension parseExtension(XmlPullParser parser) throws Exception {
         MUCUser mucUser = new MUCUser();
         boolean done = false;
         while (!done) {

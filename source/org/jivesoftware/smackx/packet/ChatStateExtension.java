@@ -59,7 +59,7 @@ public class ChatStateExtension implements PacketExtension {
 
     public static class Provider extends PacketExtensionProvider {
 
-        public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
+        protected PacketExtension parseExtension(XmlPullParser parser) throws Exception {
             ChatState state;
             try {
                 state = ChatState.valueOf(parser.getName());

@@ -142,7 +142,7 @@ public class RoomTransfer implements PacketExtension {
 
     public static class Provider extends PacketExtensionProvider {
 
-        public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
+        protected PacketExtension parseExtension(XmlPullParser parser) throws Exception {
             final RoomTransfer invitation = new RoomTransfer();
             invitation.type = RoomTransfer.Type.valueOf(parser.getAttributeValue("", "type"));
 

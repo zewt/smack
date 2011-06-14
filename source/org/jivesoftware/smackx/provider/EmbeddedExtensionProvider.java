@@ -82,7 +82,7 @@ import org.xmlpull.v1.XmlPullParser;
 abstract public class EmbeddedExtensionProvider extends PacketExtensionProvider
 {
 
-	final public PacketExtension parseExtension(XmlPullParser parser) throws Exception
+	final protected PacketExtension parseExtension(XmlPullParser parser) throws Exception
 	{
         String namespace = parser.getNamespace();
         String name = parser.getName();

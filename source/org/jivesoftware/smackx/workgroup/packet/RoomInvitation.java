@@ -142,7 +142,7 @@ public class RoomInvitation implements PacketExtension {
 
     public static class Provider extends PacketExtensionProvider {
 
-        public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
+        protected PacketExtension parseExtension(XmlPullParser parser) throws Exception {
             final RoomInvitation invitation = new RoomInvitation();
             invitation.type = Type.valueOf(parser.getAttributeValue("", "type"));
 
