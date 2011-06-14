@@ -20,7 +20,11 @@
 
 package org.jivesoftware.smack.provider;
 
+import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.packet.PacketExtension;
+import org.jivesoftware.smack.util.XmlPullParserDom;
+import org.jivesoftware.smack.util.XmlUtil;
+import org.w3c.dom.Element;
 import org.xmlpull.v1.XmlPullParser;
 
 /**
@@ -42,5 +46,30 @@ public abstract class PacketExtensionProvider {
      * @return a new IQ instance.
      * @throws java.lang.Exception if an error occurs parsing the XML.
      */
-    public abstract PacketExtension parseExtension(XmlPullParser parser) throws Exception;
+    protected PacketExtension parseExtension(XmlPullParser parser) throws Exception {
+        throw new RuntimeException("parseIQ(Element) threw UseXmlPullParser, but parseIQ(XmlPullParser) is not implement");
+    }
+
+    /**
+     * Parse an extension sub-packet and create a PacketExtension instance.
+     * <p>
+     * Transitionally, this is optional.  The default implementation converts to an
+     * XmlPullParser and calls {@link #parseExtension(XmlPullParser)}.
+     * 
+     * @param parser the XML element.
+     */
+    public PacketExtension parseExtension(Element packet) throws XMPPException {
+        try {
+            XmlPullParser parser = new XmlPullParserDom(packet, true);
+            if(parser.getEventType() != XmlPullParserDom.START_DOCUMENT)
+                throw new XMPPException("Invalid XmlPullParser state");
+            parser.next();
+            if(parser.getEventType() != XmlPullParserDom.START_TAG)
+                throw new XMPPException("Invalid XmlPullParser state");
+
+            return parseExtension(parser);
+        } catch(Exception e2) {
+            throw new XMPPException(e2);
+        }
+    }
 }

@@ -47,7 +47,9 @@ public abstract class IQProvider {
      * @return a new IQ instance.
      * @throws Exception if an error occurs parsing the XML.
      */
-    public abstract IQ parseIQ(XmlPullParser parser) throws Exception;
+    public IQ parseIQ(XmlPullParser parser) throws Exception {
+        throw new RuntimeException("parseIQ(Element) threw UseXmlPullParser, but parseIQ(XmlPullParser) is not implement");
+    }
 
     /**
      * Parse the IQ sub-document and create an IQ instance. Each IQ must have a

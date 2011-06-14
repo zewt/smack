@@ -1,12 +1,14 @@
 package org.jivesoftware.smack.util;
 
+import java.io.IOException;
 import java.io.StringReader;
 
+import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.packet.XMPPError;
 import org.jivesoftware.smack.test.SmackTestCase;
-import org.xmlpull.v1.XmlPullParserFactory;
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
+import org.w3c.dom.Element;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
 
 public class XMPPErrorTest extends SmackTestCase {
 
@@ -62,10 +64,10 @@ public class XMPPErrorTest extends SmackTestCase {
         // Make the XML to test
     	String xml = "<error code='404' type='cancel'>" +
     			"<item-not-found xmlns='urn:ietf:params:xml:ns:xmpp-stanzas'/>" +
-    			"</error></iq>";
+			"</error>";
         try {
         	// Create the xml parser
-        	XmlPullParser parser = getParserFromXML(xml);
+                Element parser = getParserFromXML(xml);
         	// Create a packet from the xml
         	XMPPError packet = parseError(parser);
         	
@@ -86,7 +88,7 @@ public class XMPPErrorTest extends SmackTestCase {
     			"</error>";
         try {
         	// Create the xml parser
-        	XmlPullParser parser = getParserFromXML(xml);
+                Element parser = getParserFromXML(xml);
         	// Create a packet from the xml
         	XMPPError error = parseError(parser);
         	
@@ -107,7 +109,7 @@ public class XMPPErrorTest extends SmackTestCase {
 	   		"</error>";
        try {
        	// Create the xml parser
-       	XmlPullParser parser = getParserFromXML(xml);
+        Element parser = getParserFromXML(xml);
        	// Create a packet from the xml
        	XMPPError error = parseError(parser);
        	
@@ -133,7 +135,7 @@ public class XMPPErrorTest extends SmackTestCase {
     			"</error>";
         try {
         	// Create the xml parser
-        	XmlPullParser parser = getParserFromXML(xml);
+                Element parser = getParserFromXML(xml);
         	// Create a packet from the xml
         	XMPPError error = parseError(parser);
         	
@@ -158,7 +160,7 @@ public class XMPPErrorTest extends SmackTestCase {
     			"</error>";
         try {
         	// Create the xml parser
-        	XmlPullParser parser = getParserFromXML(xml);
+                Element parser = getParserFromXML(xml);
         	// Create a packet from the xml
         	XMPPError error = parseError(parser);
         	
@@ -169,16 +171,12 @@ public class XMPPErrorTest extends SmackTestCase {
         }
     }
     
-    private XMPPError parseError(XmlPullParser parser) throws Exception {
-    	parser.next();
-    	return PacketParserUtils.parseError(parser);
+    private XMPPError parseError(Element packet) throws XMPPException {
+	return PacketParserUtils.parseError(packet);
     }
     
-    private XmlPullParser getParserFromXML(String xml) throws XmlPullParserException {
-	XmlPullParser parser = XmlPullParserFactory.newInstance().newPullParser();
-    	parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
-    	parser.setInput(new StringReader(xml));
-    	return parser;
+    private Element getParserFromXML(String xml) throws SAXException, IOException {
+        return XmlUtil.getXMLRootNode(new InputSource(new StringReader(xml)));
     }
     
     protected int getMaxConnections() {

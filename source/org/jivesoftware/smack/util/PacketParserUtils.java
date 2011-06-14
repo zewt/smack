@@ -629,43 +629,23 @@ public class PacketParserUtils {
      * @param parser the XML parser, positioned at the starting element of the extension.
      * @return a PacketExtension.
      * @throws Exception if a parsing error occurs.
+     * @deprecated Transitional shim.  Use {@link #parsePacketExtension(String, String, Element)}.
      */
     public static PacketExtension parsePacketExtension(String elementName, String namespace, XmlPullParser parser) throws Exception
     {
-        // See if a provider is registered to handle the extension.
-        PacketExtensionProvider provider = ProviderManager.getInstance().getExtensionProvider(elementName, namespace);
-        if (provider != null) {
-            return provider.parseExtension(parser);
-        }
-        // No providers registered, so use a default extension.
-        DefaultPacketExtension extension = new DefaultPacketExtension(elementName, namespace);
-        boolean done = false;
-        while (!done) {
-            int eventType = parser.next();
-            if (eventType == XmlPullParser.START_TAG) {
-                String name = parser.getName();
-                // If an empty element, set the value with the empty string.
-                if (parser.isEmptyElementTag()) {
-                    extension.setValue(name,"");
-                }
-                // Otherwise, get the the element text.
-                else {
-                    eventType = parser.next();
-                    if (eventType == XmlPullParser.TEXT) {
-                        String value = parser.getText();
-                        extension.setValue(name, value);
-                    }
-                }
-            }
-            else if (eventType == XmlPullParser.END_TAG) {
-                if (parser.getName().equals(elementName)) {
-                    done = true;
-                }
-            }
-        }
-        return extension;
+        Element packet = XmlUtil.ReadNodeFromXmlPull(parser);
+        return parsePacketExtension(elementName, namespace, packet);
     }
 
+    /**
+     * Parses a packet extension sub-packet.
+     *
+     * @param elementName the XML element name of the packet extension.
+     * @param namespace the XML namespace of the packet extension.
+     * @param element the XML element to parse..
+     * @return a PacketExtension.
+     * @throws Exception if a parsing error occurs.
+     */
     public static PacketExtension parsePacketExtension(String elementName, String namespace, Element packet)
     throws XMPPException
     {
@@ -674,7 +654,7 @@ public class PacketParserUtils {
         if (provider != null) {
             XmlPullParser parser = new XmlPullParserDom(packet, true);
             try {
-                return provider.parseExtension(parser);
+                return provider.parseExtension(packet);
             } catch(RuntimeException e) {
                 throw e;
             } catch(Exception e) {
