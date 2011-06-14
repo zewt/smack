@@ -26,11 +26,9 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 import org.jivesoftware.smack.Connection.ListenerWrapper;
-import org.jivesoftware.smack.XMPPStream.PacketCallback;
 import org.jivesoftware.smack.packet.Packet;
 import org.jivesoftware.smack.packet.ReceivedPacket;
 import org.jivesoftware.smack.util.PacketParserUtils;
-import org.jivesoftware.smack.util.XmlPullParserDom;
 import org.w3c.dom.Element;
 
 /**

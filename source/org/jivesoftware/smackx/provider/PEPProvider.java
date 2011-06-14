@@ -26,10 +26,8 @@ import java.util.Map;
 import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.packet.PacketExtension;
 import org.jivesoftware.smack.provider.PacketExtensionProvider;
-import org.jivesoftware.smack.util.XmlPullParserDom;
 import org.jivesoftware.smack.util.XmlUtil;
 import org.w3c.dom.Element;
-import org.xmlpull.v1.XmlPullParser;
 
 /**
  *
