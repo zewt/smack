@@ -84,7 +84,7 @@ public class DelayInformationProvider extends PacketExtensionProvider {
     public DelayInformationProvider() {
     }
 
-    public PacketExtension parseExtension(XmlPullParser parser) throws Exception {
+    protected PacketExtension parseExtension(XmlPullParser parser) throws Exception {
         String stampString = (parser.getAttributeValue("", "stamp"));
         Date stamp = null;
         DateFormat format = null;

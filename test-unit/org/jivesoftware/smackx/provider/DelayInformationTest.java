@@ -25,12 +25,11 @@ import java.util.Properties;
 import java.util.TimeZone;
 
 import org.jivesoftware.smack.util.StringUtils;
+import org.jivesoftware.smack.util.XmlUtil;
 import org.jivesoftware.smackx.packet.DelayInfo;
 import org.jivesoftware.smackx.packet.DelayInformation;
 import org.junit.Test;
-import org.xmlpull.v1.XmlPullParserFactory;
-import org.xmlpull.v1.XmlPullParser;
-import org.xmlpull.v1.XmlPullParserException;
+import org.w3c.dom.Element;
 
 import com.jamesmurty.utils.XMLBuilder;
 
@@ -45,7 +44,6 @@ public class DelayInformationTest {
     public void delayInformationTest() throws Exception {
         DelayInformationProvider p = new DelayInformationProvider();
         DelayInformation delayInfo;
-        XmlPullParser parser;
         String control;
         GregorianCalendar calendar = new GregorianCalendar(2002, 9 - 1, 10, 23, 8, 25);
         calendar.setTimeZone(TimeZone.getTimeZone("UTC"));
@@ -58,15 +56,14 @@ public class DelayInformationTest {
             .t("Offline Storage")
             .asString(outputProperties);
         
-        parser = getParser(control, "x");
+        Element parser = XmlUtil.getXMLRootNode(control);
         delayInfo = (DelayInformation) p.parseExtension(parser);
         
         assertEquals("capulet.com", delayInfo.getFrom());
         assertEquals(date, delayInfo.getStamp());
         assertEquals("Offline Storage", delayInfo.getReason());
 
-        assertEquals(XmlPullParser.END_TAG, parser.getEventType());
-        assertEquals("x", parser.getName());
+        assertEquals("x", parser.getLocalName());
 
         control = XMLBuilder.create("x")
             .a("xmlns", "jabber:x:delay")
@@ -74,23 +71,19 @@ public class DelayInformationTest {
             .a("stamp", "2002-09-10T23:08:25Z")
             .asString(outputProperties);
         
-        parser = getParser(control, "x");
+        parser = XmlUtil.getXMLRootNode(control);
         delayInfo = (DelayInformation) p.parseExtension(parser);
 
         assertEquals("capulet.com", delayInfo.getFrom());
         assertEquals(date, delayInfo.getStamp());
         assertNull(delayInfo.getReason());
-
-        assertEquals(XmlPullParser.END_TAG, parser.getEventType());
-        assertEquals("x", parser.getName());
-
+        assertEquals("x", parser.getLocalName());
     }
 
     @Test
     public void delayInfoTest() throws Exception {
         DelayInformationProvider p = new DelayInfoProvider();
         DelayInfo delayInfo;
-        XmlPullParser parser;
         String control;
         GregorianCalendar calendar = new GregorianCalendar(2002, 9 - 1, 10, 23, 8, 25);
         calendar.setTimeZone(TimeZone.getTimeZone("UTC"));
@@ -103,15 +96,14 @@ public class DelayInformationTest {
             .t("Offline Storage")
             .asString(outputProperties);
 
-        parser = getParser(control, "delay");
+        Element parser = XmlUtil.getXMLRootNode(control);
         delayInfo = (DelayInfo) p.parseExtension(parser);
         
         assertEquals("capulet.com", delayInfo.getFrom());
         assertEquals(date, delayInfo.getStamp());
         assertEquals("Offline Storage", delayInfo.getReason());
 
-        assertEquals(XmlPullParser.END_TAG, parser.getEventType());
-        assertEquals("delay", parser.getName());
+        assertEquals("delay", parser.getLocalName());
         
         control = XMLBuilder.create("delay")
             .a("xmlns", "urn:xmpp:delay")
@@ -119,16 +111,14 @@ public class DelayInformationTest {
             .a("stamp", "2002-09-10T23:08:25Z")
             .asString(outputProperties);
         
-        parser = getParser(control, "delay");
+        parser = XmlUtil.getXMLRootNode(control);
         delayInfo = (DelayInfo) p.parseExtension(parser);
         
         assertEquals("capulet.com", delayInfo.getFrom());
         assertEquals(date, delayInfo.getStamp());
         assertNull(delayInfo.getReason());
 
-        assertEquals(XmlPullParser.END_TAG, parser.getEventType());
-        assertEquals("delay", parser.getName());
-
+        assertEquals("delay", parser.getLocalName());
     }
 
     @Test
@@ -146,7 +136,7 @@ public class DelayInformationTest {
             .a("stamp", "2002-09-10T23:08:25.12Z")
             .asString(outputProperties);
         
-        delayInfo = (DelayInfo) p.parseExtension(getParser(control, "delay"));
+        delayInfo = (DelayInfo) p.parseExtension(XmlUtil.getXMLRootNode(control));
         
         GregorianCalendar cal = (GregorianCalendar) calendar.clone(); 
         cal.add(Calendar.MILLISECOND, 12);
@@ -159,7 +149,7 @@ public class DelayInformationTest {
             .a("stamp", "2002-09-10T23:08:25Z")
             .asString(outputProperties);
         
-        delayInfo = (DelayInfo) p.parseExtension(getParser(control, "delay"));
+        delayInfo = (DelayInfo) p.parseExtension(XmlUtil.getXMLRootNode(control));
         
         assertEquals(calendar.getTime(), delayInfo.getStamp());
 
@@ -170,7 +160,7 @@ public class DelayInformationTest {
             .a("stamp", "2002-9-10T23:08:25Z")
             .asString(outputProperties);
         
-        delayInfo = (DelayInfo) p.parseExtension(getParser(control, "delay"));
+        delayInfo = (DelayInfo) p.parseExtension(XmlUtil.getXMLRootNode(control));
         
         assertEquals(calendar.getTime(), delayInfo.getStamp());
 
@@ -181,7 +171,7 @@ public class DelayInformationTest {
             .a("stamp", "20020910T23:08:25")
             .asString(outputProperties);
         
-        delayInfo = (DelayInfo) p.parseExtension(getParser(control, "delay"));
+        delayInfo = (DelayInfo) p.parseExtension(XmlUtil.getXMLRootNode(control));
         
         assertEquals(calendar.getTime(), delayInfo.getStamp());
 
@@ -201,7 +191,7 @@ public class DelayInformationTest {
             .a("stamp", dateFormat.format(dateInPast.getTime()))
             .asString(outputProperties);
         
-        delayInfo = (DelayInfo) p.parseExtension(getParser(control, "delay"));
+        delayInfo = (DelayInfo) p.parseExtension(XmlUtil.getXMLRootNode(control));
         
         assertEquals(dateInPast.getTime(), delayInfo.getStamp());
 
@@ -212,7 +202,7 @@ public class DelayInformationTest {
             .a("stamp", "200868T09:16:20")
             .asString(outputProperties);
         
-        delayInfo = (DelayInfo) p.parseExtension(getParser(control, "delay"));
+        delayInfo = (DelayInfo) p.parseExtension(XmlUtil.getXMLRootNode(control));
         Date controlDate = StringUtils.parseXEP0082Date("2008-06-08T09:16:20.0Z");
         
         assertEquals(controlDate, delayInfo.getStamp());
@@ -224,25 +214,9 @@ public class DelayInformationTest {
             .a("stamp", "yesterday")
             .asString(outputProperties);
         
-        delayInfo = (DelayInfo) p.parseExtension(getParser(control, "delay"));
+        delayInfo = (DelayInfo) p.parseExtension(XmlUtil.getXMLRootNode(control));
         
         assertNotNull(delayInfo.getStamp());
 
     }
-    
-    private XmlPullParser getParser(String control, String startTag)
-                    throws XmlPullParserException, IOException {
-        XmlPullParser parser = XmlPullParserFactory.newInstance().newPullParser();
-        parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true);
-        parser.setInput(new StringReader(control));
-
-        while (true) {
-            if (parser.next() == XmlPullParser.START_TAG
-                            && parser.getName().equals(startTag)) {
-                break;
-            }
-        }
-        return parser;
-    }
-
 }
